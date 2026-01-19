@@ -1,0 +1,62 @@
+[
+  {
+    "question": "Can you provide specific examples of projects where you utilized your skills in SQL, Kubernetes, and Docker?",
+    "answer": "i have done projects on this",
+    "score": 2,
+    "feedback": "The answer lacks specific examples and does not demonstrate the candidate's experience in utilizing SQL, Kubernetes, and Docker."
+  },
+  {
+    "question": "How have you contributed to improving efficiency or workflow in your previous roles using your IT skills?",
+    "answer": "yes",
+    "score": 1,
+    "feedback": "The answer is vague and does not provide any specific examples of how the candidate has contributed to improving efficiency or workflow."
+  },
+  {
+    "question": "What motivated you to pursue a career in Information Technology and how has your experience shaped your career goals?",
+    "answer": "trying something new",
+    "score": 3,
+    "feedback": "The answer is very brief and does not provide insight into the candidate's motivation or career goals in IT."
+  },
+  {
+    "question": "How do you stay updated on the latest trends and advancements in the IT industry, particularly in the areas of SQL, Kubernetes, and Docker?",
+    "answer": "google and youtube",
+    "score": 4,
+    "feedback": "While Google and YouTube can be sources of information, the answer could be improved by mentioning other resources or methods for staying updated."
+  },
+  {
+    "question": "Can you discuss a challenging problem you encountered in your previous role and how you successfully resolved it using your technical skills?",
+    "answer": "no",
+    "score": 1,
+    "feedback": "The candidate's response indicates a lack of experience in facing and solving challenging problems using technical skills."
+  },
+  {
+    "question": "How do you approach troubleshooting and problem-solving in a fast-paced IT environment?",
+    "answer": "i dont know",
+    "score": 1,
+    "feedback": "The candidate's response suggests a lack of understanding or experience in troubleshooting and problem-solving in a fast-paced IT environment."
+  },
+  {
+    "question": "Have you had experience working in a team setting on IT projects? If so, can you describe your role and contributions?",
+    "answer": "yes done alot of projects",
+    "score": 2,
+    "feedback": "The answer lacks specific details about the candidate's role and contributions in team settings on IT projects."
+  },
+  {
+    "question": "How do you prioritize tasks and manage your time effectively when working on multiple IT projects simultaneously?",
+    "answer": "i dont know",
+    "score": 1,
+    "feedback": "The candidate's response indicates a lack of understanding in prioritizing tasks and time management in a multi-project environment."
+  },
+  {
+    "question": "What certifications or additional training have you pursued to enhance your skills in SQL, Kubernetes, and Docker?",
+    "answer": "aws certifications",
+    "score": 5,
+    "feedback": "While AWS certifications are valuable, the answer could be improved by mentioning specific certifications or training related to SQL, Kubernetes, and Docker."
+  },
+  {
+    "question": "Can you provide examples of how you have effectively communicated technical information to non-technical stakeholders in previous roles?",
+    "answer": "no",
+    "score": 1,
+    "feedback": "The candidate's response indicates a lack of experience in effectively communicating technical information to non-technical stakeholders."
+  }
+]

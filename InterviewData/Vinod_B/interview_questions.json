@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Vinod B",
+    "questions": [
+        "Can you describe your experience working with SQL server databases, including versions 2014 and 2016?",
+        "What are some of the key SQL features you have utilized, such as Joins, Set Operators, and Sub Queries?",
+        "How do you approach writing and optimizing SQL queries, as well as developing Stored Procedures and User-defined functions?",
+        "Can you explain your experience with Triggers, Views, Cursors, and Synonyms in SQL development?",
+        "What is your experience with SSRS in generating reports from SQL server databases, including features like Drill-Down and Cascading Reports?",
+        "How have you handled importing/exporting data between different sources in your projects?",
+        "What transformations have you implemented in SSIS packages, such as Data Conversion, Derived Columns, and Union All?",
+        "Can you discuss your experience with deploying reports and creating subscriptions in SSRS?",
+        "How have you used NANO BI Analytical tool in your projects, particularly in creating tables and deploying reports?",
+        "How do you approach writing complex SQL queries, creating different types of reports, and scheduling stored procedures in your projects?"
+    ]
+}

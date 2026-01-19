@@ -1,0 +1,40 @@
+{
+  "weights": {
+    "JD Match Score": 0.15,
+    "Experience Score": 0.10,
+    "Candidate Type Score": 0.10,
+    "Project Score": 0.20,
+    "Skill Score": 0.20,
+    "Certificate Score": 0.05,
+    "Contribute Score": 0.05,
+    "Soft Skill Score": 0.05,
+    "Industry Penalty": 0.02,
+    "Cultural Fit Score": 0.03,
+    "Effort Score": 0.03,
+    "Penalty Score": 0.02
+  },
+  "skill_rules": {
+    "match": 1.0,
+    "missing": -0.5
+  },
+  "experience_score": {
+    "thresholds": [3, 7],
+    "scores": [1, 2.5, 4]
+  },
+  "candidate_type_score": {
+    "junior": 1.5,
+    "mid-level": 4,
+    "senior": 5
+  },
+  "culture_fit_score": {
+    "low": -0.25,
+    "medium": 1.25,
+    "high": 3
+  },
+  "effort_needed_score": {
+    "high": -0.25,
+    "medium": 1,
+    "low": 3
+  },
+  "normalize_multiplier": 1000
+}

@@ -1,0 +1,14 @@
+Save as link for pip
+https://pip.pypa.io/en/stable/installation/
+
+python get-pip.py
+
+then add it to paths
+
+
+pip install watchdog
+pip install pandas PyPDF2 openai langchain
+pip install langchain langchain-community langchain-openai
+
+
+assembly ai == 2fe815b7fbf04031a734833c686a7d2a

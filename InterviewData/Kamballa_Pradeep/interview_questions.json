@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Kamballa Pradeep",
+    "questions": [
+        "Can you elaborate on your experience with Microsoft SQL Server and how you have utilized Transact-SQL in your professional software development projects?",
+        "How have you contributed to enhancing the performance of SQL Server databases by creating and updating Clustered and Non-Clustered Indexes?",
+        "Could you provide examples of how you have implemented business logic using Triggers, Indexes, Views, and Stored Procedures in your previous projects?",
+        "In what ways have you optimized queries by creating various clustered and non-clustered indexes and indexed views in SQL Server?",
+        "Can you discuss your experience with authoring and deploying SQL Server Integration Services (SSIS) packages, and how you have used them in your projects?",
+        "How have you applied your knowledge of relational database models, including constructing Procedures, Triggers, Tables, Table variables, user-defined functions, and views, in your software development work?",
+        "What methodologies have you used for analyzing and understanding business requirements in projects, and how have you implemented ETL and business logic with various tasks and transformations?",
+        "How have you been involved in unit testing against developed packages and ensuring security and roles in SQL Server environments?",
+        "Can you provide examples of how you have written migration queries for data migration and report purposes, and how you have developed dynamic SQL queries with manipulated data?",
+        "How have you collaborated with development and QA teams in coordinating development activities and enhancing existing code according to client requirements in your previous role as a SQL Developer?"
+    ]
+}

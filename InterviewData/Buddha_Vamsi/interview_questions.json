@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Buddha Vamsi",
+    "questions": [
+        "Can you provide an example of a project where you designed the database architecture for a client project at Fluentgrid Limited?",
+        "How have you utilized your expertise in SQL and PLSQL to create and modify tables, views, stored procedures, functions, and indexes in your current role as a Database Engineer?",
+        "Can you explain a specific instance where you used triggers, temporary tables, and CTE recursive methods in your database development work?",
+        "How have you leveraged your skills in Business Intelligence tools like Pentaho Kettle to write transformations (ETL) in your projects?",
+        "What experience do you have in configuring, tuning, and maintaining MS-SQL Server and PL/SQL-Oracle database servers at Fluentgrid Limited?",
+        "Can you describe a challenging situation you encountered while creating ETL jobs and monitoring their performance? How did you overcome it?",
+        "How has your academic background in Computer Science Engineering contributed to your proficiency in database tools such as Sybase ASE, Oracle, and Pentaho data integration?",
+        "What motivated you to participate in workshops on topics like mobile application development, security and software engineering, and cloud computing technology?",
+        "How do you stay updated with the latest trends in database technologies and programming languages like Core Java, HTML, and CSS?",
+        "In what ways do you believe your experience and skills make you a valuable asset to a potential employer in the IT industry?"
+    ]
+}

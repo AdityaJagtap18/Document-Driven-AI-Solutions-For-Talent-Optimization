@@ -1,0 +1,33 @@
+[2025-04-13 16:07:12] BE Project — Resume Parsing Started
+[2025-04-13 16:07:15] BE Project Resume Parsing Start
+[2025-04-13 16:07:15] Parsing started: resume_10.pdf
+[2025-04-13 16:07:15] Details: {
+  "API Token Used": 0,
+  "API Cost ($)": 0.0,
+  "Time Taken (sec)": 0.0,
+  "resume_name": "resume_10.pdf"
+}
+[2025-04-13 16:07:15] Parsing completed: resume_10.pdf
+[2025-04-13 16:07:15] Name: N/A | JD Match: N/A | Score: N/A | Tokens: 0 | Cost: $0.000000 | Time: 0.0 sec
+[2025-04-13 16:07:15] ✅ Completed: resume_10.pdf
+[2025-04-13 16:07:15] Parsing started: resume_8.pdf
+[2025-04-13 16:07:15] Details: {
+  "API Token Used": 0,
+  "API Cost ($)": 0.0,
+  "Time Taken (sec)": 0.0,
+  "resume_name": "resume_8.pdf"
+}
+[2025-04-13 16:07:15] Parsing completed: resume_8.pdf
+[2025-04-13 16:07:15] Name: N/A | JD Match: N/A | Score: N/A | Tokens: 0 | Cost: $0.000000 | Time: 0.0 sec
+[2025-04-13 16:07:15] ✅ Completed: resume_8.pdf
+[2025-04-13 16:07:15] Parsing started: resume_9.pdf
+[2025-04-13 16:07:15] Details: {
+  "API Token Used": 0,
+  "API Cost ($)": 0.0,
+  "Time Taken (sec)": 0.0,
+  "resume_name": "resume_9.pdf"
+}
+[2025-04-13 16:07:15] Parsing completed: resume_9.pdf
+[2025-04-13 16:07:15] Name: N/A | JD Match: N/A | Score: N/A | Tokens: 0 | Cost: $0.000000 | Time: 0.0 sec
+[2025-04-13 16:07:15] ✅ Completed: resume_9.pdf
+[2025-04-13 16:10:32] BE Project Resume Parsing Start

@@ -1,0 +1,14 @@
+[
+  {
+    "question": "1. Hi Aditya! It's great to have you here. Can you tell me about a project or accomplishment that you're really proud of from your experience with Python, TensorFlow, or PyTorch?",
+    "answer": "I have created an airport for recruitment processes and yeah that's one of my most you know you stand favourite"
+  },
+  {
+    "question": "2. Welcome, Aditya! How did you first become interested in working with deep learning and cloud platforms? Was there a particular moment or experience that sparked your passion for these technologies?",
+    "answer": "when I learn deep learning in college I was very infrared with what it can do and how beneficial it is that's the time when I was interested in deep learning and with cloud platforms have was more into it because of scalability as I found housekeeper different platforms like AWS are that's when I actually started doing cloud also"
+  },
+  {
+    "question": "3. Hello, Aditya! When you're not busy coding or working on data projects, what do you enjoy doing in your free time? Any hobbies or interests that help you unwind from the tech world?",
+    "answer": "yeah I like to read"
+  }
+]

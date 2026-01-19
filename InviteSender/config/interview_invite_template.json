@@ -1,0 +1,4 @@
+{
+  "subject_template": "Interview Scheduled with CDIP Recruitment – {candidate_name}",
+  "body_template": "Dear {candidate_name},\n\nWe are pleased to invite you for an interview as part of the next steps in our recruitment process.\n\n Date: {interview_date} ({interview_day})\n Time: {interview_start} – {interview_end}\n Slot: {interview_slot}\n Interview Link: {interview_link}\n\nPlease find your calendar invite attached. Ensure your availability during the mentioned slot.\n\nBest wishes,\nGroup 3 – DY Patil College of Engineering\nCognitive Resume Intelligence"
+}

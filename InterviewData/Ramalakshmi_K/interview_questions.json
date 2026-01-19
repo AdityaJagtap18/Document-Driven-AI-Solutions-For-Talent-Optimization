@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Ramalakshmi K",
+    "questions": [
+        "Can you explain your experience working with Microsoft SQL Server/Microsoft BI and AWS Redshift?",
+        "How have you utilized your skills in Business Intelligence (BI), Data Warehouse (DWH), and Data Analytics in your previous projects?",
+        "What tools have you worked with in the past such as SQL Server Management Studio, Microsoft Visual Studio, Business Intelligence Development Studio, and SSIS?",
+        "Can you provide an example of a project where you wrote scripts and indexing strategies for a migration to AWS Redshift from SQL Server and MySQL databases?",
+        "How have you used SSIS to create packages and data flow transformations in your previous roles?",
+        "Describe your experience in writing complex SQL queries, joins, and importing/exporting data between databases and files",
+        "How have you applied Python and SQL in your technical projects, particularly with libraries such as Numpy, Pandas, and Matplotlib?",
+        "In what ways have you used ETL tools like SSIS and cloud platforms like AWS Redshift in your projects?",
+        "Can you elaborate on your role as a Software Developer at Bixware Technologies, specifically in the ETL and Cube projects for More Retail Limited?",
+        "How have you contributed to the development and maintenance of sales and inventory cubes, as well as the deployment of monitoring systems on AWS in your previous roles?"
+    ]
+}

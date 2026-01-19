@@ -1,0 +1,23 @@
+[
+  {
+    "question": "1. Hi Rajendra! It's great to have you here. Can you share a bit about your journey with us? What inspired you to pursue a career in the tech industry?",
+    "answer": [
+      "yeah sure I've been working in it for 5 years",
+      null
+    ]
+  },
+  {
+    "question": "2. With your impressive 7.7 years of experience, you must have some interesting stories to tell. Could you share a memorable moment from your professional career that has stayed with you?",
+    "answer": [
+      "no",
+      null
+    ]
+  },
+  {
+    "question": "3. Your skills in Python, TensorFlow, and deep learning are truly impressive! How do you usually stay updated with the latest trends and advancements in the field of technology?",
+    "answer": [
+      "Google",
+      null
+    ]
+  }
+]

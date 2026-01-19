@@ -1,0 +1,4 @@
+[2025-04-09 12:32:27] BE Project Resume Parsing Start
+[2025-04-09 12:32:27] Parsing started: resume_2.pdf
+[2025-04-09 12:32:27] Parsing started: resume_3.pdf
+[2025-04-09 12:32:27] Parsing started: resume_4.pdf

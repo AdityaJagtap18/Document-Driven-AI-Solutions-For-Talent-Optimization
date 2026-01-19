@@ -1,0 +1,116 @@
+[2025-04-10 08:35:38] BE Project — Resume Parsing Started
+[2025-04-10 08:35:41] BE Project Resume Parsing Start
+[2025-04-10 08:35:41] Parsing started: resume_10.pdf
+[2025-04-10 08:35:52] Details: {
+  "Name": "Dishani Shan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "NLP",
+      "computer vision",
+      "reinforcement learning",
+      "big data technologies",
+      "MLOps",
+      "CI/CD pipelines"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "data preprocessing",
+    "feature engineering"
+  ],
+  "Profile Summary": "Experienced Agricultural consultant with a strong background in data analysis and model training. Seeking to transition into a Machine Learning Developer role to apply expertise in developing intelligent models.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Unleash vertical e-markets Certification"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Data Analysis"
+  ],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Agriculture",
+  "Culture Fit Assessment": "Medium - While the candidate has relevant technical skills, there are gaps in experience with specific ML technologies and methodologies.",
+  "Potential Concerns": [
+    "Lack of experience with NLP, computer vision, reinforcement learning, big data technologies, MLOps, and CI/CD pipelines"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "Moderate growth potential within the company, with the need for upskilling in certain areas.",
+  "Effort Needed by the Company": "Medium - The candidate shows promise but requires training and development in specific technical areas.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "4",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows potential for growth with the right training and support.",
+  "resume_name": "resume_10.pdf"
+}
+[2025-04-10 08:35:52] Parsing completed: resume_10.pdf
+[2025-04-10 08:35:52] Parsing started: resume_9.pdf
+[2025-04-10 08:36:19] Details: {
+  "Name": "Yuvraj Raval",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "TensorFlow",
+      "PyTorch"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": [
+      "Regression",
+      "Classification",
+      "Clustering",
+      "Deep Learning"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Machine Learning",
+    "Data Analysis"
+  ],
+  "Profile Summary": "Experienced control and instrumentation engineer with a strong background in data analysis and machine learning. Skilled in SQL, Node.js, and machine learning algorithms.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Architect out-of-the-box portals Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "",
+  "Culture Fit Assessment": "Medium - Candidate has relevant technical skills but lacks experience with specific tools and technologies mentioned in the job description.",
+  "Potential Concerns": [
+    "Lack of experience with specific ML frameworks and cloud platforms"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "Moderate growth potential based on existing skills and experience.",
+  "Effort Needed by the Company": "Medium - Candidate will require training and upskilling to meet the technical requirements of the role.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "",
+  "resume_name": "resume_9.pdf"
+}
+[2025-04-10 08:36:19] Parsing completed: resume_9.pdf

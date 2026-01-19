@@ -1,0 +1,10 @@
+{
+  "smtp_email": "noreply.cidp.in@gmail.com",
+  "smtp_password": "bopr sawv zbju hwbd",
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "imap_email": "cognitivedocumentintelligecepl@gmail.com",
+  "imap_password": "dekq drdn vmkr dkhq",
+  "imap_server": "imap.gmail.com",
+  "talent_acquisition_email": "aditya.jagtapin@gmail.com"
+}

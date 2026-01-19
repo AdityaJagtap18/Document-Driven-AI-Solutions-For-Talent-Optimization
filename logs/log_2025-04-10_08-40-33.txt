@@ -1,0 +1,117 @@
+[2025-04-10 08:40:33] BE Project — Resume Parsing Started
+[2025-04-10 08:40:36] BE Project Resume Parsing Start
+[2025-04-10 08:40:36] Parsing started: resume_4.pdf
+[2025-04-10 08:40:44] Details: {
+  "Name": "Seher Ganesh",
+  "JD Match": "60%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "TensorFlow",
+      "PyTorch"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": [
+      "Regression",
+      "Classification",
+      "Clustering",
+      "Deep Learning"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Data Analysis",
+    "Machine Learning",
+    "Model Training"
+  ],
+  "Profile Summary": "Experienced Engineer with a background in water engineering and strong skills in Java, Node.js, and SQL. Seeking to transition into a Machine Learning Developer role to design, develop, and deploy intelligent models.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Incubate bricks-and-clicks users Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "",
+  "Culture Fit Assessment": "Medium - Candidate has some relevant skills but lacks key technical skills and tools required for the role.",
+  "Potential Concerns": [
+    "Lack of experience with Python and ML frameworks like TensorFlow and PyTorch"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "Moderate growth potential with additional training and upskilling.",
+  "Effort Needed by the Company": "High - Significant training and support required to bridge the skill gap.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "2",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows potential but will need additional training to meet the technical requirements of the Machine Learning Developer role.",
+  "resume_name": "resume_4.pdf"
+}
+[2025-04-10 08:40:44] Parsing completed: resume_4.pdf
+[2025-04-10 08:40:44] Parsing started: resume_5.pdf
+[2025-04-10 08:40:51] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "data preprocessing",
+    "cloud platforms"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in Python and ML frameworks. Skilled in developing, training, and deploying machine learning models for various applications.",
+  "Projects": [
+    {
+      "Project Name": "Project 1",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "AWS"
+      ],
+      "Impact": "Improved model performance by 20% through optimization techniques."
+    }
+  ],
+  "Certifications & Courses": [
+    "Machine Learning Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Teamwork"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - Candidate's technical skills and experience align well with the job description.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company.",
+  "Effort Needed by the Company": "Low - Candidate has relevant experience and skills for the role.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 1,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows strong potential for contributing to machine learning projects.",
+  "resume_name": "resume_5.pdf"
+}
+[2025-04-10 08:40:51] Parsing completed: resume_5.pdf

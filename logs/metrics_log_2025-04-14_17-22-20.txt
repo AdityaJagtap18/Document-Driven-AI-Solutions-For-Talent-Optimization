@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "C:\Users\adity\BE Project\BEProjectResumeParser\ResumeMEtrics.py", line 168, in <module>
+    print(f"\u2705 Saved to: {metrics_csv_path.resolve()} using config scoring.")
+  File "C:\Users\adity\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 0: character maps to <undefined>

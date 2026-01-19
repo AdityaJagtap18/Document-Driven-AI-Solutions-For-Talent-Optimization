@@ -1,0 +1,339 @@
+[2025-04-13 15:57:14] BE Project — Resume Parsing Started
+[2025-04-13 15:57:37] BE Project Resume Parsing Start
+[2025-04-13 15:57:37] Parsing started: resume_1.pdf
+[2025-04-13 15:57:45] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "regression",
+    "classification",
+    "clustering",
+    "deep learning"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in developing and deploying intelligent models to solve real-world problems.",
+  "Projects": [
+    {
+      "Project Name": "N/A",
+      "Relevance to JD": "N/A",
+      "Technologies Used": [],
+      "Impact": "N/A"
+    }
+  ],
+  "Certifications & Courses": [
+    "Unleash customized initiatives"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - The candidate has relevant experience and skills for the Machine Learning Developer role.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company.",
+  "Effort Needed by the Company": "Low - The candidate is well-suited for the Machine Learning Developer role and requires minimal training or onboarding.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "The candidate shows promise and alignment with the job description.",
+  "resume_name": "resume_1.pdf"
+}
+[2025-04-13 15:57:45] Parsing completed: resume_1.pdf
+[2025-04-13 15:57:45] Name: Candidate Name | JD Match: 80% | Score: 8.0 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:57:45] ✅ Completed: resume_1.pdf
+[2025-04-13 15:57:45] Parsing started: resume_2.pdf
+[2025-04-13 15:57:51] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "Machine Learning"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with strong programming skills in Python and expertise in ML frameworks like TensorFlow and PyTorch. Skilled in data processing, model training, and deployment.",
+  "Projects": [
+    {
+      "Project Name": "N/A",
+      "Relevance to JD": "N/A",
+      "Technologies Used": [],
+      "Impact": "N/A"
+    }
+  ],
+  "Certifications & Courses": [
+    "Expedite intuitive action-items Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "N/A",
+  "Culture Fit Assessment": "High - The candidate's technical skills align well with the job description requirements.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company due to relevant experience and skills.",
+  "Effort Needed by the Company": "Low - The candidate is well-equipped to handle the responsibilities of the role with minimal training.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "2",
+  "Employment Gaps Detected": true,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "N/A",
+  "resume_name": "resume_2.pdf"
+}
+[2025-04-13 15:57:51] Parsing completed: resume_2.pdf
+[2025-04-13 15:57:51] Name: Candidate Name | JD Match: 80% | Score: 8.0 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:57:51] ✅ Completed: resume_2.pdf
+[2025-04-13 15:57:51] Parsing started: resume_3.pdf
+[2025-04-13 15:58:00] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "TensorFlow",
+      "PyTorch",
+      "Keras",
+      "AWS",
+      "GCP",
+      "Azure",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Tools & Technologies": [
+      "Spark",
+      "Hadoop"
+    ],
+    "Concepts & Methodologies": [
+      "NLP",
+      "Computer Vision",
+      "Reinforcement Learning",
+      "MLOps",
+      "CI/CD"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Machine Learning",
+    "Python",
+    "Data Processing",
+    "Model Training",
+    "Deployment"
+  ],
+  "Profile Summary": "Experienced Medical sales representative with a strong background in Machine Learning and Python. Seeking to transition into a role as a Machine Learning Developer.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Incubate rich e-tailers Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Healthcare",
+  "Culture Fit Assessment": "Medium - The candidate has relevant experience in healthcare but lacks some key technical skills required for the role.",
+  "Potential Concerns": [
+    "Lack of experience with specific ML frameworks and cloud platforms"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth with additional training and experience in relevant tools and technologies.",
+  "Effort Needed by the Company": "Medium - The candidate shows promise but will require additional training and support to fully meet the job requirements.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "0",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows potential for growth with the right training and development opportunities.",
+  "resume_name": "resume_3.pdf"
+}
+[2025-04-13 15:58:00] Parsing completed: resume_3.pdf
+[2025-04-13 15:58:00] Name: Candidate Name | JD Match: 70% | Score: 6.5 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:58:00] ✅ Completed: resume_3.pdf
+[2025-04-13 15:58:00] Parsing started: resume_4.pdf
+[2025-04-13 15:58:13] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "TensorFlow",
+      "PyTorch"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": [
+      "Regression",
+      "Classification",
+      "Clustering",
+      "Deep Learning",
+      "NLP",
+      "Computer Vision",
+      "Reinforcement Learning",
+      "Spark",
+      "Hadoop",
+      "MLOps",
+      "CI/CD"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Machine Learning Developer",
+    "Data Processing",
+    "Model Training",
+    "Deployment",
+    "Data Analysis"
+  ],
+  "Profile Summary": "Experienced Engineer with a background in water engineering and data analysis, seeking to transition into a Machine Learning Developer role to apply skills in data processing, model training, and deployment.",
+  "Projects": [
+    {
+      "Project Name": "N/A",
+      "Relevance to JD": "N/A",
+      "Technologies Used": [],
+      "Impact": "N/A"
+    }
+  ],
+  "Certifications & Courses": [
+    "Incubate bricks-and-clicks users Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication"
+  ],
+  "Industry Experience": "N/A",
+  "Culture Fit Assessment": "Medium - The candidate shows potential to adapt to the machine learning environment but may require additional training.",
+  "Potential Concerns": [
+    "Lack of experience with key ML frameworks and tools"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited experience in relevant technologies"
+  ],
+  "Candidate\u2019s Growth Potential": "Moderate growth potential with additional training and exposure to relevant tools and technologies.",
+  "Effort Needed by the Company": "High - The candidate will require significant training and upskilling to meet the job requirements.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "2",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows potential but will need additional training and exposure to key ML frameworks and tools.",
+  "resume_name": "resume_4.pdf"
+}
+[2025-04-13 15:58:13] Parsing completed: resume_4.pdf
+[2025-04-13 15:58:13] Name: Candidate Name | JD Match: 70% | Score: 6.5 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:58:13] ✅ Completed: resume_4.pdf
+[2025-04-13 15:58:13] Parsing started: resume_5.pdf
+[2025-04-13 15:58:20] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "regression",
+    "deep learning",
+    "NLP",
+    "computer vision",
+    "reinforcement learning",
+    "Spark",
+    "MLOps",
+    "CI/CD pipelines"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in Python programming and deep learning algorithms. Proficient in developing and deploying ML models for real-world applications.",
+  "Projects": [
+    {
+      "Project Name": "Project 1",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "Spark"
+      ],
+      "Impact": "Improved model performance by implementing advanced NLP techniques."
+    }
+  ],
+  "Certifications & Courses": [
+    "Machine Learning Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - Candidate's technical skills and experience align well with the job requirements.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company.",
+  "Effort Needed by the Company": "Low - Candidate is well-equipped to handle the responsibilities of the role.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 1,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows strong potential for contributing to ML projects within the company.",
+  "resume_name": "resume_5.pdf"
+}
+[2025-04-13 15:58:20] Parsing completed: resume_5.pdf
+[2025-04-13 15:58:20] Name: Candidate Name | JD Match: 80% | Score: 8.0 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:58:20] ✅ Completed: resume_5.pdf
+[2025-04-13 15:58:20] Parsing started: resume_6.pdf
+[2025-04-13 15:58:31] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "90%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "Machine Learning"
+  ],
+  "Profile Summary": "Experienced Surveyor seeking a position as a Machine Learning Developer with strong programming skills in Python and experience with ML frameworks like TensorFlow and PyTorch.",
+  "Projects": [],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Insurance",
+  "Culture Fit Assessment": "High - Candidate has relevant experience and skills for the job role.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company.",
+  "Effort Needed by the Company": "Low - Candidate already possesses the required technical skills and experience.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "2",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with the job description and has the potential to excel in the role.",
+  "resume_name": "resume_6.pdf"
+}
+[2025-04-13 15:58:31] Parsing completed: resume_6.pdf
+[2025-04-13 15:58:31] Name: Candidate Name | JD Match: 90% | Score: 8.5 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:58:31] ✅ Completed: resume_6.pdf

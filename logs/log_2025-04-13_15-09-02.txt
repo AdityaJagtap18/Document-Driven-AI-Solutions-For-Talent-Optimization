@@ -1,0 +1,142 @@
+[2025-04-13 15:09:02] BE Project — Resume Parsing Started
+[2025-04-13 15:09:04] BE Project Resume Parsing Start
+[2025-04-13 15:09:04] Parsing started: Priyal-Resume.pdf
+[2025-04-13 15:09:12] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "TensorFlow",
+      "PyTorch"
+    ],
+    "Tools & Technologies": [
+      "GCP",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": [
+      "Regression",
+      "Classification",
+      "Clustering",
+      "Deep Learning",
+      "NLP",
+      "Computer Vision",
+      "Reinforcement Learning",
+      "Spark",
+      "Hadoop",
+      "MLOps",
+      "CI/CD"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "Machine Learning",
+    "Cloud Platforms",
+    "APIs"
+  ],
+  "Profile Summary": "Experienced DevOps and Full Stack Developer with a strong foundation in cloud platforms, automation, and scripting. Skilled in developing AI-driven solutions and setting up media server environments.",
+  "Projects": [
+    {
+      "Project Name": "Media Server Environment Setup",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Cloud Platforms",
+        "Automation & Scripting"
+      ],
+      "Impact": "Successfully set up a media server environment to optimize media storage and access."
+    },
+    {
+      "Project Name": "AI-driven Talent Optimization Platform",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Machine Learning"
+      ],
+      "Impact": "Developed an AI-driven platform to optimize talent selection and management."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python",
+    "Cloud Platforms",
+    "Automation & Scripting"
+  ],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "",
+  "Culture Fit Assessment": "Medium - The candidate has relevant technical skills but lacks experience with specific ML frameworks and technologies mentioned in the job description.",
+  "Potential Concerns": [
+    "Lack of experience with specific ML frameworks and technologies mentioned in the job description."
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company with further training and exposure to ML frameworks and technologies.",
+  "Effort Needed by the Company": "Medium - The candidate has a strong technical foundation but requires additional training in specific ML frameworks and technologies.",
+  "Resume Strength Score": "7.0",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 2,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "",
+  "resume_name": "Priyal-Resume.pdf"
+}
+[2025-04-13 15:09:12] Parsing completed: Priyal-Resume.pdf
+[2025-04-13 15:09:12] Name: Candidate Name | JD Match: 80% | Score: 7.0 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:09:12] ✅ Completed: Priyal-Resume.pdf
+[2025-04-13 15:09:12] Parsing started: resume_5.pdf
+[2025-04-13 15:09:21] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "90%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "data preprocessing",
+    "cloud platforms"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with expertise in developing and deploying intelligent models for various applications.",
+  "Projects": [
+    {
+      "Project Name": "Project A",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "AWS"
+      ],
+      "Impact": "Improved model performance by 20% through optimization techniques."
+    }
+  ],
+  "Certifications & Courses": [
+    "Machine Learning Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Problem-solving"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - Candidate has a strong background in machine learning and relevant technologies.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company.",
+  "Effort Needed by the Company": "Low - Candidate has the required skills and experience for the role.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 1,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Strong technical background and relevant experience in machine learning.",
+  "resume_name": "resume_5.pdf"
+}
+[2025-04-13 15:09:21] Parsing completed: resume_5.pdf
+[2025-04-13 15:09:21] Name: Candidate Name | JD Match: 90% | Score: 8.5 | Tokens: 0 | Cost: $0.000000 | Time: 0 sec
+[2025-04-13 15:09:21] ✅ Completed: resume_5.pdf

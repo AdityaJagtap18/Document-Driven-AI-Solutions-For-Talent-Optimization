@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Prem Sai",
+    "questions": [
+        "Can you explain your experience in scripting T-SQL queries, Stored Procedures, User Defined Functions, and Triggers?",
+        "How have you utilized Sub-Queries, Derived tables, and Joins to simplify complex queries involving multiple tables?",
+        "What is your approach to performing Error Handling and performance tuning in Stored Procedures?",
+        "Can you provide examples of how you have used Temporary tables, Table Variables, and CTE's (Common Table Expressions) in your projects?",
+        "How have you been involved in creating and maintaining database objects like Indexes, Functions, views, UDF\u2019s, and constraints?",
+        "What is your experience with using Ranking Functions, Date Functions, String Functions, and Aggregate Functions in SQL Server?",
+        "Can you discuss your knowledge of Transactions, Isolation levels, and Concurrency Problems in SQL Server?",
+        "How have you built Relationships using Constraints in your database design?",
+        "What is your familiarity with creating automated processes using SQL Server Agent Jobs?",
+        "How have you adapted to and utilized new features in SQL Server 2016 and 2019 in your projects?"
+    ]
+}

@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Ramesh Nataru",
+    "questions": [
+        "Can you walk us through your experience with designing, developing, and supporting Microsoft SQL Server 2008, 8R2, and 2012?",
+        "How have you utilized Joins, Set Operators, Temporary Tables, Table Variables, CTE/Derived Tables, and sub-Queries in your work?",
+        "Can you provide examples of your experience in constructing Tables, Views, Indexes, Synonyms, Functions, Cursors, and Stored Procedures in SQL Server?",
+        "How have you used ETL tools like SSIS, Bulk Insert, and BCP for Data Extraction, Transformation, and Loading in your projects?",
+        "What is your experience with designing and developing SQL Server Integration Services (SSIS) packages, including control flow tasks like Data Flow Task and For Loop Container?",
+        "How have you implemented different transformations like Data Conversion, Conditional Split, Merge, Merge Join, and Union All in your SSIS packages?",
+        "Can you discuss your approach to providing Logging and Error Handling in SSIS packages using Event Handler, Checkpoints, and logging techniques?",
+        "How have you designed and deployed various types of reports using SSRS, including features like Group-by, Drill-Down, Parameterized Reports, and Report builder?",
+        "Can you explain your process for Deploying SSIS Packages and SSRS reports, as well as updating information based on business logic using SQL Server Agent and Windows Scheduler?",
+        "How have you applied your knowledge of SQL Profiler, performance tuning, Query tuning, and new features in advanced versions of SQL Server in your projects?"
+    ]
+}

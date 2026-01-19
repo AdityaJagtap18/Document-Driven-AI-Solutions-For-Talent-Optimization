@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Neeraj Mishra",
+    "questions": [
+        "Can you provide an example of a complex SQL query you have written to implement a business requirement in your previous projects?",
+        "How have you utilized DML and DDL operations to meet specific business requirements in your experience as an Oracle Developer?",
+        "What experience do you have in resolving production issues by modifying backend codes as needed?",
+        "How have you contributed to the development of backend code, including altering tables, adding new columns, constraints, sequences, and indexes based on business requirements?",
+        "Can you explain your role in creating procedures, functions, triggers, and views in your Oracle projects?",
+        "How have you utilized SQL*Loader in loading data into different tables in your projects?",
+        "How have you coordinated with DBAs to improve database performance in your previous roles?",
+        "Can you discuss a specific instance where you enhanced current functionality to improve system performance in a project?",
+        "How do you approach gathering requirements from business users and analyzing them to implement in your projects?",
+        "Can you provide an example of a project where you worked on change/business requirements and how you handled the analysis and resolution of production incidents?"
+    ]
+}

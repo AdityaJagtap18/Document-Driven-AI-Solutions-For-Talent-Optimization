@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Rajupavana Kumari",
+    "questions": [
+        "Can you elaborate on your experience in creating database objects such as Stored Procedures, Functions, Views, Indexes, and Joins to facilitate efficient data manipulation and data consistency?",
+        "How have you utilized Derived Tables, Sub-Queries, Set Operators, and Joins to write complex queries in SQL?",
+        "Can you share your experience with Temporary Objects in SQL, such as CTE, Temporary Table, and Table Variable?",
+        "How have you utilized SQL Profiler for debugging queries in your professional experience?",
+        "Explain your experience in creating and updating Clustered and Non-Clustered Indexes to enhance SQL Server performance",
+        "Can you discuss a specific project where you developed physical data models and created DDL scripts to create database schema and objects? What challenges did you face and how did you overcome them?",
+        "How did you use Joins and sub-Queries to simplify complex queries involving multiple tables in your projects? Can you provide an example of how you optimized procedures and triggers for production use?",
+        "What methodologies have you employed for disaster recovery procedures and policies for backup and recovery of databases in your projects?",
+        "How have you performed performance tuning in SQL Server using SQL Profiler and data loading techniques in your projects?",
+        "Can you walk us through your role as a Software Developer in the Workers Compensation Management project? How did you contribute to the design, development, and testing of the system, and what were the key outcomes of your involvement?"
+    ]
+}

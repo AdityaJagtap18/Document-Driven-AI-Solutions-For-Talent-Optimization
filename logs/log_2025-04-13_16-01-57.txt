@@ -1,0 +1,189 @@
+[2025-04-13 16:01:57] BE Project — Resume Parsing Started
+[2025-04-13 16:01:57] BE Project Resume Parsing Start
+[2025-04-13 16:01:57] Parsing started: resume_11.pdf
+[2025-04-13 16:02:04] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "60%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "PyTorch",
+      "Regression",
+      "Clustering",
+      "Feature Engineering",
+      "APIs",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure"
+    ],
+    "Concepts & Methodologies": [
+      "NLP",
+      "Computer Vision",
+      "Reinforcement Learning",
+      "Spark",
+      "Hadoop",
+      "MLOps",
+      "CI/CD"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Machine Learning",
+    "Python",
+    "TensorFlow",
+    "Data Analysis"
+  ],
+  "Profile Summary": "Experienced Surveyor with a strong background in Machine Learning, Python, and Data Analysis seeking a challenging position as a Machine Learning Developer to apply skills and grow professionally.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Monetize customized platforms"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Building control",
+  "Culture Fit Assessment": "Medium - The candidate has relevant skills and experience but lacks some key technical skills and tools required for the role.",
+  "Potential Concerns": [
+    "Lack of experience with specific ML frameworks and cloud platforms"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High - With additional training and experience, the candidate has the potential to excel in a Machine Learning Developer role.",
+  "Effort Needed by the Company": "High - The company will need to provide training and support to bridge the candidate's skill gaps.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "2",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "",
+  "API Token Used": 0,
+  "API Cost ($)": 0,
+  "Time Taken (sec)": 6.57,
+  "resume_name": "resume_11.pdf"
+}
+[2025-04-13 16:02:04] Parsing completed: resume_11.pdf
+[2025-04-13 16:02:04] Name: Candidate Name | JD Match: 60% | Score: 6.5 | Tokens: 0 | Cost: $0.000000 | Time: 6.57 sec
+[2025-04-13 16:02:04] ✅ Completed: resume_11.pdf
+[2025-04-13 16:02:04] Parsing started: resume_12.pdf
+[2025-04-13 16:02:15] Details: {
+  "Name": "Candidate Name",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "NumPy",
+      "Pandas",
+      "Scikit-learn",
+      "TensorFlow",
+      "PyTorch"
+    ],
+    "Tools & Technologies": [
+      "AWS",
+      "GCP",
+      "Azure",
+      "Docker",
+      "Kubernetes"
+    ],
+    "Concepts & Methodologies": [
+      "Regression",
+      "Classification",
+      "Clustering",
+      "Deep Learning"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "Machine Learning"
+  ],
+  "Profile Summary": "Experienced Marine scientist with a background in Machine Learning and Python programming. Skilled in data processing and model training.",
+  "Projects": [
+    {
+      "Project Name": "N/A",
+      "Relevance to JD": "N/A",
+      "Technologies Used": [],
+      "Impact": "N/A"
+    }
+  ],
+  "Certifications & Courses": [
+    "Strategize virtual systems"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python",
+    "Machine Learning"
+  ],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "N/A",
+  "Culture Fit Assessment": "Medium - Candidate has relevant technical skills but lacks experience with specific tools and technologies mentioned in the JD.",
+  "Potential Concerns": [
+    "Lack of experience with specific ML frameworks and cloud platforms"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth with additional training and exposure to relevant tools and technologies.",
+  "Effort Needed by the Company": "Medium - Company may need to provide training on specific tools and technologies mentioned in the JD.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows potential in transitioning to a Machine Learning role with additional training and exposure to relevant tools and technologies.",
+  "API Token Used": 0,
+  "API Cost ($)": 0,
+  "Time Taken (sec)": 10.55,
+  "resume_name": "resume_12.pdf"
+}
+[2025-04-13 16:02:15] Parsing completed: resume_12.pdf
+[2025-04-13 16:02:15] Name: Candidate Name | JD Match: 70% | Score: 6.5 | Tokens: 0 | Cost: $0.000000 | Time: 10.55 sec
+[2025-04-13 16:02:15] ✅ Completed: resume_12.pdf
+[2025-04-13 16:02:15] Parsing started: resume_13.pdf
+[2025-04-13 16:02:21] Details: {
+  "Name": "Faiyaz Bera",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "regression",
+    "classification",
+    "clustering",
+    "deep learning",
+    "data preprocessing",
+    "feature engineering"
+  ],
+  "Profile Summary": "Experienced financial risk analyst with strong programming skills in Python and experience with ML frameworks like TensorFlow and PyTorch. Seeking a challenging position as a Machine Learning Developer.",
+  "Projects": [],
+  "Certifications & Courses": [
+    "Synthesize cross-platform infrastructures Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [],
+  "Industry Experience": "Finance",
+  "Culture Fit Assessment": "Medium - Candidate has relevant technical skills but may need additional experience with big data technologies and MLOps.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company with further training and experience.",
+  "Effort Needed by the Company": "Medium - Company may need to provide training on big data technologies and MLOps.",
+  "Resume Strength Score": "7.0",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Relevant Projects Count": 0,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "",
+  "API Token Used": 0,
+  "API Cost ($)": 0,
+  "Time Taken (sec)": 6.76,
+  "resume_name": "resume_13.pdf"
+}
+[2025-04-13 16:02:21] Parsing completed: resume_13.pdf
+[2025-04-13 16:02:21] Name: Faiyaz Bera | JD Match: 70% | Score: 7.0 | Tokens: 0 | Cost: $0.000000 | Time: 6.76 sec
+[2025-04-13 16:02:21] ✅ Completed: resume_13.pdf
+[2025-04-13 16:06:48] BE Project Resume Parsing Start

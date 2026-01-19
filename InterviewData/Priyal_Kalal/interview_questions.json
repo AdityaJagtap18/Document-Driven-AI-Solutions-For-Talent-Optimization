@@ -1,0 +1,15 @@
+{
+    "candidate_name": "Priyal Kalal",
+    "questions": [
+        "Can you discuss a specific project you worked on as a DevOps Intern at IAMOPS Pvt Ltd that showcases your expertise in AWS services and cloud-based deployments?",
+        "How did you approach the development and maintenance of web applications as a Full Stack Developer Intern at VIT Tech Pvt Ltd, particularly in terms of utilizing React and Spring Boot?",
+        "Could you explain the significance of the media server environment project MAID that you worked on, including the tools and technologies you used for its setup?",
+        "What challenges did you encounter while developing the AI-Driven Talent Optimization Platform, and how did you overcome them?",
+        "How did you leverage NLP techniques to extract and analyze unstructured data from resumes and job descriptions in the AI-Driven Talent Optimization Platform project?",
+        "Can you elaborate on your experience with cloud platforms such as AWS and Azure, and how you utilized services like EC2, S3, IAM, VPC, VMs, Storage, and Active Directory for enterprise solutions?",
+        "How have you implemented Infrastructure as Code (IaC) using Terraform in your projects, and what benefits did it bring to your development process?",
+        "In what ways did you utilize automation and scripting tools like Bash, Python, and Shell Scripting in your role as a DevOps Intern and Full Stack Developer Intern?",
+        "How did you integrate CI/CD tools like Jenkins, GitHub Actions, and Docker into your projects, and what impact did it have on the efficiency of your development workflow?",
+        "Can you provide examples of how you collaborated with team members and stakeholders to successfully deliver projects, and how you managed any conflicts or challenges that arose during the process?"
+    ]
+}

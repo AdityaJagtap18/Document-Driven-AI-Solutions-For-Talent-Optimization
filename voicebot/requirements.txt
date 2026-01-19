@@ -1,0 +1,8 @@
+streamlit
+pandas
+SpeechRecognition
+openai
+langchain
+elevenlabs
+pyaudio
+numpy
