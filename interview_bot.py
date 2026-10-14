@@ -3,9 +3,12 @@ import json
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage
+from dotenv import load_dotenv
 
 # === CONFIG ===
-os.environ["OPENAI_API_KEY"] = "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"
+load_dotenv()
+if not os.environ.get("OPENAI_API_KEY"):
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
 interview_data_root = Path("InterviewData")
 llm = ChatOpenAI(temperature=0.5, max_tokens=1000, model="gpt-3.5-turbo")
 

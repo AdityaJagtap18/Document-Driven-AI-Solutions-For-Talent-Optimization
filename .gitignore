@@ -12,6 +12,9 @@ env/
 
 config/email_credentials.json
 voicebot/config.json
+InviteSender/config/invite_email_config.json
+Commands/Save as link for pip.txt
+Commands/sqlcommands.txt
 
 private/
 

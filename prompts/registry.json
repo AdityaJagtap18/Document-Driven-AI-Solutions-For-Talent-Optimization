@@ -55,6 +55,14 @@
       "source_script": "voicebot/voice_bot.py",
       "model": "gpt-3.5-turbo",
       "status": "active"
+    },
+    {
+      "id": "interview_bot_answer_scoring",
+      "version": 1,
+      "file": "interview_bot_answer_scoring.v1.md",
+      "source_script": "interview_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
     }
   ]
 }

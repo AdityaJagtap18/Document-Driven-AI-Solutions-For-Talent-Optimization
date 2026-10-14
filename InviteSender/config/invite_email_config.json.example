@@ -1,0 +1,10 @@
+{
+  "smtp_email": "noreply.yourdomain@gmail.com",
+  "smtp_password": "your-gmail-app-password",
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "imap_email": "your-inbox@gmail.com",
+  "imap_password": "your-gmail-app-password",
+  "imap_server": "imap.gmail.com",
+  "talent_acquisition_email": "ta-team@yourdomain.com"
+}
