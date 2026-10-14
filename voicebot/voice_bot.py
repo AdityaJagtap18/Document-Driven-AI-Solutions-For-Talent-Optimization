@@ -7,19 +7,20 @@ import openai
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 import os
-import json as jsonlib 
+import json as jsonlib
 import uuid
 import wave
 import re
+from dotenv import load_dotenv
 
-
-
+load_dotenv()
+if not os.environ.get("OPENAI_API_KEY"):
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
 
 llm = ChatOpenAI(
     temperature=0.7,
     max_tokens=1000,
     model="gpt-3.5-turbo",
-    openai_api_key="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"
 )
 
 

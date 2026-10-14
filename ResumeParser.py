@@ -5,7 +5,10 @@
 
 
 import os
-os.environ["OPENAI_API_KEY"] ="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"
+from dotenv import load_dotenv
+load_dotenv()
+if not os.environ.get("OPENAI_API_KEY"):
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
 
 
 # In[3]:

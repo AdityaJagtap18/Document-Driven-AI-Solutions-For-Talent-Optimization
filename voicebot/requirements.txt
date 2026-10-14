@@ -3,6 +3,11 @@ pandas
 SpeechRecognition
 openai
 langchain
+langchain-openai
 elevenlabs
 pyaudio
 numpy
+python-dotenv
+streamlit-webrtc
+av
+opencv-python

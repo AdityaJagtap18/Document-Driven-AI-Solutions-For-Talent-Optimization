@@ -10,6 +10,9 @@ from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # === Paths Setup ===
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -128,8 +131,12 @@ if __name__ == "__main__":
 
     # Step 4: Gmail Credentials (use App Password for Gmail)
     imap_server = "imap.gmail.com"
-    email_user = "cognitivedocumentintelligecepl@gmail.com"
-    email_pass = "dekq drdn vmkr dkhq"
+    email_user = os.environ.get("GMAIL_WATCHER_USER")
+    email_pass = os.environ.get("GMAIL_WATCHER_APP_PASSWORD")
+    if not email_user or not email_pass:
+        raise RuntimeError(
+            "GMAIL_WATCHER_USER / GMAIL_WATCHER_APP_PASSWORD not set. Add them to your .env file."
+        )
 
     # Step 5: Start Gmail polling in background
     threading.Thread(

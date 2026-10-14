@@ -1,0 +1,12 @@
+PyPDF2
+langchain
+langchain-openai
+openai
+pandas
+watchdog
+python-dotenv
+edge-tts
+sounddevice
+soundfile
+openai-whisper
+selenium
