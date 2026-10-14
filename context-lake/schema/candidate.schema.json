@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Candidate",
+  "description": "Cosmos DB 'candidates' container document. Partition key: /candidate_id.",
+  "type": "object",
+  "required": ["candidate_id", "resume_name", "ingested_at", "source_blob_path"],
+  "properties": {
+    "candidate_id": { "type": "string", "description": "Stable UUID, generated at ingest; the partition key." },
+    "resume_name": { "type": "string" },
+    "ingested_at": { "type": "string", "format": "date-time" },
+    "source_blob_path": { "type": "string", "description": "Path in the raw-resumes Blob container." },
+    "jd_id": { "type": "string", "description": "FK to jd-corpus / jd_id this candidate was parsed against." },
+
+    "Name": { "type": "string" },
+    "Email": { "type": "string" },
+    "Phone": { "type": "string" },
+    "LinkedIn": { "type": "string" },
+    "JD Match": { "type": "string" },
+    "Missing Keywords": {
+      "type": "object",
+      "properties": {
+        "Technical Skills": { "type": "array", "items": { "type": "string" } },
+        "Tools & Technologies": { "type": "array", "items": { "type": "string" } },
+        "Concepts & Methodologies": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Top Matching Keywords": { "type": "array", "items": { "type": "string" } },
+    "Profile Summary": { "type": "string" },
+    "Projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Project Name": { "type": "string" },
+          "Relevance to JD": { "type": "string", "enum": ["High", "Medium", "Low"] },
+          "Technologies Used": { "type": "array", "items": { "type": "string" } },
+          "Impact": { "type": "string" }
+        }
+      }
+    },
+    "Certifications & Courses": { "type": "array", "items": { "type": "string" } },
+    "Resume Strength Score": { "type": "number", "minimum": 0, "maximum": 10 },
+    "Candidate Type": { "type": "string", "enum": ["Junior", "Mid-Level", "Senior"] },
+    "Employment Gaps Detected": { "type": "boolean" },
+
+    "ranking_tier": {
+      "type": "string",
+      "enum": ["Recommended for Fast-Track", "To be Considered", "Rejected"],
+      "description": "Output of ResumeMEtrics.py classify_candidate(); populated after scoring, not at parse time."
+    },
+    "normalized_weighted_score": { "type": "number" }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "indexes": [
+    {
+      "name": "resume-chunks",
+      "description": "One document per resume chunk, for RAG-grounded resume-to-JD matching.",
+      "fields": [
+        { "name": "chunk_id", "type": "Edm.String", "key": true },
+        { "name": "candidate_id", "type": "Edm.String", "filterable": true },
+        { "name": "resume_name", "type": "Edm.String", "filterable": true, "retrievable": true },
+        { "name": "chunk_text", "type": "Edm.String", "retrievable": true, "searchable": true },
+        { "name": "chunk_index", "type": "Edm.Int32", "filterable": true, "sortable": true },
+        { "name": "embedding", "type": "Collection(Edm.Single)", "dimensions": 1536, "vectorSearchProfile": "default-vector-profile" },
+        { "name": "jd_id_at_parse_time", "type": "Edm.String", "filterable": true },
+        { "name": "parsed_at", "type": "Edm.DateTimeOffset", "filterable": true, "sortable": true }
+      ],
+      "vectorSearch": {
+        "algorithm": "hnsw",
+        "embeddingModel": "text-embedding-3-small",
+        "distanceMetric": "cosine"
+      },
+      "semanticConfiguration": {
+        "titleField": "resume_name",
+        "contentFields": ["chunk_text"]
+      }
+    },
+    {
+      "name": "jd-corpus",
+      "description": "One document per job description, for JD similarity / reuse analytics.",
+      "fields": [
+        { "name": "jd_id", "type": "Edm.String", "key": true },
+        { "name": "jd_filename", "type": "Edm.String", "filterable": true },
+        { "name": "jd_text", "type": "Edm.String", "retrievable": true, "searchable": true },
+        { "name": "embedding", "type": "Collection(Edm.Single)", "dimensions": 1536, "vectorSearchProfile": "default-vector-profile" },
+        { "name": "created_at", "type": "Edm.DateTimeOffset", "filterable": true, "sortable": true }
+      ],
+      "vectorSearch": {
+        "algorithm": "hnsw",
+        "embeddingModel": "text-embedding-3-small",
+        "distanceMetric": "cosine"
+      }
+    }
+  ]
+}

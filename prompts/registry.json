@@ -1,0 +1,60 @@
+{
+  "prompts": [
+    {
+      "id": "resume_chunk_summarization",
+      "version": 1,
+      "file": "resume_chunk_summarization.v1.md",
+      "source_script": "ResumeParser.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "resume_merge_structured_extraction",
+      "version": 1,
+      "file": "resume_merge_structured_extraction.v1.md",
+      "source_script": "ResumeParser.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "interview_questions_generation",
+      "version": 1,
+      "file": "interview_questions_generation.v1.md",
+      "source_script": "generate_questions.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "voicebot_warmup_questions",
+      "version": 1,
+      "file": "voicebot_warmup_questions.v1.md",
+      "source_script": "voicebot/voice_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "voicebot_followup_response",
+      "version": 1,
+      "file": "voicebot_followup_response.v1.md",
+      "source_script": "voicebot/voice_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "voicebot_followup_no_response",
+      "version": 1,
+      "file": "voicebot_followup_no_response.v1.md",
+      "source_script": "voicebot/voice_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    },
+    {
+      "id": "voicebot_transcript_scoring",
+      "version": 1,
+      "file": "voicebot_transcript_scoring.v1.md",
+      "source_script": "voicebot/voice_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "active"
+    }
+  ]
+}

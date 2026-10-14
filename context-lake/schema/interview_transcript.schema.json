@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InterviewTranscript",
+  "description": "Cosmos DB 'interview_transcripts' container document. Partition key: /candidate_id. Merges generate_questions.py output and the voicebot's questions.json/answers.json.",
+  "type": "object",
+  "required": ["transcript_id", "candidate_id", "interview_type", "created_at"],
+  "properties": {
+    "transcript_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "interview_type": { "type": "string", "enum": ["pre_generated_questions", "voicebot_warmup"] },
+    "created_at": { "type": "string", "format": "date-time" },
+
+    "questions": { "type": "array", "items": { "type": "string" } },
+
+    "qa_pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "answer": { "type": "string" }
+        }
+      },
+      "description": "voicebot only; '(No response)' preserved as-is for drop-off analytics."
+    },
+
+    "overall_score": { "type": "number", "minimum": 0, "maximum": 10 },
+    "score_extraction_raw": { "type": "string", "description": "Raw LLM scoring response, kept for audit even though only the first number is used today (see prompts/voicebot_transcript_scoring.v1.md risk note)." }
+  }
+}
