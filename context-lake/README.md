@@ -24,8 +24,29 @@ This folder defines the target centralized data layer — Stage 11 of the FDE sp
 ## Schemas
 
 - [`schema/candidate.schema.json`](schema/candidate.schema.json) — the structured output already produced by `resume_merge_structured_extraction.v1` (see `../prompts/`), extended with lake-only fields (`_id`, `ingested_at`, `source_blob_path`, `ranking_tier`).
-- [`schema/interview_transcript.schema.json`](schema/interview_transcript.schema.json) — merges the voicebot's `questions.json` + `answers.json` + score into one record per interview.
+- [`schema/interview_transcript.schema.json`](schema/interview_transcript.schema.json) — merges all three interview flows into one record shape: `generate_questions.py` (questions only), `interview_bot.py` (CLI Q&A with per-question LLM scoring), and the voicebot (`questions.json`/`answers.json`/`score.json`).
+
+## Code
+
+- [`client.py`](client.py) — Cosmos DB + Blob Storage client factories, reading `COSMOS_ENDPOINT`/`COSMOS_KEY`/`COSMOS_DATABASE`/`BLOB_CONNECTION_STRING` from `.env` (see `../.env.example`). Raises a clear `RuntimeError` naming the missing variable(s) instead of a bare SDK error if the resources aren't configured yet. Auto-creates the database/containers/blob containers on first use — nothing to provision by hand beyond the Cosmos account and Storage account themselves.
+- [`repositories.py`](repositories.py) — CRUD functions for all four containers: `upsert_candidate`/`get_candidate`/`find_candidate_by_resume_name`/`list_candidates`, `upsert_interview_transcript`/`list_interview_transcripts`, `append_scoring_history`/`list_scoring_history` (append-only), `append_audit_log`/`list_audit_log` (append-only, immutable).
+- [`blob_store.py`](blob_store.py) — `upload_resume_blob`/`download_resume_blob`/`blob_exists` for the `raw-resumes`/`parsed-resumes` containers.
+- [`migrate_from_csv.py`](migrate_from_csv.py) — one-time backfill script, run with `--dry-run` first (writes a preview JSON, makes no Azure connection — safe to run with no resources provisioned at all).
+
+Local imports in this folder are flat (`import client`, not `from context_lake.client import`) — the directory name has a hyphen, which isn't a valid Python package identifier, same convention `voicebot/` already uses for its own local imports.
+
+Install this folder's own dependencies with `pip install -r context-lake/requirements.txt` (kept separate from the root `requirements.txt` since nothing else in the repo imports this code yet).
+
+## Backfill findings (from running `migrate_from_csv.py --dry-run` against this repo's real data)
+
+Running the dry-run surfaced a genuine brownfield data-loss bug, not a script bug: `Resume_Parsed_CSVs/resume_summary.csv` gets **overwritten** on every `ResumeParser.py` run, so candidates processed in earlier runs silently disappear from it. 48 of this repo's 84 known candidates were missing from the live CSV entirely — recoverable only because `InviteSender/Invitations_Archive/resume_summary_*.csv` happened to keep timestamped snapshots. The script now also reads those archives and merges in anything missing from the live file (oldest archive first, so the newest available snapshot wins per candidate).
+
+After that recovery, 84 candidate documents and 85 interview transcripts were built from this repo's actual data, with only 4 transcripts left unmatched to a candidate:
+- `Buddha_Vamsi` and `Kamballa_Pradeep` — their `OutputResume_Folder` filenames have a double underscore (`Buddha_Vamsi__resume.pdf`), so the folder-name-based `candidate_id` guess doesn't match `resume_name` in the CSV. Needs a manual fix if these candidates matter, or renaming the source PDF.
+- Two `voicebot/InterviewData/` entries (`Aditya_Jagtap`, `Rajendra_Jagtap`) — these are the developer's own test interviews, not real candidates, so having no matching resume is expected and correct.
+
+This is exactly the kind of silent data loss the context lake exists to prevent going forward — once writes go through `repositories.py` instead of overwriting a CSV, this class of bug can't recur.
 
 ## Status
 
-Design only, no migration implemented yet. Migration order is tracked in the Excel tracker (`FDE_Stage_Tracker` sheet, Stage 11 and Stage 14 rows): Blob containers first (lowest risk, pure lift-and-shift of file storage), then Cosmos DB for `candidates` (requires writing a one-time CSV→Cosmos backfill script), then `audit_log` (net-new, no backfill possible — starts clean from cutover date).
+Data-access layer (`client.py`, `repositories.py`, `blob_store.py`) and the backfill script (`migrate_from_csv.py`) are built and dry-run verified against this repo's real data (see above). **Not yet wired into the existing scripts** (`ResumeParser.py`, `ResumeMEtrics.py`, etc. still write to CSV/JSON as before) — that's a deliberate separate step, tracked in the Excel tracker's `Feature_Backlog` sheet. **No Azure Cosmos DB / Storage account is provisioned yet**, so nothing has actually been written to Azure — run `migrate_from_csv.py` (without `--dry-run`) once those resources exist and `.env` is filled in.

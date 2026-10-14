@@ -1,16 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "InterviewTranscript",
-  "description": "Cosmos DB 'interview_transcripts' container document. Partition key: /candidate_id. Merges generate_questions.py output and the voicebot's questions.json/answers.json.",
+  "description": "Cosmos DB 'interview_transcripts' container document. Partition key: /candidate_id. Merges generate_questions.py output, interview_bot.py's CLI Q&A, and the voicebot's questions.json/answers.json/score.json.",
   "type": "object",
   "required": ["transcript_id", "candidate_id", "interview_type", "created_at"],
   "properties": {
     "transcript_id": { "type": "string" },
     "candidate_id": { "type": "string" },
-    "interview_type": { "type": "string", "enum": ["pre_generated_questions", "voicebot_warmup"] },
+    "interview_type": {
+      "type": "string",
+      "enum": ["pre_generated_questions", "cli_scored_qna", "voicebot_warmup"],
+      "description": "pre_generated_questions = generate_questions.py (questions only, no answers captured here). cli_scored_qna = interview_bot.py (candidate types answers via input(), LLM scores each). voicebot_warmup = voicebot/voice_bot.py (spoken ice-breakers + transcript-level score)."
+    },
     "created_at": { "type": "string", "format": "date-time" },
 
-    "questions": { "type": "array", "items": { "type": "string" } },
+    "questions": { "type": "array", "items": { "type": "string" }, "description": "pre_generated_questions only." },
 
     "qa_pairs": {
       "type": "array",
@@ -18,13 +22,15 @@
         "type": "object",
         "properties": {
           "question": { "type": "string" },
-          "answer": { "type": "string" }
+          "answer": { "type": "string" },
+          "score": { "type": "number", "description": "cli_scored_qna only — per-question score from interview_bot.py." },
+          "feedback": { "type": "string", "description": "cli_scored_qna only — per-question LLM feedback." }
         }
       },
-      "description": "voicebot only; '(No response)' preserved as-is for drop-off analytics."
+      "description": "cli_scored_qna and voicebot_warmup; '(No response)' preserved as-is for drop-off analytics."
     },
 
     "overall_score": { "type": "number", "minimum": 0, "maximum": 10 },
-    "score_extraction_raw": { "type": "string", "description": "Raw LLM scoring response, kept for audit even though only the first number is used today (see prompts/voicebot_transcript_scoring.v1.md risk note)." }
+    "score_extraction_raw": { "type": "string", "description": "Raw LLM scoring response, kept for audit. voicebot_warmup only extracts the first regex-matched number (see prompts/voicebot_transcript_scoring.v1.md risk note); cli_scored_qna writes the raw response with no json.loads validation at all (see prompts/interview_bot_answer_scoring.v1.md risk note)." }
   }
 }
