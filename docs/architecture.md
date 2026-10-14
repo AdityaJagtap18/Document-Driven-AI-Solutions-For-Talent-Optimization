@@ -1,6 +1,6 @@
 # CDPI Architecture: Current vs. Target
 
-See also the interactive version: `tracker/CDPI_FDE_Tracker.xlsx` (Azure_Service_Mapping sheet) for cost tiers and Azure-for-Students availability per component.
+See also the interactive version: `private/CDPI_FDE_Tracker.xlsx` (Azure_Service_Mapping sheet) for cost tiers and Azure-for-Students availability per component. This file is gitignored (local-only) — ask whoever has it for a copy if you don't.
 
 ## Current (Brownfield)
 

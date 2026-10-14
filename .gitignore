@@ -13,6 +13,8 @@ env/
 config/email_credentials.json
 voicebot/config.json
 
+private/
+
 *.log
 
 .ipynb_checkpoints/
