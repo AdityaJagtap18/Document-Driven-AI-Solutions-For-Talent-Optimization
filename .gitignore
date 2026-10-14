@@ -8,6 +8,10 @@ env/
 
 .env
 .env.*
+!.env.example
+
+config/email_credentials.json
+voicebot/config.json
 
 *.log
 
