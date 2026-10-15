@@ -189,8 +189,8 @@ window.CDPI_MOCK_API = {
     return mockDelay({
       count: 2,
       jds: [
-        { jd_id: "ml_developer", jd_filename: "ml_developer.txt" },
-        { jd_id: "data_analyst", jd_filename: "data_analyst.txt" },
+        { jd_id: "ml_developer", jd_filename: "ml_developer.txt", title: "Machine Learning Developer" },
+        { jd_id: "data_analyst", jd_filename: "data_analyst.txt", title: "Data Analyst" },
       ],
     });
   },

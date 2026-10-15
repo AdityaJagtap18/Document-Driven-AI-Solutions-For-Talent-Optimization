@@ -100,7 +100,7 @@ def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     jds = jd_manager.list_jds(_repo_root / "jd_folder")
     return _json_response({
         "count": len(jds),
-        "jds": [{"jd_id": jd["jd_id"], "jd_filename": jd["jd_filename"]} for jd in jds],
+        "jds": [{"jd_id": jd["jd_id"], "jd_filename": jd["jd_filename"], "title": jd["title"]} for jd in jds],
     })
 
 

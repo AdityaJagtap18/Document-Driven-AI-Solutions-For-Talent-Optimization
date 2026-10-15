@@ -184,7 +184,7 @@ function ApplicationForm(props) {
             <select value={form.jdId} onChange={setField("jdId")}>
               <option value="">Not specified</option>
               {jds.map(function (jd) {
-                return <option key={jd.jd_id} value={jd.jd_id}>{jd.jd_filename}</option>;
+                return <option key={jd.jd_id} value={jd.jd_id}>{jd.title || jd.jd_filename}</option>;
               })}
             </select>
           </label>

@@ -1,6 +1,6 @@
 import pytest
 
-from jd_manager import list_jds, embed_jds, score_candidate_against_jds
+from jd_manager import list_jds, embed_jds, score_candidate_against_jds, _extract_title
 
 
 class TestListJds:
@@ -11,6 +11,14 @@ class TestListJds:
         assert [jd["jd_id"] for jd in jds] == ["data_analyst", "ml_developer"]
         assert jds[0]["jd_filename"] == "data_analyst.txt"
         assert jds[0]["text"] == "DA role"
+
+    def test_golden_title_extracted_from_job_title_line(self, tmp_path):
+        (tmp_path / "ml_developer.txt").write_text(
+            "Machine Learning Developer Job Description\n\nJob Title: Machine Learning Developer\nLocation: Remote",
+            encoding="utf-8",
+        )
+        jds = list_jds(tmp_path)
+        assert jds[0]["title"] == "Machine Learning Developer"
 
     def test_edge_missing_folder_returns_empty(self, tmp_path):
         assert list_jds(tmp_path / "does_not_exist") == []
@@ -23,6 +31,26 @@ class TestListJds:
         (tmp_path / "real.txt").write_text("Real JD", encoding="utf-8")
         jds = list_jds(tmp_path)
         assert [jd["jd_id"] for jd in jds] == ["real"]
+
+
+class TestExtractTitle:
+    def test_golden_job_title_line_preferred_over_first_line(self):
+        text = "Some Header\n\nJob Title: Data Analyst\nLocation: Remote"
+        assert _extract_title(text, "data_analyst") == "Data Analyst"
+
+    def test_golden_case_insensitive_job_title_label(self):
+        text = "job title: Senior Backend Engineer"
+        assert _extract_title(text, "fallback") == "Senior Backend Engineer"
+
+    def test_edge_no_job_title_line_falls_back_to_first_nonempty_line(self):
+        text = "\n\n  Data Analyst Role  \nRequirements: SQL, Python"
+        assert _extract_title(text, "fallback") == "Data Analyst Role"
+
+    def test_adversarial_empty_text_falls_back_to_prettified_jd_id(self):
+        assert _extract_title("", "ml_developer") == "Ml Developer"
+
+    def test_adversarial_whitespace_only_text_falls_back_to_prettified_jd_id(self):
+        assert _extract_title("   \n  \n", "data-analyst") == "Data Analyst"
 
 
 class TestEmbedJds:

@@ -18,13 +18,35 @@ the simplest stable key available without introducing a JD registry; same
 convention as resume_name being used as a key elsewhere in this codebase.
 """
 
+import re
 from pathlib import Path
+
+_JOB_TITLE_LINE_RE = re.compile(r"^\s*Job Title:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+
+
+def _extract_title(text: str, jd_id: str) -> str:
+    """Best-effort human-readable title for a JD — the file itself has no
+    explicit title field. Prefers a "Job Title: ..." line (the convention
+    this repo's own jd_folder/jd.txt already uses), falls back to the
+    first non-empty line of the file, falls back to the jd_id itself
+    (e.g. "ml_developer" -> "Ml Developer") if the text is somehow empty.
+    Used so the frontend's "Applying for" dropdown (and anywhere else a
+    JD needs a label) shows something readable instead of a raw
+    filename."""
+    match = _JOB_TITLE_LINE_RE.search(text)
+    if match:
+        return match.group(1).strip()
+    for line in text.splitlines():
+        line = line.strip()
+        if line:
+            return line
+    return jd_id.replace("_", " ").replace("-", " ").title()
 
 
 def list_jds(jd_folder: Path) -> list:
-    """Returns [{"jd_id", "jd_filename", "path", "text"}] for every .txt
-    file in jd_folder, sorted by filename for a stable order. Empty list if
-    the folder doesn't exist or has no JD files."""
+    """Returns [{"jd_id", "jd_filename", "title", "path", "text"}] for
+    every .txt file in jd_folder, sorted by filename for a stable order.
+    Empty list if the folder doesn't exist or has no JD files."""
     if not jd_folder.exists():
         return []
     jds = []
@@ -35,6 +57,7 @@ def list_jds(jd_folder: Path) -> list:
         jds.append({
             "jd_id": jd_path.stem,
             "jd_filename": jd_path.name,
+            "title": _extract_title(text, jd_path.stem),
             "path": str(jd_path),
             "text": text,
         })
