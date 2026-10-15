@@ -18,6 +18,8 @@ Commands/sqlcommands.txt
 
 private/
 
+semantic-library/index/
+
 *.log
 
 .ipynb_checkpoints/

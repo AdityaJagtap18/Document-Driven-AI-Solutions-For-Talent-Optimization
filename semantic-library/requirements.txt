@@ -1,0 +1,6 @@
+openai
+numpy
+python-dotenv
+PyPDF2
+# only needed once Azure AI Search is provisioned (vector_store.AzureAISearchVectorStore):
+# azure-search-documents
