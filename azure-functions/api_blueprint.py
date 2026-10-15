@@ -74,6 +74,27 @@ def health(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"status": "ok"})
 
 
+@bp.route(route="jds", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Multi-JD support (Phase 6): lists every job description currently in
+    jd_folder/, so the Recruiter/Admin Dashboard can let a recruiter pick
+    which open role to view candidate rankings for. Reads jd_folder/
+    directly, same as observability/summary reads logs/ directly — no
+    Cosmos DB involved, works with zero Azure resources provisioned.
+    Candidates' own per-JD scores live in the "JD Matches" column written
+    by ResumeMEtrics.py (see jd_manager.py) — not exposed by this endpoint,
+    since that data isn't in candidate.schema.json yet (CSV/scoring_history
+    only); filtering candidates by jd_id is follow-up work once it is."""
+    sys.path.insert(0, str(_repo_root))
+    import jd_manager
+
+    jds = jd_manager.list_jds(_repo_root / "jd_folder")
+    return _json_response({
+        "count": len(jds),
+        "jds": [{"jd_id": jd["jd_id"], "jd_filename": jd["jd_filename"]} for jd in jds],
+    })
+
+
 @bp.route(route="candidates", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_candidates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard: list candidates, optionally filtered by

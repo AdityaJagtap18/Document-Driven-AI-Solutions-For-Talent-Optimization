@@ -11,6 +11,7 @@ import pytest
 
 import api_blueprint as api
 import repositories
+import jd_manager
 
 
 def _req(method="GET", route_params=None, body=None):
@@ -27,6 +28,26 @@ class TestHealth:
         resp = api.health(_req())
         assert resp.status_code == 200
         assert json.loads(resp.get_body()) == {"status": "ok"}
+
+
+class TestListJds:
+    def test_golden_returns_jd_ids_and_filenames(self, monkeypatch):
+        monkeypatch.setattr(
+            jd_manager, "list_jds",
+            lambda jd_folder: [
+                {"jd_id": "ml_developer", "jd_filename": "ml_developer.txt", "path": "x", "text": "y"},
+            ],
+        )
+        resp = api.list_jds_endpoint(_req())
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert body == {"count": 1, "jds": [{"jd_id": "ml_developer", "jd_filename": "ml_developer.txt"}]}
+
+    def test_edge_no_active_jds_returns_empty_list(self, monkeypatch):
+        monkeypatch.setattr(jd_manager, "list_jds", lambda jd_folder: [])
+        resp = api.list_jds_endpoint(_req())
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body()) == {"count": 0, "jds": []}
 
 
 class TestListCandidates:

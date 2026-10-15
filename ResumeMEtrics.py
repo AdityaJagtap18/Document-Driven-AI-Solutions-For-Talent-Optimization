@@ -29,6 +29,33 @@ from vector_store import LocalVectorStore  # noqa: E402
 SEMANTIC_INDEX_PATH = _semantic_lib_dir / "index" / "resume-chunks.json"
 SEMANTIC_JD_FOLDER = Path("jd_folder")
 
+# === Multi-JD scoring (jd_manager.py) ===
+# Additive, same pattern as Semantic Match Score above: "Semantic Match
+# Score" stays best-match-vs-newest-JD (kept for the existing weighted-score
+# formula). "JD Matches" is new: every candidate scored against every JD
+# currently in jd_folder/, so a recruiter juggling several open roles can
+# see which roles a candidate actually fits, not just the single most
+# recent one. See jd_manager.py's module docstring for the full rationale.
+from vector_store import cosine_scores  # noqa: E402
+import jd_manager  # noqa: E402
+
+
+def load_all_jds_with_vectors(jd_folder: Path) -> list:
+    """Embeds every JD in jd_folder in one batch call. Returns [] (with a
+    printed warning) on any failure — callers must treat [] as 'no JD
+    Matches column data available this run', same fail-soft convention as
+    load_jd_vector() below."""
+    jds = jd_manager.list_jds(jd_folder)
+    if not jds:
+        return []
+    try:
+        from embeddings import embed_texts  # imported here: only needed if JDs exist
+
+        return jd_manager.embed_jds(jds, embed_texts)
+    except Exception as e:
+        print(f"[WARN] Could not embed JDs for multi-JD scoring ({e}); JD Matches column will be empty for every candidate.")
+        return []
+
 # === Context lake dual-write (context-lake/) ===
 # Best-effort: every scoring run also appends one scoring_history record per
 # candidate to Cosmos DB, preserving the full before/after history that the
@@ -58,12 +85,16 @@ def load_jd_vector(jd_folder: Path):
         return None
 
 
-def compute_candidate_metrics(df: pd.DataFrame, config: dict, jd_vector, semantic_store) -> pd.DataFrame:
+def compute_candidate_metrics(df: pd.DataFrame, config: dict, jd_vector, semantic_store, jds_with_vectors=None) -> pd.DataFrame:
     """Pure-ish transform: takes a resume_summary-shaped DataFrame + config +
     (optional) semantic search context, returns it with all raw score
     columns, normalized columns, weighted score, and rank added. Does not
     read or write any files — kept separate from main() so this is testable
-    with a small synthetic DataFrame."""
+    with a small synthetic DataFrame.
+
+    jds_with_vectors is optional (defaults to None -> "JD Matches" column is
+    [] for every row) so existing callers/tests that only care about the
+    single-JD scoring formula are unaffected."""
     weights = config["weights"]
     norm_multiplier = config["normalize_multiplier"]
 
@@ -73,6 +104,13 @@ def compute_candidate_metrics(df: pd.DataFrame, config: dict, jd_vector, semanti
         df.columns.get_loc("JD Match Score") + 1,
         "Semantic Match Score",
         df.apply(lambda row: semantic_match_score_or_fallback(row, jd_vector, semantic_store), axis=1),
+    )
+    df.insert(
+        df.columns.get_loc("Semantic Match Score") + 1,
+        "JD Matches",
+        df["resume_name"].apply(
+            lambda name: jd_manager.score_candidate_against_jds(name, jds_with_vectors or [], semantic_store, cosine_scores)
+        ),
     )
     df.insert(df.columns.get_loc("Relevant Experience (yrs)") + 1, "Experience Score",
               df["Relevant Experience (yrs)"].apply(lambda x: experience_score(x, config)))
@@ -165,8 +203,9 @@ def main():
 
     semantic_store = LocalVectorStore(str(SEMANTIC_INDEX_PATH))
     jd_vector = load_jd_vector(SEMANTIC_JD_FOLDER)
+    jds_with_vectors = load_all_jds_with_vectors(SEMANTIC_JD_FOLDER)
 
-    df = compute_candidate_metrics(df, config, jd_vector, semantic_store)
+    df = compute_candidate_metrics(df, config, jd_vector, semantic_store, jds_with_vectors)
     df.to_csv(metrics_csv_path, index=False)
     print(f"✅ Saved to: {metrics_csv_path.resolve()} using config scoring.")
 
