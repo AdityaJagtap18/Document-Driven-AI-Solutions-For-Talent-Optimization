@@ -88,7 +88,6 @@ from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-import re
 
 # === Semantic search wiring (semantic-library/) ===
 # Section-aware chunking + JD-relevance ranking, replacing the old naive
@@ -123,11 +122,7 @@ def write_log(msg):
     with open("log.txt", "a", encoding="utf-8") as f:
         f.write(f"[{now}] {msg}\n")
 
-def extract_name_from_filename(filename):
-    base = Path(filename).stem.lower()
-    parts = base.replace("resume", "").replace("cv", "").replace("-", " ").replace("_", " ").split()
-    clean_name = " ".join(word.capitalize() for word in parts if word not in ["resume", "cv", "final", "updated"])
-    return clean_name
+from resume_text_utils import extract_name_from_filename, extract_contact_details
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -139,27 +134,6 @@ def extract_text_from_pdf(pdf_path):
 
 def summarize_pdf(pdf_path, jd, jd_vector, semantic_store):
     resume_text = extract_text_from_pdf(pdf_path)
-
-    # Extract email, phone, LinkedIn
-    def extract_contact_details(text):
-        if not isinstance(text, str):
-            return '', '', ''
-        
-        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        email_matches = re.findall(email_pattern, text)
-        email = email_matches[0] if email_matches else ''
-        
-        phone_pattern = r'(?:\+91[\-\s]?|91[\-\s]?|0)?(?:[6-9]\d{2}[\s-]?\d{3}[\s-]?\d{4})'
-        phone_matches = re.findall(phone_pattern, text)
-        phone = phone_matches[0].replace(" ", "").replace("-", "") if phone_matches else ''
-
-        linkedin_pattern = r'(https?://)?(www\.)?linkedin\.com/(in|pub)/[a-zA-Z0-9\-_/]+'
-        linkedin_match = re.search(linkedin_pattern, text)
-        linkedin = linkedin_match.group(0) if linkedin_match else ''
-
-
-        return email, phone, linkedin
-
     email, phone, linkedin = extract_contact_details(resume_text)
 
     # Section-aware chunk + embed the whole resume, and persist every chunk
