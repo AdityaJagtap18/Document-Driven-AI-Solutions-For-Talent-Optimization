@@ -157,3 +157,19 @@ def list_audit_log(candidate_id: str) -> list:
             partition_key=candidate_id,
         )
     )
+
+
+def list_all_audit_log(action: str = None) -> list:
+    """Cross-partition audit_log read, unlike list_audit_log() above which
+    is scoped to one candidate. Needed for exec/aggregate reporting (e.g.
+    "what's the overall human-review approval rate") -- added for Phase 6's
+    executive-summary endpoint, same query-shape as list_candidates()'s
+    optional filter above."""
+    container = get_container("audit_log")
+    if action:
+        query = "SELECT * FROM c WHERE c.action = @action"
+        params = [{"name": "@action", "value": action}]
+    else:
+        query = "SELECT * FROM c"
+        params = []
+    return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))

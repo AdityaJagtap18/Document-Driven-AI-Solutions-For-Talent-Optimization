@@ -30,6 +30,62 @@ class TestHealth:
         assert json.loads(resp.get_body()) == {"status": "ok"}
 
 
+class TestExecutiveSummary:
+    def test_golden_computes_tier_distribution_and_approval_rate(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "list_candidates",
+            lambda ranking_tier=None: [
+                {"ranking_tier": "Recommended for Fast-Track"},
+                {"ranking_tier": "Recommended for Fast-Track"},
+                {"ranking_tier": "Rejected"},
+                {"ranking_tier": "To be Considered"},
+            ],
+        )
+        monkeypatch.setattr(
+            repositories, "list_all_audit_log",
+            lambda action=None: [
+                {"action": "human_review_approve"},
+                {"action": "human_review_approve"},
+                {"action": "human_review_reject"},
+                {"action": "document_verification"},  # not a review decision, excluded from the rate
+            ],
+        )
+        resp = api.executive_summary_endpoint(_req())
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert body["total_candidates"] == 4
+        assert body["candidates_by_tier"] == {
+            "Recommended for Fast-Track": 2, "Rejected": 1, "To be Considered": 1,
+        }
+        assert body["human_review"] == {
+            "approvals": 2, "rejections": 1, "total_reviewed": 3, "approval_rate": round(2 / 3, 4),
+        }
+
+    def test_edge_no_candidates_or_reviews_yet(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_candidates", lambda ranking_tier=None: [])
+        monkeypatch.setattr(repositories, "list_all_audit_log", lambda action=None: [])
+        resp = api.executive_summary_endpoint(_req())
+        body = json.loads(resp.get_body())
+        assert body["total_candidates"] == 0
+        assert body["candidates_by_tier"] == {}
+        assert body["human_review"]["approval_rate"] is None  # not 0 -- "no data" is not "0% approval"
+
+    def test_edge_candidate_missing_ranking_tier_counts_as_unscored(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_candidates", lambda ranking_tier=None: [{"candidate_id": "1"}])
+        monkeypatch.setattr(repositories, "list_all_audit_log", lambda action=None: [])
+        resp = api.executive_summary_endpoint(_req())
+        body = json.loads(resp.get_body())
+        assert body["candidates_by_tier"] == {"Unscored": 1}
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(ranking_tier=None):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "list_candidates", broken)
+        resp = api.executive_summary_endpoint(_req())
+        assert resp.status_code == 503
+
+
 class TestListJds:
     def test_golden_returns_jd_ids_and_filenames(self, monkeypatch):
         monkeypatch.setattr(

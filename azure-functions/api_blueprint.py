@@ -302,6 +302,46 @@ def verify_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     })
 
 
+@bp.route(route="analytics/executive-summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def executive_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Embedded Analytics for Exec Reporting (Phase 6): pipeline-level KPIs
+    for an exec dashboard -- candidate volume/tier distribution and the
+    human-review approval rate -- distinct from observability/summary
+    above, which is LLM token/cost, not hiring-funnel data.
+
+    Approval rate is computed from audit_log entries, not from
+    ranking_tier on the live candidate record, because ranking_tier gets
+    overwritten on every review decision (see review_candidate_endpoint)
+    -- the audit_log is the only place "how many approvals vs rejections
+    actually happened" survives as a count, per entry, immutably."""
+    try:
+        candidates = repositories.list_candidates()
+        audit_entries = repositories.list_all_audit_log()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    tier_counts = {}
+    for c in candidates:
+        tier = c.get("ranking_tier") or "Unscored"
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+    approvals = sum(1 for e in audit_entries if e.get("action") == "human_review_approve")
+    rejections = sum(1 for e in audit_entries if e.get("action") == "human_review_reject")
+    total_reviewed = approvals + rejections
+    approval_rate = round(approvals / total_reviewed, 4) if total_reviewed else None
+
+    return _json_response({
+        "total_candidates": len(candidates),
+        "candidates_by_tier": tier_counts,
+        "human_review": {
+            "approvals": approvals,
+            "rejections": rejections,
+            "total_reviewed": total_reviewed,
+            "approval_rate": approval_rate,
+        },
+    })
+
+
 @bp.route(route="observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard's cost/token usage view. Doesn't touch
