@@ -1,7 +1,9 @@
 import pandas as pd
 import speech_recognition as sr
 import json
+import sys
 import time
+from pathlib import Path
 from elevenlabs_utils import speak
 import openai
 from langchain_openai import ChatOpenAI
@@ -12,6 +14,9 @@ import uuid
 import wave
 import re
 from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from llm_utils import call_with_retry  # noqa: E402
 
 load_dotenv()
 if not os.environ.get("OPENAI_API_KEY"):
@@ -30,7 +35,10 @@ def ask_openai(prompt):
             SystemMessage(content="You are a friendly and helpful interview assistant and your only here to warm up the candidate your job is to only make the candidate feel good till the actuall interviewer arives. Do not ask leading questions"),
             HumanMessage(content=prompt)
         ]
-        response = llm(messages)
+        response = call_with_retry(
+            llm, messages,
+            on_retry=lambda attempt, e: print(f"[LangChain/OpenAI Retry {attempt}]: {e}"),
+        )
         return response.content
     except Exception as e:
         print(f"[LangChain/OpenAI Error]: {e}")

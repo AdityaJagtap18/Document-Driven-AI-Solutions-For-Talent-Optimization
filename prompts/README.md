@@ -29,4 +29,5 @@ Every LLM prompt used anywhere in CDPI, extracted verbatim from source and versi
 - `resume_chunk_summarization.v1` and the three `voicebot_*` prompts are still free-text/unvalidated — only the two merge/scoring prompts have been moved to JSON mode so far (Phase 1 of the roadmap). The chunk-summarization prompt's output is intermediate (feeds the merge prompt, never parsed as JSON itself) so it's lower priority; the voicebot prompts are conversational text by design, not structured data, so JSON mode doesn't apply to them.
 - No prompt-injection guarding: raw resume text and candidate speech are interpolated directly into prompts with no delimiter-escaping or instruction-hierarchy reinforcement.
 - No few-shot examples or golden-case eval set exists yet for any of these (TEVV Stage 26 gap).
-- No retry/backoff on any of the 8 LLM call sites yet — next item in Phase 1.
+
+All 8 call sites now retry with exponential backoff on failure (`llm_utils.call_with_retry`, Phase 1 of the roadmap) — this closed what used to be listed here as an open gap.

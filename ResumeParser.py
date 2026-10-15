@@ -88,6 +88,8 @@ from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
+from resume_text_utils import extract_name_from_filename, extract_contact_details
+from llm_utils import call_with_retry
 
 # === Semantic search wiring (semantic-library/) ===
 # Section-aware chunking + JD-relevance ranking, replacing the old naive
@@ -121,8 +123,6 @@ def write_log(msg):
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
     with open("log.txt", "a", encoding="utf-8") as f:
         f.write(f"[{now}] {msg}\n")
-
-from resume_text_utils import extract_name_from_filename, extract_contact_details
 
 def extract_text_from_pdf(pdf_path):
     text = ""
@@ -166,7 +166,10 @@ Extract the key points in concise bullet form, JSON-style if possible. Do NOT re
 """
         )
         prompt = prompt_template.format(text=chunk, jd=jd)
-        partial_summary = llm.predict(prompt)
+        partial_summary = call_with_retry(
+            llm.predict, prompt,
+            on_retry=lambda attempt, e: write_log(f"Retry {attempt} for chunk summarization on {pdf_path.name}: {e}"),
+        )
         summaries.append(partial_summary)
 
     merge_prompt = f"""
@@ -223,7 +226,10 @@ Return only the JSON.
         temperature=0.3, max_tokens=1500, model="gpt-3.5-turbo",
         model_kwargs={"response_format": {"type": "json_object"}},
     )
-    final_response = llm_merge.predict(merge_prompt)
+    final_response = call_with_retry(
+        llm_merge.predict, merge_prompt,
+        on_retry=lambda attempt, e: write_log(f"Retry {attempt} for merge step on {pdf_path.name}: {e}"),
+    )
 
     try:
         structured_data = json.loads(final_response)

@@ -20386,3 +20386,66 @@ __root__
   "resume_name": "Amira_Dasgupta_resume.pdf"
 }
 [2026-10-15 08:22:33] Completed: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:27:03] BE Project Resume Parsing Start
+[2026-10-15 08:27:03] Parsing started: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:27:03] Semantic ranking for Amira_Dasgupta_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-15 08:27:16] Details: {
+  "Name": "Amira Dasgupta",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Machine Learning Developer",
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "Data processing",
+    "Model training",
+    "Deployment"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in developing, training, and optimizing machine learning models. Skilled in data processing, model deployment, and staying updated with advancements in ML and AI.",
+  "Projects": [
+    {
+      "Project Name": "Monetize customized platforms",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "NumPy",
+        "Pandas",
+        "Scikit-learn",
+        "TensorFlow",
+        "PyTorch"
+      ],
+      "Impact": "Successfully monetized customized platforms using advanced machine learning models."
+    }
+  ],
+  "Certifications & Courses": [
+    "Monetize customized platforms"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Problem-solving",
+    "Teamwork"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - The candidate's experience and skills align well with the requirements of the role.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company based on their technical skills and experience.",
+  "Effort Needed by the Company": "Low - The candidate is well-equipped to handle the responsibilities of the role with minimal training.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Strong technical background and relevant experience make the candidate a suitable fit for the Machine Learning Developer role.",
+  "Email": "yuvaanshetty@hotmail.com",
+  "Phone": "07334126827",
+  "LinkedIn": "",
+  "resume_name": "Amira_Dasgupta_resume.pdf"
+}
+[2026-10-15 08:27:16] Completed: Amira_Dasgupta_resume.pdf

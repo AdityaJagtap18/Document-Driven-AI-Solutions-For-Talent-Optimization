@@ -10,6 +10,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 from dotenv import load_dotenv
 
+from llm_utils import call_with_retry
+
 # === Config ===
 load_dotenv()
 if not os.environ.get("OPENAI_API_KEY"):
@@ -69,7 +71,10 @@ Return the questions in a clean numbered list format.
     try:
         print("Sending request to OpenAI...")
         llm = ChatOpenAI(temperature=0.7, max_tokens=800, model="gpt-3.5-turbo")
-        response = llm([HumanMessage(content=prompt)])
+        response = call_with_retry(
+            llm, [HumanMessage(content=prompt)],
+            on_retry=lambda attempt, e: print(f"Retry {attempt} for {resume_name}: {e}"),
+        )
         questions_raw = response.content
 
         questions = [q.strip("0123456789. ").strip() for q in questions_raw.split("\n") if q.strip()]

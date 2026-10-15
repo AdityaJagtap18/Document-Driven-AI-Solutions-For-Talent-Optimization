@@ -5,6 +5,8 @@ from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage
 from dotenv import load_dotenv
 
+from llm_utils import call_with_retry
+
 # === CONFIG ===
 load_dotenv()
 if not os.environ.get("OPENAI_API_KEY"):
@@ -65,7 +67,10 @@ Candidate Responses:
     print("\nScoring in progress...")
 
     try:
-        response = llm([HumanMessage(content=scoring_prompt)])
+        response = call_with_retry(
+            llm, [HumanMessage(content=scoring_prompt)],
+            on_retry=lambda attempt, e: print(f"Retry {attempt} for scoring: {e}"),
+        )
         parsed = json.loads(response.content)
         score_data = parsed["scores"]
 
