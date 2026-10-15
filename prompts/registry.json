@@ -14,6 +14,14 @@
       "file": "resume_merge_structured_extraction.v1.md",
       "source_script": "ResumeParser.py",
       "model": "gpt-3.5-turbo",
+      "status": "superseded"
+    },
+    {
+      "id": "resume_merge_structured_extraction",
+      "version": 2,
+      "file": "resume_merge_structured_extraction.v2.md",
+      "source_script": "ResumeParser.py",
+      "model": "gpt-3.5-turbo",
       "status": "active"
     },
     {
@@ -60,6 +68,14 @@
       "id": "interview_bot_answer_scoring",
       "version": 1,
       "file": "interview_bot_answer_scoring.v1.md",
+      "source_script": "interview_bot.py",
+      "model": "gpt-3.5-turbo",
+      "status": "superseded"
+    },
+    {
+      "id": "interview_bot_answer_scoring",
+      "version": 2,
+      "file": "interview_bot_answer_scoring.v2.md",
       "source_script": "interview_bot.py",
       "model": "gpt-3.5-turbo",
       "status": "active"

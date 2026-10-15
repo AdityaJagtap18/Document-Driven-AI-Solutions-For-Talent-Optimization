@@ -10,7 +10,10 @@ load_dotenv()
 if not os.environ.get("OPENAI_API_KEY"):
     raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
 interview_data_root = Path("InterviewData")
-llm = ChatOpenAI(temperature=0.5, max_tokens=1000, model="gpt-3.5-turbo")
+llm = ChatOpenAI(
+    temperature=0.5, max_tokens=1000, model="gpt-3.5-turbo",
+    model_kwargs={"response_format": {"type": "json_object"}},
+)
 
 
 def run_interview_for_candidate(candidate_folder: Path):
@@ -42,16 +45,18 @@ def run_interview_for_candidate(candidate_folder: Path):
     scoring_prompt = f"""
 You are a technical interviewer. Score the following candidate's answers out of 10, with brief justification for each.
 
-Format:
-[
-  {{
-    "question": "...",
-    "answer": "...",
-    "score": ...,
-    "feedback": "..."
-  }},
-  ...
-]
+Return a JSON object with this exact shape:
+{{
+  "scores": [
+    {{
+      "question": "...",
+      "answer": "...",
+      "score": ...,
+      "feedback": "..."
+    }},
+    ...
+  ]
+}}
 
 Candidate Responses:
 {json.dumps(answers, indent=2)}
@@ -61,10 +66,11 @@ Candidate Responses:
 
     try:
         response = llm([HumanMessage(content=scoring_prompt)])
-        score_data = response.content
+        parsed = json.loads(response.content)
+        score_data = parsed["scores"]
 
         with open(scoring_folder / "score_summary.json", "w", encoding="utf-8") as f:
-            f.write(score_data)
+            json.dump(score_data, f, indent=2)
 
         print("Score summary saved at:", scoring_folder / "score_summary.json")
     except Exception as e:

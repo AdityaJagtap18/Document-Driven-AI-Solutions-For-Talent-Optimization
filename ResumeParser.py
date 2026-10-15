@@ -219,7 +219,10 @@ Return clean JSON output with this format:
 
 Return only the JSON.
 """
-    llm_merge = ChatOpenAI(temperature=0.3, max_tokens=1500, model="gpt-3.5-turbo")
+    llm_merge = ChatOpenAI(
+        temperature=0.3, max_tokens=1500, model="gpt-3.5-turbo",
+        model_kwargs={"response_format": {"type": "json_object"}},
+    )
     final_response = llm_merge.predict(merge_prompt)
 
     try:
