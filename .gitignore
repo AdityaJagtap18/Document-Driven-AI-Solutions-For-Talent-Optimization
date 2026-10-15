@@ -26,6 +26,8 @@ semantic-library/index/
 
 logs/llm_observability.jsonl
 
+azure-functions/local.settings.json
+
 *.log
 
 .ipynb_checkpoints/

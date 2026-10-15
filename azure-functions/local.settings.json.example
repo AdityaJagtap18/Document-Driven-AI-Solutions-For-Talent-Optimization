@@ -1,0 +1,8 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<storage-account-connection-string-for-the-function-app-itself>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "BLOB_CONNECTION_STRING": "<same-or-different-storage-account-connection-string-holding-raw-resumes-container>"
+  }
+}
