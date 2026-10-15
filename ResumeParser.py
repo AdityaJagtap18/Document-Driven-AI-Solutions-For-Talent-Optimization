@@ -5,10 +5,16 @@
 
 
 import os
-from dotenv import load_dotenv
-load_dotenv()
-if not os.environ.get("OPENAI_API_KEY"):
-    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
+from secrets_loader import get_secret
+
+# get_secret checks Azure Key Vault first (if AZURE_KEY_VAULT_URL is set),
+# then falls back to .env — see docs/azure-provisioning/phase2-cosmos-storage-keyvault.md.
+# Written back into os.environ so langchain's ChatOpenAI (which reads
+# OPENAI_API_KEY from the environment implicitly) picks it up either way.
+_openai_key = get_secret("OPENAI_API_KEY")
+if not _openai_key:
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
+os.environ["OPENAI_API_KEY"] = _openai_key
 
 
 # In[3]:

@@ -20449,3 +20449,60 @@ __root__
   "resume_name": "Amira_Dasgupta_resume.pdf"
 }
 [2026-10-15 08:27:16] Completed: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:40:25] BE Project Resume Parsing Start
+[2026-10-15 08:40:25] Parsing started: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:40:26] Semantic ranking for Amira_Dasgupta_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-15 08:40:41] Details: {
+  "Name": "Amira Dasgupta",
+  "JD Match": "90%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "Machine Learning",
+    "Data Analysis"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in Python and ML frameworks like TensorFlow and PyTorch. Skilled in developing, training, and optimizing machine learning models for various applications.",
+  "Projects": [
+    {
+      "Project Name": "Project X",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "PyTorch"
+      ],
+      "Impact": "Improved model performance by 20%"
+    }
+  ],
+  "Certifications & Courses": [
+    "Monetize customized platforms Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - Candidate's technical skills align well with the requirements of the role.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company due to strong technical skills.",
+  "Effort Needed by the Company": "Low - Candidate is well-equipped to handle the responsibilities of the role.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows promise and can be a valuable asset to the team.",
+  "Email": "yuvaanshetty@hotmail.com",
+  "Phone": "07334126827",
+  "LinkedIn": "",
+  "resume_name": "Amira_Dasgupta_resume.pdf"
+}
+[2026-10-15 08:40:41] Completed: Amira_Dasgupta_resume.pdf

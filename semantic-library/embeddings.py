@@ -6,18 +6,21 @@ only changes the client construction below, not the vector dimensionality
 (both serve the same text-embedding-3-small model family)."""
 
 import os
+import sys
+from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from secrets_loader import get_secret  # noqa: E402
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 1536
 
 
 def _require_key():
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
+    key = get_secret("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
+    os.environ["OPENAI_API_KEY"] = key  # OpenAI() client reads this from the environment implicitly
 
 
 def embed_text(text: str) -> list:

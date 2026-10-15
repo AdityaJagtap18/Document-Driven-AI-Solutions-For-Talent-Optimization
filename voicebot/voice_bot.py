@@ -13,14 +13,14 @@ import json as jsonlib
 import uuid
 import wave
 import re
-from dotenv import load_dotenv
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from llm_utils import call_with_retry  # noqa: E402
+from secrets_loader import get_secret  # noqa: E402
 
-load_dotenv()
-if not os.environ.get("OPENAI_API_KEY"):
-    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
+_openai_key = get_secret("OPENAI_API_KEY")
+if not _openai_key:
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
+os.environ["OPENAI_API_KEY"] = _openai_key
 
 llm = ChatOpenAI(
     temperature=0.7,

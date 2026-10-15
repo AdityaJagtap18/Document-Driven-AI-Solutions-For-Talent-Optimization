@@ -8,14 +8,15 @@ from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
-from dotenv import load_dotenv
 
 from llm_utils import call_with_retry
+from secrets_loader import get_secret
 
 # === Config ===
-load_dotenv()
-if not os.environ.get("OPENAI_API_KEY"):
-    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example).")
+_openai_key = get_secret("OPENAI_API_KEY")
+if not _openai_key:
+    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
+os.environ["OPENAI_API_KEY"] = _openai_key
 parsed_folder = Path("ParsedReadyForQuestions")
 output_folder = Path("OutputResume_Folder")
 interview_data_root = Path("InterviewData")

@@ -1,9 +1,10 @@
 import os
+import sys
 from functools import lru_cache
+from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from secrets_loader import get_secret  # noqa: E402
 
 COSMOS_CONTAINERS = {
     "candidates": "/candidate_id",
@@ -15,25 +16,29 @@ COSMOS_CONTAINERS = {
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]
 
 
-def _require_env(names):
-    missing = [n for n in names if not os.environ.get(n)]
+def _require_secrets(names):
+    """Looks each name up via get_secret() (Key Vault first, then .env) and
+    returns {name: value}. Raises if any are missing from both."""
+    values = {n: get_secret(n) for n in names}
+    missing = [n for n, v in values.items() if not v]
     if missing:
         raise RuntimeError(
-            f"Missing required environment variable(s): {', '.join(missing)}. "
-            "Add them to your .env file (see .env.example) once the Azure Cosmos DB "
-            "and/or Storage resources are provisioned."
+            f"Missing required secret(s): {', '.join(missing)}. "
+            "Add them to your .env file (see .env.example) or Key Vault, once the Azure "
+            "Cosmos DB and/or Storage resources are provisioned."
         )
+    return values
 
 
 @lru_cache(maxsize=1)
 def get_cosmos_database():
     """Returns the Cosmos DB database client, creating the database if it doesn't exist.
-    Requires COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE in the environment."""
-    _require_env(["COSMOS_ENDPOINT", "COSMOS_KEY", "COSMOS_DATABASE"])
+    Requires COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE (env or Key Vault)."""
+    values = _require_secrets(["COSMOS_ENDPOINT", "COSMOS_KEY", "COSMOS_DATABASE"])
     from azure.cosmos import CosmosClient
 
-    client = CosmosClient(os.environ["COSMOS_ENDPOINT"], credential=os.environ["COSMOS_KEY"])
-    return client.create_database_if_not_exists(id=os.environ["COSMOS_DATABASE"])
+    client = CosmosClient(values["COSMOS_ENDPOINT"], credential=values["COSMOS_KEY"])
+    return client.create_database_if_not_exists(id=values["COSMOS_DATABASE"])
 
 
 def get_container(name: str):
@@ -52,11 +57,11 @@ def get_container(name: str):
 
 @lru_cache(maxsize=1)
 def get_blob_service_client():
-    """Returns the Blob service client. Requires BLOB_CONNECTION_STRING in the environment."""
-    _require_env(["BLOB_CONNECTION_STRING"])
+    """Returns the Blob service client. Requires BLOB_CONNECTION_STRING (env or Key Vault)."""
+    values = _require_secrets(["BLOB_CONNECTION_STRING"])
     from azure.storage.blob import BlobServiceClient
 
-    return BlobServiceClient.from_connection_string(os.environ["BLOB_CONNECTION_STRING"])
+    return BlobServiceClient.from_connection_string(values["BLOB_CONNECTION_STRING"])
 
 
 def get_blob_container(name: str):
