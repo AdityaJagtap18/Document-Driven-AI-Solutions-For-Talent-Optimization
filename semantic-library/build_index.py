@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyPDF2 import PdfReader
 
-from chunking import chunk_text
+from chunking import chunk_resume_text
 from embeddings import embed_texts
 from vector_store import LocalVectorStore
 
@@ -56,7 +56,7 @@ def build_resume_index(resume_dir: Path, out_path: Path):
         if not text:
             skipped.append(pdf_path.name)
             continue
-        chunks = chunk_text(text)
+        chunks = chunk_resume_text(text)
         for i, chunk in enumerate(chunks):
             all_chunk_ids.append(f"{pdf_path.name}::chunk{i}")
             all_chunk_texts.append(chunk)
