@@ -14,17 +14,55 @@
  * security.
  *
  * No router library (not worth the dependency for this many views with
- * no bundler) -- URL doesn't change, refresh loses your session, same
- * limitation the old nav had, noted in frontend/README.md.
+ * no bundler) -- URL doesn't change, refresh loses your place within the
+ * app, same limitation the old nav had, noted in frontend/README.md. The
+ * session itself (which role you're signed in as) DOES survive a
+ * refresh -- stored in localStorage, read back on load. Wrapped in
+ * try/catch since localStorage can throw (private browsing, blocked
+ * site data) -- a session just doesn't persist in that case, the app
+ * still works.
  */
+var SESSION_KEY = "cdpi_session";
+
+function loadStoredUser() {
+  try {
+    var raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function storeUser(user) {
+  try {
+    if (user) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(SESSION_KEY);
+    }
+  } catch (e) {
+    // localStorage unavailable -- session just won't survive a refresh this time
+  }
+}
+
 function App() {
   var api = window.CDPI_CONFIG.mode === "real" ? window.CDPI_REAL_API : window.CDPI_MOCK_API;
-  var userState = React.useState(null);
+  var userState = React.useState(loadStoredUser);
   var user = userState[0];
   var setUser = userState[1];
 
+  function handleLogin(loggedInUser) {
+    storeUser(loggedInUser);
+    setUser(loggedInUser);
+  }
+
+  function handleSignOut() {
+    storeUser(null);
+    setUser(null);
+  }
+
   if (!user) {
-    return <Login onLogin={setUser} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
@@ -34,7 +72,7 @@ function App() {
         <div className="app-user-indicator">
           {user.name} &middot; <strong>{user.roleLabel}</strong>
         </div>
-        <button className="btn" onClick={function () { setUser(null); }}>Sign out</button>
+        <button className="btn" onClick={handleSignOut}>Sign out</button>
         <div className="app-mode-indicator">
           API: <strong>{window.CDPI_CONFIG.mode}</strong>
         </div>
