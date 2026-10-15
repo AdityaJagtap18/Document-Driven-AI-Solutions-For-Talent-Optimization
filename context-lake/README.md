@@ -32,6 +32,7 @@ This folder defines the target centralized data layer — Stage 11 of the FDE sp
 - [`repositories.py`](repositories.py) — CRUD functions for all four containers: `upsert_candidate`/`get_candidate`/`find_candidate_by_resume_name`/`list_candidates`, `upsert_interview_transcript`/`list_interview_transcripts`, `append_scoring_history`/`list_scoring_history` (append-only), `append_audit_log`/`list_audit_log` (append-only, immutable).
 - [`blob_store.py`](blob_store.py) — `upload_resume_blob`/`download_resume_blob`/`blob_exists` for the `raw-resumes`/`parsed-resumes` containers.
 - [`migrate_from_csv.py`](migrate_from_csv.py) — one-time backfill script, run with `--dry-run` first (writes a preview JSON, makes no Azure connection — safe to run with no resources provisioned at all).
+- [`candidate_id.py`](candidate_id.py) — `candidate_id_for(resume_name)`, a deterministic uuid5 shared by `migrate_from_csv.py` and `ResumeParser.py`'s live dual-write, so the same resume always maps to the same Cosmos document regardless of which path writes it first.
 
 Local imports in this folder are flat (`import client`, not `from context_lake.client import`) — the directory name has a hyphen, which isn't a valid Python package identifier, same convention `voicebot/` already uses for its own local imports.
 
@@ -49,4 +50,8 @@ This is exactly the kind of silent data loss the context lake exists to prevent 
 
 ## Status
 
-Data-access layer (`client.py`, `repositories.py`, `blob_store.py`) and the backfill script (`migrate_from_csv.py`) are built and dry-run verified against this repo's real data (see above). **Not yet wired into the existing scripts** (`ResumeParser.py`, `ResumeMEtrics.py`, etc. still write to CSV/JSON as before) — that's a deliberate separate step, tracked in the Excel tracker's `Feature_Backlog` sheet. **No Azure Cosmos DB / Storage account is provisioned yet**, so nothing has actually been written to Azure — run `migrate_from_csv.py` (without `--dry-run`) once those resources exist and `.env` is filled in.
+Data-access layer (`client.py`, `repositories.py`, `blob_store.py`) and the backfill script (`migrate_from_csv.py`) are built and dry-run verified against this repo's real data (see above).
+
+**Now wired into the live pipeline** (Phase 2 of the roadmap): `ResumeParser.py` dual-writes a candidate document to Cosmos DB after every resume it parses, and `ResumeMEtrics.py` appends a `scoring_history` record per candidate after every scoring run — both alongside the existing CSV writes, which stay the authoritative output for now. Both writes are wrapped in their own `try/except`: if Cosmos DB isn't configured, the attempt fails, logs a clear reason (`write_log()` in ResumeParser.py, a `[WARN]` print in ResumeMEtrics.py), and the script continues exactly as before. Verified for real: ran both scripts end-to-end with no Cosmos DB configured, confirmed exit code 0, correct CSV output, and the expected fail-soft log message naming the missing `COSMOS_ENDPOINT`/`COSMOS_KEY`/`COSMOS_DATABASE`.
+
+**No Azure Cosmos DB / Storage account is provisioned yet** — see [`../docs/azure-provisioning/phase2-cosmos-storage-keyvault.md`](../docs/azure-provisioning/phase2-cosmos-storage-keyvault.md) for step-by-step setup (Portal or Bicep). Once provisioned and `.env` is filled in, the dual-write above starts landing data automatically — no further code changes needed. Then run `migrate_from_csv.py` (without `--dry-run`) once to backfill the historical 84 candidates / 85 transcripts that predate the live wiring.
