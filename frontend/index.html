@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CDPI Recruiter Portal</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
-  <link rel="stylesheet" href="src/styles.css">
+  <link rel="stylesheet" href="src/styles.css?v=4">
 </head>
 <body>
   <div id="root"></div>
@@ -15,18 +15,25 @@
        exact versions. Babel standalone transforms JSX in the browser,
        which is fine for this stopgap but should be replaced by a real
        Vite build once Node is available (frontend/README.md covers the
-       migration path). -->
+       migration path).
+
+       `python -m http.server` sends no Cache-Control headers, so browsers
+       can cache these local .jsx/.js files more aggressively than you'd
+       expect — if you edit one and a reload doesn't show the change, bump
+       the ?v= query param on every script tag below (or hard-refresh:
+       Ctrl+Shift+R). -->
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin></script>
 
-  <script src="src/config.js"></script>
-  <script src="src/mockApiClient.js"></script>
-  <script src="src/apiClient.js"></script>
+  <script src="src/config.js?v=4"></script>
+  <script src="src/mockApiClient.js?v=4"></script>
+  <script src="src/apiClient.js?v=4"></script>
 
-  <script type="text/babel" data-presets="react" src="src/components/Dashboard.jsx"></script>
-  <script type="text/babel" data-presets="react" src="src/components/ReviewQueue.jsx"></script>
-  <script type="text/babel" data-presets="react" src="src/components/CandidatePortal.jsx"></script>
-  <script type="text/babel" data-presets="react" src="src/App.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/components/Login.jsx?v=4"></script>
+  <script type="text/babel" data-presets="react" src="src/components/Dashboard.jsx?v=4"></script>
+  <script type="text/babel" data-presets="react" src="src/components/ReviewQueue.jsx?v=4"></script>
+  <script type="text/babel" data-presets="react" src="src/components/CandidatePortal.jsx?v=4"></script>
+  <script type="text/babel" data-presets="react" src="src/App.jsx?v=4"></script>
 </body>
 </html>

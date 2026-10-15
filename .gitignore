@@ -24,6 +24,8 @@ private/
 
 semantic-library/index/
 
+frontend/src/data/candidates.json
+
 logs/llm_observability.jsonl
 
 azure-functions/local.settings.json

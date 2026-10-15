@@ -53,7 +53,9 @@ function CandidatePortal(props) {
           <div className="status-result">
             <p>Hi {data.result.Name || "there"} — your application is currently:</p>
             <TierBadge tier={data.result.ranking_tier} />
-            <p className="muted">Submitted {new Date(data.result.ingested_at).toLocaleDateString()}</p>
+            {data.result.ingested_at && (
+              <p className="muted">Submitted {new Date(data.result.ingested_at).toLocaleDateString()}</p>
+            )}
           </div>
         )}
         {data.checked && data.error && (

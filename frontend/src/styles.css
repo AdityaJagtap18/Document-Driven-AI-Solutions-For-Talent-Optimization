@@ -46,7 +46,29 @@ body {
 }
 .nav-btn-active { background: var(--accent); color: white; border-color: var(--accent); }
 
-.app-mode-indicator { margin-left: auto; font-size: 0.8rem; color: var(--fg-muted); }
+.app-mode-indicator { margin-left: 12px; font-size: 0.8rem; color: var(--fg-muted); }
+.app-user-indicator { margin-left: auto; font-size: 0.85rem; color: var(--fg-muted); }
+
+.login-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--fg-muted); }
+.login-field input, .login-field select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+.login-demo-hint { font-size: 0.75rem; margin-top: 4px; }
 
 .app-main { padding: 24px; max-width: 980px; margin: 0 auto; width: 100%; }
 

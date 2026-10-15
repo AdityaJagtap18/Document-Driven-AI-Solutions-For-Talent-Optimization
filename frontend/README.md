@@ -48,10 +48,32 @@ Nothing else needs to change — `App.jsx` picks `window.CDPI_REAL_API` or `wind
 
 **Dashboard + HR Reporting combined into one view**: the backlog lists these as two separate features, but HR Reporting was scoped as "extends the Recruiter/Admin Dashboard with exportable reports" — there's no exportable-report endpoint yet either, so there was nothing distinct to build as a second view. Revisit once a reports/export endpoint exists.
 
+## Login (demo accounts, not real auth)
+
+`src/components/Login.jsx` gates which single view renders — no more nav bar letting you click into every persona's view. Hardcoded demo accounts (visible in that file's source, checked entirely client-side):
+
+| Username | Password | Sees |
+|---|---|---|
+| `candidate` | `candidate123` | Candidate Portal only |
+| `recruiter` | `recruiter123` | Human Review Queue only |
+| `admin` | `admin123` | Recruiter/Admin Dashboard only |
+
+This is explicitly **not** access control — it's a usability fix (one view per session instead of free navigation) for a local demo. Real RBAC needs Entra ID / MSAL, see below.
+
+## Real candidate data (mock mode, not hardcoded)
+
+`src/data/candidates.json` (gitignored — it's real names/emails/phone numbers, same PII reasoning as `semantic-library/index/`) replaces the old 4 made-up candidates. Generate/refresh it from the actual pipeline output:
+
+```bash
+python frontend/export_real_candidates.py
+```
+
+Reads `CandidateMetrics_Folder/candidate_ranking_metrics.csv`, writes `src/data/candidates.json` with the same `candidate_id` the real pipeline would assign (via `context-lake/candidate_id.py`'s deterministic uuid5), so these ids stay consistent with whatever ends up in Cosmos DB once that's provisioned. `mockApiClient.js` falls back to a small hardcoded set if this file is missing (e.g. on a fresh checkout before anyone's run the script).
+
 ## What's NOT built (real gaps, not hidden)
 
-- **Admin and Dev persona views** — not started.
-- **RBAC / Entra ID auth** — the persona nav lets you switch freely with zero access control. A real implementation needs an Azure AD App Registration (external Azure setup the user needs to do) and MSAL.js integration. Not faked with a login screen that doesn't actually check anything.
+- **Dev persona view** — not started.
+- **Real RBAC / Entra ID auth** — the demo login above only gates which view renders; it's not a real identity check. A real implementation needs an Azure AD App Registration (external Azure setup the user needs to do) and MSAL.js integration.
 - **URL routing** — view switching is in-memory React state only (no router library, not worth the dependency for 3 views with no bundler). Browser back/refresh loses your place. A real router (React Router, or Vite's file-based routing) should come with the eventual Vite migration.
 - **Application submission (resume upload)** — needs a new API endpoint (file upload → Blob Storage write → trigger processing) that doesn't exist in `azure-functions/api_blueprint.py` yet. The UI placeholder is honest about this rather than faking a working form.
 - **Interview self-scheduling** — depends on the above, plus a scheduling endpoint that also doesn't exist yet.
