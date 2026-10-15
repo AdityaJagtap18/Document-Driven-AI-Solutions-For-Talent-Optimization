@@ -1,17 +1,19 @@
 {
+  "_weights_note": "Semantic Match Score (new, embedding-based) added at 0.10; every other weight scaled by 0.9 from its prior value so the total still sums to 1.00. Original values: JD Match Score 0.15, Experience Score 0.10, Candidate Type Score 0.10, Project Score 0.20, Skill Score 0.20, Certificate Score 0.05, Contribute Score 0.05, Soft Skill Score 0.05, Industry Penalty 0.02, Cultural Fit Score 0.03, Effort Score 0.03, Penalty Score 0.02.",
   "weights": {
-    "JD Match Score": 0.15,
-    "Experience Score": 0.10,
-    "Candidate Type Score": 0.10,
-    "Project Score": 0.20,
-    "Skill Score": 0.20,
-    "Certificate Score": 0.05,
-    "Contribute Score": 0.05,
-    "Soft Skill Score": 0.05,
-    "Industry Penalty": 0.02,
-    "Cultural Fit Score": 0.03,
-    "Effort Score": 0.03,
-    "Penalty Score": 0.02
+    "JD Match Score": 0.135,
+    "Semantic Match Score": 0.10,
+    "Experience Score": 0.09,
+    "Candidate Type Score": 0.09,
+    "Project Score": 0.18,
+    "Skill Score": 0.18,
+    "Certificate Score": 0.045,
+    "Contribute Score": 0.045,
+    "Soft Skill Score": 0.045,
+    "Industry Penalty": 0.018,
+    "Cultural Fit Score": 0.027,
+    "Effort Score": 0.027,
+    "Penalty Score": 0.018
   },
   "skill_rules": {
     "match": 1.0,

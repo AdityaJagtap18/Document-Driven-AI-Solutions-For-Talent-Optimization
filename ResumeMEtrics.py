@@ -7,7 +7,24 @@
 import pandas as pd
 import ast
 import json
+import sys
 from pathlib import Path
+
+# === Semantic search wiring (semantic-library/) ===
+# Adds a 13th scoring dimension, "Semantic Match Score": best-chunk cosine
+# similarity (0-10 scale) between a candidate's indexed resume chunks and the
+# JD, computed from the same embeddings ResumeParser.py persists. This is
+# additive, not a replacement — the existing LLM self-reported "JD Match
+# Score" (jd_match_score(), below) is kept as-is so the two can be compared.
+# If a candidate's resume isn't in the semantic index yet (not yet processed
+# by the updated ResumeParser.py, or re-embedding failed), falls back to that
+# candidate's JD Match Score for this new column too.
+_semantic_lib_dir = Path(__file__).resolve().parent / "semantic-library"
+sys.path.insert(0, str(_semantic_lib_dir))
+from vector_store import LocalVectorStore, cosine_scores  # noqa: E402
+
+SEMANTIC_INDEX_PATH = _semantic_lib_dir / "index" / "resume-chunks.json"
+SEMANTIC_JD_FOLDER = Path("jd_folder")
 
 # === Create output folder ===
 metrics_output_folder = Path("CandidateMetrics_Folder")
@@ -25,6 +42,22 @@ with open("config/scoring_config.json", "r") as f:
 
 weights = config["weights"]
 norm_multiplier = config["normalize_multiplier"]
+
+# === Load JD + embed once, and open the semantic index (graceful if either is unavailable) ===
+semantic_store = LocalVectorStore(str(SEMANTIC_INDEX_PATH))
+jd_vector = None
+jd_files = list(SEMANTIC_JD_FOLDER.glob("*.txt")) if SEMANTIC_JD_FOLDER.exists() else []
+if jd_files:
+    latest_jd_file = max(jd_files, key=lambda f: f.stat().st_mtime)
+    try:
+        from embeddings import embed_text  # imported here: only needed if a JD file exists
+
+        jd_vector = embed_text(latest_jd_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"[WARN] Could not embed JD for semantic scoring ({e}); "
+              f"Semantic Match Score will fall back to JD Match Score for every candidate.")
+else:
+    print("[WARN] No JD file found in jd_folder/; Semantic Match Score will fall back to JD Match Score for every candidate.")
 
 # === Scoring Functions ===
 
@@ -113,6 +146,24 @@ def jd_match_score(jd_str):
     except:
         return 0
 
+def semantic_match_score(resume_name, jd_vector, semantic_store):
+    """Best-chunk cosine similarity (0-10 scale, same range as
+    jd_match_score) between this resume's indexed chunks and the JD. Returns
+    None if the resume isn't in the semantic index yet or no JD embedding is
+    available — caller falls back to jd_match_score() in that case."""
+    if jd_vector is None:
+        return None
+    chunks = semantic_store.find_by_metadata("resume_name", resume_name)
+    if not chunks:
+        return None
+    vectors = [c["vector"] for c in chunks]
+    best = float(max(cosine_scores(vectors, jd_vector)))
+    return round(max(0.0, best) * 10, 2)
+
+def semantic_match_score_or_fallback(row):
+    score = semantic_match_score(row["resume_name"], jd_vector, semantic_store)
+    return score if score is not None else jd_match_score(row["JD Match"])
+
 def experience_score(exp_str):
     try:
         exp = float(exp_str)
@@ -133,6 +184,11 @@ def candidate_type_score(type_str):
 # === Insert Raw Score Columns ===
 
 df.insert(df.columns.get_loc("JD Match") + 1, "JD Match Score", df["JD Match"].apply(jd_match_score))
+df.insert(
+    df.columns.get_loc("JD Match Score") + 1,
+    "Semantic Match Score",
+    df.apply(semantic_match_score_or_fallback, axis=1),
+)
 df.insert(df.columns.get_loc("Relevant Experience (yrs)") + 1, "Experience Score", df["Relevant Experience (yrs)"].apply(experience_score))
 df.insert(df.columns.get_loc("Candidate Type") + 1, "Candidate Type Score", df["Candidate Type"].apply(candidate_type_score))
 df.insert(df.columns.get_loc("Projects") + 1, "Project Score", df["Projects"].apply(project_score))
@@ -206,7 +262,7 @@ df.to_csv(csv_path, index=False)
 
 # Show preview
 print("Updated original CSV with sorted 'Normalized Rank' and added 'Selection Recommendation'.")
-display(df.head(10))
+print(df.head(10).to_string())
 
 
 # In[ ]:

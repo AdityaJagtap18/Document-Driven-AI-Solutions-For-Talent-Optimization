@@ -39,6 +39,11 @@ class VectorStore(ABC):
     def load(self):
         """Loads a previously persisted index, if one exists."""
 
+    @abstractmethod
+    def find_by_metadata(self, key: str, value) -> list:
+        """Returns every [{id, vector, metadata}] whose metadata[key] == value
+        — e.g. all chunks for one resume_name, regardless of similarity."""
+
 
 class LocalVectorStore(VectorStore):
     """A local JSON-backed vector store using numpy cosine similarity — zero
@@ -99,6 +104,15 @@ class LocalVectorStore(VectorStore):
         self._vectors = np.array(data["vectors"], dtype=np.float32) if data["vectors"] else None
         self._metadata = data["metadata"]
 
+    def find_by_metadata(self, key: str, value) -> list:
+        if self._vectors is None:
+            return []
+        return [
+            {"id": doc_id, "vector": self._vectors[i], "metadata": self._metadata[doc_id]}
+            for i, doc_id in enumerate(self._ids)
+            if self._metadata[doc_id].get(key) == value
+        ]
+
     def __len__(self):
         return len(self._ids)
 
@@ -150,3 +164,7 @@ class AzureAISearchVectorStore(VectorStore):
 
     def load(self):
         pass  # Nothing to load locally; reads go straight through search().
+
+    def find_by_metadata(self, key: str, value) -> list:
+        results = self._client().search(search_text=None, filter=f"{key} eq '{value}'", top=1000)
+        return [{"id": r["chunk_id"], "vector": r.get("embedding"), "metadata": r} for r in results]
