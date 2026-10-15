@@ -220,3 +220,115 @@ class TestObservabilitySummary:
         resp = api.observability_summary_endpoint(_req())
         body = json.loads(resp.get_body())
         assert body == {"total_calls": 0, "total_tokens": 0, "total_cost_usd": 0.0, "by_label": {}}
+
+
+class TestVerifyDocument:
+    def _body(self, **overrides):
+        import base64
+        defaults = {
+            "document_base64": base64.b64encode(b"fake pdf bytes").decode(),
+            "claimed_fields": {"Name": "Priya Sharma", "Degree": "B.Tech Computer Science"},
+        }
+        defaults.update(overrides)
+        return defaults
+
+    def test_golden_all_fields_match(self, monkeypatch):
+        import document_intelligence_client
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+            "Name": {"value": "Priya Sharma", "confidence": 0.98},
+            "Degree": {"value": "B.Tech Computer Science", "confidence": 0.91},
+        })
+        audit_calls = []
+        monkeypatch.setattr(repositories, "append_audit_log", lambda e: audit_calls.append(e))
+
+        resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
+        body = json.loads(resp.get_body())
+
+        assert resp.status_code == 200
+        assert body["cross_check"]["match_rate"] == 1.0
+        assert body["cross_check"]["mismatches"] == []
+        assert body["confidence_flagged_fields"] == []
+        assert body["summary"].startswith("OK:")
+        assert audit_calls[0]["action"] == "document_verification"
+
+    def test_golden_mismatch_detected(self, monkeypatch):
+        import document_intelligence_client
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+            "Name": {"value": "Priya Sharma", "confidence": 0.98},
+            "Degree": {"value": "B.Sc Physics", "confidence": 0.91},  # doesn't match claimed
+        })
+        monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+
+        resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
+        body = json.loads(resp.get_body())
+
+        assert resp.status_code == 200
+        assert "Degree" in [m["field"] for m in body["cross_check"]["mismatches"]]
+        assert body["summary"].startswith("REVIEW: field mismatch")
+
+    def test_golden_low_confidence_flagged(self, monkeypatch):
+        import document_intelligence_client
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+            "Name": {"value": "Priya Sharma", "confidence": 0.98},
+            "Degree": {"value": "B.Tech Computer Science", "confidence": 0.3},
+        })
+        monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+
+        resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
+        body = json.loads(resp.get_body())
+
+        assert "Degree" in body["confidence_flagged_fields"]
+        assert "low OCR confidence" in body["summary"]
+
+    def test_adversarial_missing_document(self):
+        resp = api.verify_document_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body={"claimed_fields": {"Name": "Priya"}},
+        ))
+        assert resp.status_code == 400
+
+    def test_adversarial_missing_claimed_fields(self):
+        resp = api.verify_document_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body=self._body(claimed_fields={}),
+        ))
+        assert resp.status_code == 400
+
+    def test_adversarial_invalid_base64(self):
+        resp = api.verify_document_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body=self._body(document_base64="not valid base64!!!"),
+        ))
+        assert resp.status_code == 400
+
+    def test_adversarial_document_intelligence_unavailable_returns_503(self, monkeypatch):
+        import document_intelligence_client
+
+        def broken(file_bytes, **kw):
+            raise RuntimeError("Missing required secret(s): DOCUMENT_INTELLIGENCE_ENDPOINT")
+
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", broken)
+
+        resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
+        assert resp.status_code == 503
+        assert "DOCUMENT_INTELLIGENCE_ENDPOINT" in json.loads(resp.get_body())["error"]
+
+    def test_adversarial_audit_log_failure_does_not_break_the_response(self, monkeypatch):
+        """The verification result itself (the valuable output) must
+        still come back even if writing the audit trail fails."""
+        import document_intelligence_client
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+            "Name": {"value": "Priya Sharma", "confidence": 0.98},
+        })
+
+        def broken_audit(entry):
+            raise RuntimeError("Cosmos DB not configured")
+
+        monkeypatch.setattr(repositories, "append_audit_log", broken_audit)
+
+        resp = api.verify_document_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body=self._body(claimed_fields={"Name": "Priya Sharma"}),
+        ))
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["summary"].startswith("OK:")

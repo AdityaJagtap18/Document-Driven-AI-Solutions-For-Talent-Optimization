@@ -203,6 +203,84 @@ def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
         return f"failed: {e}"
 
 
+@bp.route(route="candidates/{candidate_id}/verify-document", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def verify_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Certificate/marksheet verification. Body:
+    {"document_base64": "...", "claimed_fields": {"Name": "...", "Degree": "...", ...},
+     "fields_to_check": ["Name", "Degree"]}  (fields_to_check defaults to claimed_fields' keys).
+
+    REAL SCOPE NOTE, not papered over: context-lake/schema/candidate.schema.json
+    does not capture Degree/CGPA/Institution as structured fields anywhere
+    — ResumeParser.py's merge prompt never extracts them — so this
+    endpoint cannot read "what the candidate claims" from the existing
+    Cosmos candidate record. claimed_fields must be supplied by the
+    caller (e.g. a future candidate application form that collects this
+    directly), not invented or inferred here.
+
+    Scope per the user's earlier confirmation: internal consistency +
+    tamper/forgery signals only, via document_verification.py's
+    confidence-flagging (NOT a real forgery detector — see that module's
+    docstring). No external institution/board verification.
+    """
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    document_base64 = body.get("document_base64")
+    claimed_fields = body.get("claimed_fields") or {}
+    fields_to_check = body.get("fields_to_check") or list(claimed_fields.keys())
+
+    if not document_base64:
+        return _error_response("'document_base64' is required.", status_code=400)
+    if not claimed_fields:
+        return _error_response("'claimed_fields' is required (nothing to cross-check against).", status_code=400)
+
+    import base64
+    try:
+        file_bytes = base64.b64decode(document_base64, validate=True)
+    except Exception:
+        return _error_response("'document_base64' is not valid base64.", status_code=400)
+
+    try:
+        import document_intelligence_client
+        extracted = document_intelligence_client.analyze_document(file_bytes)
+    except Exception as e:
+        return _error_response(
+            f"Document Intelligence is not available: {e}. "
+            "See docs/azure-provisioning/phase5-document-intelligence-whatsapp.md.",
+            status_code=503,
+        )
+
+    import document_verification
+    extracted_values = {name: f["value"] for name, f in extracted.items()}
+    extracted_confidences = {name: f["confidence"] for name, f in extracted.items()}
+
+    cross_check = document_verification.cross_check_document(extracted_values, claimed_fields, fields_to_check)
+    flagged = document_verification.confidence_flags(extracted_confidences)
+    summary = document_verification.verification_summary(cross_check, flagged)
+
+    try:
+        repositories.append_audit_log({
+            "candidate_id": candidate_id,
+            "action": "document_verification",
+            "summary": summary,
+            "match_rate": cross_check["match_rate"],
+            "mismatches": cross_check["mismatches"],
+            "confidence_flagged_fields": flagged,
+        })
+    except Exception:
+        pass  # audit log is best-effort here — the verification result itself is still returned below
+
+    return _json_response({
+        "candidate_id": candidate_id,
+        "cross_check": cross_check,
+        "confidence_flagged_fields": flagged,
+        "summary": summary,
+    })
+
+
 @bp.route(route="observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard's cost/token usage view. Doesn't touch
