@@ -111,6 +111,60 @@ class TestReviewCandidate:
         assert upserted["ranking_tier"] == "Recommended for Fast-Track"
         assert audit["action"] == "human_review_approve"
         assert audit["reviewer"] == "recruiter@example.com"
+        # no Phone field on this candidate -> notification skipped, not attempted
+        assert json.loads(resp.get_body())["whatsapp_notification"] == "skipped: no phone number on file"
+
+    def test_golden_approve_sends_whatsapp_when_phone_present(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Name": "Priya", "Phone": "15551234567"})
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+
+        sent = {}
+
+        def fake_send_template(to, template_name, parameters=None, **kw):
+            sent["to"] = to
+            sent["template_name"] = template_name
+            sent["parameters"] = parameters
+            return {"messages": [{"id": "wamid.fake"}]}
+
+        import whatsapp_client
+        monkeypatch.setattr(whatsapp_client, "send_whatsapp_template", fake_send_template)
+
+        resp = api.review_candidate_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body={"decision": "approve", "reviewer": "recruiter@example.com"},
+        ))
+
+        body = json.loads(resp.get_body())
+        assert resp.status_code == 200
+        assert body["whatsapp_notification"] == "sent"
+        assert sent["to"] == "15551234567"
+        assert sent["parameters"][0] == "Priya"
+
+    def test_adversarial_whatsapp_failure_does_not_break_the_review_response(self, monkeypatch):
+        """The review was already recorded successfully — a WhatsApp
+        failure must show up as a field in the 200 response, not turn the
+        whole request into an error."""
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Phone": "15551234567"})
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+
+        import whatsapp_client
+
+        def broken_send(*a, **kw):
+            raise RuntimeError("Missing required secret(s): WHATSAPP_ACCESS_TOKEN")
+
+        monkeypatch.setattr(whatsapp_client, "send_whatsapp_template", broken_send)
+
+        resp = api.review_candidate_endpoint(_req(
+            method="POST", route_params={"candidate_id": "abc"},
+            body={"decision": "reject", "reviewer": "recruiter@example.com"},
+        ))
+
+        body = json.loads(resp.get_body())
+        assert resp.status_code == 200
+        assert body["status"] == "recorded"
+        assert "failed:" in body["whatsapp_notification"]
 
     def test_adversarial_invalid_decision_rejected(self):
         resp = api.review_candidate_endpoint(_req(

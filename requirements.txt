@@ -11,7 +11,10 @@ soundfile
 openai-whisper
 selenium
 langchain-community
+requests
 # only needed once Application Insights / Key Vault are provisioned (observability.py, secrets_loader.py):
 # azure-monitor-opentelemetry
 # azure-identity
 # azure-keyvault-secrets
+# only needed once Azure AI Document Intelligence is provisioned (document_intelligence_client.py):
+# azure-ai-documentintelligence

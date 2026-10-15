@@ -33,8 +33,9 @@ from pathlib import Path
 
 import azure.functions as func
 
-_context_lake_dir = Path(__file__).resolve().parent.parent / "context-lake"
-sys.path.insert(0, str(_context_lake_dir))
+_repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_repo_root))
+sys.path.insert(0, str(_repo_root / "context-lake"))
 import repositories  # noqa: E402
 
 bp = func.Blueprint()
@@ -172,7 +173,34 @@ def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         return _cosmos_unavailable_response(e)
 
-    return _json_response({"candidate_id": candidate_id, "decision": decision, "status": "recorded"})
+    # Best-effort WhatsApp notification — deliberately OUTSIDE the Cosmos
+    # try/except above: the review decision has already been recorded
+    # successfully at this point, so a WhatsApp failure (not configured, a
+    # Meta API error, a missing/invalid phone number) must not be reported
+    # back as if the review itself failed. Logged either way, never raises.
+    whatsapp_status = _notify_candidate_whatsapp(candidate, decision)
+
+    return _json_response({
+        "candidate_id": candidate_id, "decision": decision, "status": "recorded",
+        "whatsapp_notification": whatsapp_status,
+    })
+
+
+def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
+    phone = candidate.get("Phone")
+    if not phone:
+        return "skipped: no phone number on file"
+    try:
+        import whatsapp_client
+
+        status_text = "moved forward" if decision == "approve" else "not moving forward at this time"
+        whatsapp_client.send_whatsapp_template(
+            phone, "application_status_update",
+            parameters=[candidate.get("Name", "Candidate"), status_text],
+        )
+        return "sent"
+    except Exception as e:
+        return f"failed: {e}"
 
 
 @bp.route(route="observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
