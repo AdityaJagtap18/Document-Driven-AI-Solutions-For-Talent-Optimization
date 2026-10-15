@@ -71,6 +71,7 @@ Candidate Responses:
         response = call_with_retry(
             llm, [HumanMessage(content=scoring_prompt)],
             on_retry=lambda attempt, e: print(f"Retry {attempt} for scoring: {e}"),
+            label="interview_bot_answer_scoring", model="gpt-3.5-turbo",
         )
         parsed = json.loads(response.content)
         score_data = parsed["scores"]

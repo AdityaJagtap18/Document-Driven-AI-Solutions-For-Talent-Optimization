@@ -188,6 +188,7 @@ Extract the key points in concise bullet form, JSON-style if possible. Do NOT re
         partial_summary = call_with_retry(
             llm.predict, prompt,
             on_retry=lambda attempt, e: write_log(f"Retry {attempt} for chunk summarization on {pdf_path.name}: {e}"),
+            label="resume_chunk_summarization", model="gpt-3.5-turbo",
         )
         summaries.append(partial_summary)
 
@@ -248,6 +249,7 @@ Return only the JSON.
     final_response = call_with_retry(
         llm_merge.predict, merge_prompt,
         on_retry=lambda attempt, e: write_log(f"Retry {attempt} for merge step on {pdf_path.name}: {e}"),
+        label="resume_merge_structured_extraction", model="gpt-3.5-turbo",
     )
 
     try:

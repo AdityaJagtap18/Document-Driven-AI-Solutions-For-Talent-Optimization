@@ -75,6 +75,7 @@ Return the questions in a clean numbered list format.
         response = call_with_retry(
             llm, [HumanMessage(content=prompt)],
             on_retry=lambda attempt, e: print(f"Retry {attempt} for {resume_name}: {e}"),
+            label="interview_questions_generation", model="gpt-3.5-turbo",
         )
         questions_raw = response.content
 

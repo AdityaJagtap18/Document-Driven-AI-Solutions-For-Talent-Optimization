@@ -24,6 +24,8 @@ private/
 
 semantic-library/index/
 
+logs/llm_observability.jsonl
+
 *.log
 
 .ipynb_checkpoints/

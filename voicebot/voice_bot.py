@@ -29,7 +29,7 @@ llm = ChatOpenAI(
 )
 
 
-def ask_openai(prompt):
+def ask_openai(prompt, label="voicebot_call"):
     try:
         messages = [
             SystemMessage(content="You are a friendly and helpful interview assistant and your only here to warm up the candidate your job is to only make the candidate feel good till the actuall interviewer arives. Do not ask leading questions"),
@@ -38,6 +38,7 @@ def ask_openai(prompt):
         response = call_with_retry(
             llm, messages,
             on_retry=lambda attempt, e: print(f"[LangChain/OpenAI Retry {attempt}]: {e}"),
+            label=label, model="gpt-3.5-turbo",
         )
         return response.content
     except Exception as e:
@@ -108,7 +109,7 @@ def run_voice_interview():
         )
 
         try:
-            question_list = ask_openai(prompt).split("\n")
+            question_list = ask_openai(prompt, label="voicebot_warmup_questions").split("\n")
             questions = [q.strip("- ").strip() for q in question_list if q.strip()]
         except:
             questions = ["How are you feeling today?", "Tell me about yourself.", "What attracted you to this role?"]
@@ -128,7 +129,7 @@ def run_voice_interview():
             if answer:
                 yield f"🗣️ You: {answer}"
                 try:
-                    ai_reply = ask_openai(f"The candidate said: '{answer}'. Respond supportively as a warm interviewer.")
+                    ai_reply = ask_openai(f"The candidate said: '{answer}'. Respond supportively as a warm interviewer.", label="voicebot_followup_response")
                 except:
                     ai_reply = "Thank you for your response!"
                 speak(ai_reply)
@@ -136,7 +137,7 @@ def run_voice_interview():
             else:
                 yield f"🗣️ You: (No response)"
                 try:
-                    ai_reply = ask_openai(f"The candidate did not respond to: '{q}'. Say something gentle and supportive.")
+                    ai_reply = ask_openai(f"The candidate did not respond to: '{q}'. Say something gentle and supportive.", label="voicebot_followup_no_response")
                 except:
                     ai_reply = "It's okay, take your time. Let's move to the next one."
                 speak(ai_reply)
@@ -158,7 +159,7 @@ def run_voice_interview():
 
 
         try:
-            score_text = ask_openai(scoring_prompt)
+            score_text = ask_openai(scoring_prompt, label="voicebot_transcript_scoring")
             
             # Extract the first valid number (integer or decimal) from the text
             score_match = re.search(r"\b(\d+(\.\d+)?)\b", score_text)

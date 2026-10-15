@@ -20570,3 +20570,62 @@ __root__
   "resume_name": "Amira_Dasgupta_resume.pdf"
 }
 [2026-10-15 08:44:33] Completed: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:51:42] BE Project Resume Parsing Start
+[2026-10-15 08:51:42] Parsing started: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:51:43] Semantic ranking for Amira_Dasgupta_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-15 08:51:58] Context lake write skipped for Amira_Dasgupta_resume.pdf (CSV write unaffected): Missing required secret(s): COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE. Add them to your .env file (see .env.example) or Key Vault, once the Azure Cosmos DB and/or Storage resources are provisioned.
+[2026-10-15 08:51:58] Details: {
+  "Name": "Amira Dasgupta",
+  "JD Match": "90%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Machine Learning Developer",
+    "Python",
+    "ML frameworks",
+    "algorithms",
+    "data preprocessing",
+    "cloud platforms"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a strong background in developing, training, and optimizing machine learning models. Skilled in data preprocessing, feature engineering, and deploying models in production.",
+  "Projects": [
+    {
+      "Project Name": "Monetize customized platforms",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "PyTorch"
+      ],
+      "Impact": "Successfully implemented customized platforms for monetization purposes."
+    }
+  ],
+  "Certifications & Courses": [
+    "Certification in Monetize customized platforms"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Leadership"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - The candidate's technical skills and experience align well with the job description.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company based on their relevant experience and skills.",
+  "Effort Needed by the Company": "Low - The candidate is well-equipped to handle the responsibilities of the role.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows promise and is a strong fit for the Machine Learning Developer position.",
+  "Email": "yuvaanshetty@hotmail.com",
+  "Phone": "07334126827",
+  "LinkedIn": "",
+  "resume_name": "Amira_Dasgupta_resume.pdf"
+}
+[2026-10-15 08:51:58] Completed: Amira_Dasgupta_resume.pdf
