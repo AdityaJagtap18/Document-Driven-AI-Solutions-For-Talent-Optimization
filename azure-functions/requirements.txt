@@ -1,1 +1,8 @@
 azure-functions
+azure-cosmos
+python-dotenv
+# only needed once Key Vault is provisioned (secrets_loader.py, imported via repositories.py/client.py):
+# azure-identity
+# azure-keyvault-secrets
+# only needed once Application Insights is configured (observability.py, imported by the blob trigger):
+# azure-monitor-opentelemetry

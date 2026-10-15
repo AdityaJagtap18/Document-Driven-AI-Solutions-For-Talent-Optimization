@@ -45,7 +45,10 @@ from pathlib import Path
 
 import azure.functions as func
 
+from api_blueprint import bp as api_bp
+
 app = func.FunctionApp()
+app.register_functions(api_bp)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

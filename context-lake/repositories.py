@@ -36,9 +36,17 @@ def upsert_candidate(candidate: dict) -> dict:
 
 
 def get_candidate(candidate_id: str):
+    """Returns None only when the candidate genuinely doesn't exist.
+    Configuration/connection errors (Cosmos DB not provisioned, bad
+    credentials, etc.) propagate instead of being silently swallowed into a
+    None — callers (e.g. the API layer in azure-functions/api_blueprint.py)
+    need to tell "not found" apart from "the backend is unavailable" to
+    return the right HTTP status (404 vs. 503)."""
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
     try:
         return get_container("candidates").read_item(item=candidate_id, partition_key=candidate_id)
-    except Exception:
+    except CosmosResourceNotFoundError:
         return None
 
 
@@ -48,6 +56,20 @@ def find_candidate_by_resume_name(resume_name: str):
         container.query_items(
             query="SELECT * FROM c WHERE c.resume_name = @resume_name",
             parameters=[{"name": "@resume_name", "value": resume_name}],
+            enable_cross_partition_query=True,
+        )
+    )
+    return items[0] if items else None
+
+
+def find_candidate_by_email(email: str):
+    """For the candidate self-service portal's status check — candidates
+    don't know their internal candidate_id, only the email they applied with."""
+    container = get_container("candidates")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.Email = @email",
+            parameters=[{"name": "@email", "value": email}],
             enable_cross_partition_query=True,
         )
     )
