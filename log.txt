@@ -20187,3 +20187,70 @@ __root__
   "resume_name": "Cassandra_Robbins_resume.pdf"
 }
 [2025-06-27 14:14:10] Completed: Cassandra_Robbins_resume.pdf
+[2026-10-15 07:48:35] BE Project Resume Parsing Start
+[2026-10-15 07:48:35] Parsing started: Amira_Dasgupta_resume.pdf
+[2026-10-15 07:48:36] Semantic ranking for Amira_Dasgupta_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-15 07:48:52] Details: {
+  "Name": "Amira Dasgupta",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Angular"
+    ],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "TensorFlow",
+    "PyTorch",
+    "regression",
+    "classification",
+    "clustering",
+    "deep learning",
+    "data preprocessing",
+    "feature engineering"
+  ],
+  "Profile Summary": "Experienced Surveyor with a strong background in Machine Learning and Data Analysis. Skilled in Python programming and ML frameworks.",
+  "Projects": [
+    {
+      "Project Name": "Monetize customized platforms Certification",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "PyTorch"
+      ],
+      "Impact": "Developed and deployed intelligent models for customized platforms."
+    }
+  ],
+  "Certifications & Courses": [
+    "Monetize customized platforms Certification"
+  ],
+  "Skills That Will Contribute to the Company": [],
+  "Soft Skills & Leadership Qualities": [
+    "Communication"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "Medium - Candidate has relevant technical skills but lacks experience with certain tools and technologies mentioned in the JD.",
+  "Potential Concerns": [
+    "Lack of experience with Java and SQL, missing knowledge of Angular"
+  ],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High",
+  "Effort Needed by the Company": "Medium - Candidate may require training on specific tools and technologies.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": true,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows potential for growth with the right training and support.",
+  "Email": "yuvaanshetty@hotmail.com",
+  "Phone": "07334126827",
+  "LinkedIn": "",
+  "resume_name": "Amira_Dasgupta_resume.pdf"
+}
+[2026-10-15 07:48:52] Completed: Amira_Dasgupta_resume.pdf

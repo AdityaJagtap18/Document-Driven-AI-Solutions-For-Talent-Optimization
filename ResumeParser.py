@@ -82,12 +82,29 @@ import os
 import shutil
 import time
 import json
+import sys
 import pandas as pd
 from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 import re
+
+# === Semantic search wiring (semantic-library/) ===
+# Section-aware chunking + JD-relevance ranking, replacing the old naive
+# char-based chunk_text(). Every chunk (not just the top-K sent to the LLM
+# below) is still persisted into the shared semantic index, so search stays
+# complete even though summarization is filtered for cost. See
+# semantic-library/README.md for the measured chunking-quality fix this
+# builds on (0.39-0.49 -> 0.55-0.60 cosine similarity).
+_semantic_lib_dir = Path(__file__).resolve().parent / "semantic-library"
+sys.path.insert(0, str(_semantic_lib_dir))
+from embeddings import embed_text  # noqa: E402
+from vector_store import LocalVectorStore  # noqa: E402
+from index_resume import embed_and_index_resume_text, rank_by_relevance  # noqa: E402
+
+SEMANTIC_INDEX_PATH = _semantic_lib_dir / "index" / "resume-chunks.json"
+TOP_K_CHUNKS = 5  # only the top-K JD-relevant chunks go through per-chunk LLM summarization
 
 # === Configuration ===
 jd_folder = Path("JD_Folder")
@@ -120,21 +137,7 @@ def extract_text_from_pdf(pdf_path):
             text += page.extract_text()
     return text
 
-def chunk_text(text, max_tokens=3000):
-    sentences = text.split('. ')
-    chunks = []
-    current_chunk = ""
-    for sentence in sentences:
-        if len(current_chunk) + len(sentence) < max_tokens:
-            current_chunk += sentence + ". "
-        else:
-            chunks.append(current_chunk.strip())
-            current_chunk = sentence + ". "
-    if current_chunk:
-        chunks.append(current_chunk.strip())
-    return chunks
-
-def summarize_pdf(pdf_path, jd):
+def summarize_pdf(pdf_path, jd, jd_vector, semantic_store):
     resume_text = extract_text_from_pdf(pdf_path)
 
     # Extract email, phone, LinkedIn
@@ -158,7 +161,18 @@ def summarize_pdf(pdf_path, jd):
         return email, phone, linkedin
 
     email, phone, linkedin = extract_contact_details(resume_text)
-    chunks = chunk_text(resume_text)
+
+    # Section-aware chunk + embed the whole resume, and persist every chunk
+    # to the semantic index (search stays complete even though only the
+    # top-K most JD-relevant chunks get summarized below).
+    all_chunk_results = embed_and_index_resume_text(pdf_path.name, resume_text, semantic_store)
+    selected = rank_by_relevance(all_chunk_results, jd_vector, top_k=TOP_K_CHUNKS)
+    write_log(
+        f"Semantic ranking for {pdf_path.name}: using {len(selected)}/{len(all_chunk_results)} chunks "
+        f"for summarization (all {len(all_chunk_results)} persisted to the semantic index)."
+    )
+    chunks = [r["text"] for r in selected]
+
     summaries = []
 
     llm = ChatOpenAI(temperature=0.7, max_tokens=1000, model="gpt-3.5-turbo")
@@ -264,6 +278,11 @@ with open(latest_jd_file, "r", encoding="utf-8") as f:
     jd = f.read()
 print(f"Loaded JD from: {latest_jd_file.name}")
 
+# Embedded once per run (not once per resume) — the JD doesn't change across
+# the batch, so this is both a cost and a latency win over the naive approach.
+jd_vector = embed_text(jd)
+semantic_store = LocalVectorStore(str(SEMANTIC_INDEX_PATH))
+
 # === Parse Resumes ===
 pdf_paths = list(input_folder.glob("*.pdf"))
 if not pdf_paths:
@@ -279,9 +298,10 @@ for pdf_path in pdf_paths:
     write_log(f"Parsing started: {filename}")
 
     try:
-        parsed_data = summarize_pdf(pdf_path, jd)
+        parsed_data = summarize_pdf(pdf_path, jd, jd_vector, semantic_store)
         parsed_data["resume_name"] = filename
         all_data.append(parsed_data)
+        semantic_store.save()  # persisted per-resume so a later crash doesn't lose earlier progress
         write_log(f"Details: {json.dumps(parsed_data, indent=2)}")
         write_log(f"Completed: {filename}")
     except Exception as e:

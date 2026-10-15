@@ -7,6 +7,21 @@ import os
 from abc import ABC, abstractmethod
 
 
+def cosine_scores(vectors, query_vector):
+    """vectors: a list of vectors or an (n, dim) array-like; query_vector: one
+    vector. Returns a numpy array of cosine similarity scores, shape (n,).
+    Shared by LocalVectorStore.search() and any ad-hoc ranking that needs the
+    same scoring without going through a full VectorStore (e.g. ranking one
+    resume's chunks against a JD at parse time, before they're persisted)."""
+    import numpy as np
+
+    v = np.asarray(vectors, dtype=np.float32)
+    q = np.asarray(query_vector, dtype=np.float32)
+    q_norm = q / (np.linalg.norm(q) + 1e-10)
+    v_norms = v / (np.linalg.norm(v, axis=1, keepdims=True) + 1e-10)
+    return v_norms @ q_norm
+
+
 class VectorStore(ABC):
     @abstractmethod
     def add(self, doc_id: str, vector: list, metadata: dict = None):
@@ -58,10 +73,7 @@ class LocalVectorStore(VectorStore):
 
         if self._vectors is None or not self._ids:
             return []
-        q = np.asarray(query_vector, dtype=np.float32)
-        q_norm = q / (np.linalg.norm(q) + 1e-10)
-        v_norms = self._vectors / (np.linalg.norm(self._vectors, axis=1, keepdims=True) + 1e-10)
-        scores = v_norms @ q_norm
+        scores = cosine_scores(self._vectors, query_vector)
         top_idx = np.argsort(-scores)[:top_k]
         return [
             {"id": self._ids[i], "score": float(scores[i]), "metadata": self._metadata[self._ids[i]]}
