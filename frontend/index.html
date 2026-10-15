@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CDPI Recruiter Portal</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- No bundler (no Node/npm in the environment this was built in — see
+       frontend/README.md). React/ReactDOM/Babel loaded via CDN, pinned to
+       exact versions. Babel standalone transforms JSX in the browser,
+       which is fine for this stopgap but should be replaced by a real
+       Vite build once Node is available (frontend/README.md covers the
+       migration path). -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js" crossorigin></script>
+
+  <script src="src/config.js"></script>
+  <script src="src/mockApiClient.js"></script>
+  <script src="src/apiClient.js"></script>
+
+  <script type="text/babel" data-presets="react" src="src/components/Dashboard.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/components/ReviewQueue.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/components/CandidatePortal.jsx"></script>
+  <script type="text/babel" data-presets="react" src="src/App.jsx"></script>
+</body>
+</html>
