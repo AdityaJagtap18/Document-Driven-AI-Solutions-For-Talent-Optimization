@@ -113,6 +113,19 @@ from index_resume import embed_and_index_resume_text, rank_by_relevance  # noqa:
 SEMANTIC_INDEX_PATH = _semantic_lib_dir / "index" / "resume-chunks.json"
 TOP_K_CHUNKS = 5  # only the top-K JD-relevant chunks go through per-chunk LLM summarization
 
+# === Context lake dual-write (context-lake/) ===
+# Best-effort: every parsed candidate is also upserted into Cosmos DB
+# alongside the existing CSV write, so the lake fills up automatically from
+# today's real pipeline runs instead of needing a separate backfill forever.
+# Fails soft — if Cosmos DB isn't provisioned/configured, this is caught and
+# logged, and the CSV write (the only write this script has ever had) is
+# completely unaffected. See context-lake/README.md and
+# docs/azure-provisioning/phase2-cosmos-storage-keyvault.md.
+_context_lake_dir = Path(__file__).resolve().parent / "context-lake"
+sys.path.insert(0, str(_context_lake_dir))
+from candidate_id import candidate_id_for  # noqa: E402
+from repositories import upsert_candidate  # noqa: E402
+
 # === Configuration ===
 jd_folder = Path("JD_Folder")
 input_folder = Path("InputResume_Folder")
@@ -291,6 +304,16 @@ for pdf_path in pdf_paths:
         parsed_data["resume_name"] = filename
         all_data.append(parsed_data)
         semantic_store.save()  # persisted per-resume so a later crash doesn't lose earlier progress
+
+        try:
+            lake_doc = dict(parsed_data)
+            lake_doc["candidate_id"] = candidate_id_for(filename)
+            lake_doc["source_blob_path"] = f"raw-resumes/{filename}"
+            upsert_candidate(lake_doc)
+            write_log(f"Context lake: wrote candidate document for {filename}")
+        except Exception as e:
+            write_log(f"Context lake write skipped for {filename} (CSV write unaffected): {e}")
+
         write_log(f"Details: {json.dumps(parsed_data, indent=2)}")
         write_log(f"Completed: {filename}")
     except Exception as e:

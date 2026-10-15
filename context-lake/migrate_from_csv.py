@@ -39,12 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pandas as pd
 
-# Fixed namespace so candidate_id is stable across repeated runs (idempotent upserts).
-NAMESPACE = uuid.UUID("c6a7a2d0-6e9b-4b7a-9c7a-2f6b1d9a4b10")
-
-
-def candidate_id_for(resume_name: str) -> str:
-    return str(uuid.uuid5(NAMESPACE, resume_name))
+from candidate_id import candidate_id_for  # shared with ResumeParser.py's dual-write
 
 
 def safe_literal(value, default):

@@ -20506,3 +20506,67 @@ __root__
   "resume_name": "Amira_Dasgupta_resume.pdf"
 }
 [2026-10-15 08:40:41] Completed: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:44:19] BE Project Resume Parsing Start
+[2026-10-15 08:44:19] Parsing started: Amira_Dasgupta_resume.pdf
+[2026-10-15 08:44:19] Semantic ranking for Amira_Dasgupta_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-15 08:44:33] Context lake write skipped for Amira_Dasgupta_resume.pdf (CSV write unaffected): Missing required secret(s): COSMOS_ENDPOINT, COSMOS_KEY, COSMOS_DATABASE. Add them to your .env file (see .env.example) or Key Vault, once the Azure Cosmos DB and/or Storage resources are provisioned.
+[2026-10-15 08:44:33] Details: {
+  "Name": "Amira Dasgupta",
+  "JD Match": "80%",
+  "Missing Keywords": {
+    "Technical Skills": [],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Machine Learning Developer",
+    "Python",
+    "ML frameworks",
+    "algorithms",
+    "data preprocessing"
+  ],
+  "Profile Summary": "Experienced Machine Learning Developer with a focus on designing, developing, and deploying intelligent models to solve real-world problems.",
+  "Projects": [
+    {
+      "Project Name": "Intelligent Model Deployment Project",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "TensorFlow",
+        "PyTorch",
+        "AWS"
+      ],
+      "Impact": "Successfully deployed intelligent models for real-world applications, resulting in improved product performance."
+    }
+  ],
+  "Certifications & Courses": [
+    "Machine Learning Certification"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Strong programming skills",
+    "Experience with ML frameworks",
+    "Understanding of algorithms"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Communication",
+    "Collaboration",
+    "Problem-solving"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High - Candidate's experience and skills align well with the company's focus on cutting-edge technology solutions.",
+  "Potential Concerns": [],
+  "Red Flags & Risk Analysis": [],
+  "Candidate\u2019s Growth Potential": "High potential for growth within the company due to strong technical skills and experience.",
+  "Effort Needed by the Company": "Low - Candidate is well-equipped to contribute effectively to the team and projects.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate shows a strong alignment with the job description and has the potential to make significant contributions to the team.",
+  "Email": "yuvaanshetty@hotmail.com",
+  "Phone": "07334126827",
+  "LinkedIn": "",
+  "resume_name": "Amira_Dasgupta_resume.pdf"
+}
+[2026-10-15 08:44:33] Completed: Amira_Dasgupta_resume.pdf

@@ -29,6 +29,15 @@ from vector_store import LocalVectorStore  # noqa: E402
 SEMANTIC_INDEX_PATH = _semantic_lib_dir / "index" / "resume-chunks.json"
 SEMANTIC_JD_FOLDER = Path("jd_folder")
 
+# === Context lake dual-write (context-lake/) ===
+# Best-effort: every scoring run also appends one scoring_history record per
+# candidate to Cosmos DB, preserving the full before/after history that the
+# CSV (which gets fully overwritten every run) can't. Fails soft — see
+# write_scoring_history_to_lake() below.
+_context_lake_dir = Path(__file__).resolve().parent / "context-lake"
+sys.path.insert(0, str(_context_lake_dir))
+from candidate_id import candidate_id_for  # noqa: E402
+
 
 def load_jd_vector(jd_folder: Path):
     """Embeds the most recently modified JD in jd_folder. Returns None (with
@@ -118,6 +127,32 @@ def add_selection_recommendation(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def write_scoring_history_to_lake(df: pd.DataFrame):
+    """Best-effort: appends one scoring_history record per candidate to the
+    context lake. Fails soft and stops after the first failure instead of
+    retrying every remaining row — if Cosmos DB isn't configured, every
+    subsequent call would fail identically. The CSV output (the only output
+    this script has ever had) is unaffected either way."""
+    try:
+        from repositories import append_scoring_history
+    except Exception as e:
+        print(f"[WARN] Context lake scoring_history write skipped (import failed): {e}")
+        return
+
+    written = 0
+    for _, row in df.iterrows():
+        try:
+            record = json.loads(row.to_json())  # round-trip to plain Python types (no numpy scalars)
+            record["candidate_id"] = candidate_id_for(record.get("resume_name", ""))
+            append_scoring_history(record)
+            written += 1
+        except Exception as e:
+            print(f"[WARN] Context lake scoring_history write stopped after {written} record(s): {e}")
+            break
+    if written:
+        print(f"Context lake: wrote {written} scoring_history record(s).")
+
+
 def main():
     metrics_output_folder = Path("CandidateMetrics_Folder")
     metrics_output_folder.mkdir(parents=True, exist_ok=True)
@@ -141,6 +176,8 @@ def main():
 
     print("Updated original CSV with sorted 'Normalized Rank' and added 'Selection Recommendation'.")
     print(df.head(10).to_string())
+
+    write_scoring_history_to_lake(df)
 
 
 if __name__ == "__main__":
