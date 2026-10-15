@@ -77,14 +77,6 @@ function CandidatePortal(props) {
           <button className="btn" disabled>Submit Application</button>
         </div>
       </section>
-
-      <section className="portal-section portal-section-placeholder">
-        <h3>Self-schedule an interview</h3>
-        <p className="muted">
-          Not wired up yet — depends on both the application-submission flow above and an
-          interview-scheduling endpoint, neither of which exist yet.
-        </p>
-      </section>
     </div>
   );
 }

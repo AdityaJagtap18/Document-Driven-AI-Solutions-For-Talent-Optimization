@@ -105,6 +105,21 @@ body {
 .candidate-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 10px; overflow: hidden; }
 .candidate-table th, .candidate-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
 .candidate-table th { background: #efece4; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
+.candidate-row-clickable { cursor: pointer; }
+.candidate-row-clickable:hover { background: #f3f1ea; }
+
+.detail-panel { background: #fbfaf7; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.detail-section h4 { margin: 0 0 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
+.detail-section p { margin: 4px 0; font-size: 0.88rem; }
+.detail-section-risk { border-left: 3px solid var(--bad); padding-left: 12px; }
+.detail-row { display: flex; gap: 8px; font-size: 0.85rem; margin: 4px 0; align-items: baseline; flex-wrap: wrap; }
+.detail-label { color: var(--fg-muted); min-width: 160px; }
+.detail-value { flex: 1; }
+.detail-project { margin-bottom: 10px; font-size: 0.88rem; }
+.detail-project:last-child { margin-bottom: 0; }
+
+.chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chip { background: #efece4; color: var(--fg); border-radius: 999px; padding: 2px 9px; font-size: 0.78rem; }
 
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
 .badge-good { background: #e3f1ec; color: var(--good); }

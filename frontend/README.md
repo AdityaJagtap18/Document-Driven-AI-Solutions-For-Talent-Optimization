@@ -44,7 +44,7 @@ Nothing else needs to change — `App.jsx` picks `window.CDPI_REAL_API` or `wind
 |---|---|---|
 | Dashboard | Recruiter/Admin Dashboard + HR Reporting Dashboard (combined — see below) | Working: candidate list, tier filter, funnel counts, cost/token stats |
 | Human Review Queue | FDE Stage 23 (HITL) | Working: lists "To be Considered" tier, approve/reject calls the real review endpoint shape, requires a reviewer name |
-| Candidate Portal | Candidate Self-Service Portal | Status check fully working (`GET /candidates/by-email/{email}`). Apply + self-schedule interview are **visible, labeled placeholders** — no backend endpoint exists for either yet; see below |
+| Candidate Portal | Candidate Self-Service Portal | Status check fully working (`GET /candidates/by-email/{email}`). Apply is a **visible, labeled placeholder** — no backend endpoint exists yet; see below. Self-schedule interview was removed per user request rather than left as a placeholder |
 
 **Dashboard + HR Reporting combined into one view**: the backlog lists these as two separate features, but HR Reporting was scoped as "extends the Recruiter/Admin Dashboard with exportable reports" — there's no exportable-report endpoint yet either, so there was nothing distinct to build as a second view. Revisit once a reports/export endpoint exists.
 
@@ -76,7 +76,7 @@ Reads `CandidateMetrics_Folder/candidate_ranking_metrics.csv`, writes `src/data/
 - **Real RBAC / Entra ID auth** — the demo login above only gates which view renders; it's not a real identity check. A real implementation needs an Azure AD App Registration (external Azure setup the user needs to do) and MSAL.js integration.
 - **URL routing** — view switching is in-memory React state only (no router library, not worth the dependency for 3 views with no bundler). Browser back/refresh loses your place. A real router (React Router, or Vite's file-based routing) should come with the eventual Vite migration.
 - **Application submission (resume upload)** — needs a new API endpoint (file upload → Blob Storage write → trigger processing) that doesn't exist in `azure-functions/api_blueprint.py` yet. The UI placeholder is honest about this rather than faking a working form.
-- **Interview self-scheduling** — depends on the above, plus a scheduling endpoint that also doesn't exist yet.
+- **Interview self-scheduling** — removed from the UI per user request (was a placeholder section). Still needs the application-submission flow above plus a scheduling endpoint, neither of which exist, if it comes back later.
 - **`candidates/by-email/{email}` security gap** (inherited from the API layer, not introduced here): nothing stops looking up a different candidate's status by guessing their email. Documented in `azure-functions/api_blueprint.py`'s docstring too.
 
 ## Hosting
