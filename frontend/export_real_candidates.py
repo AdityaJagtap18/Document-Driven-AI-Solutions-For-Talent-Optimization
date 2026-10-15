@@ -111,6 +111,25 @@ def main():
             "normalized_weighted_score": _clean(row.get("Normalized Weighted Score")),
             "ingested_at": None,  # not tracked in the CSV pipeline -- only populated once writing through context-lake
             "Employment Gaps Detected": bool(row.get("Employment Gaps Detected")),
+            # Raw (non-normalized) per-dimension scores -- used by the Admin
+            # Reports view's transparency/explainability radar chart (why
+            # did this tier end up where it did, broken down by dimension).
+            # Not in candidate.schema.json, so these won't be present on a
+            # real/Cosmos-backed candidate record yet -- the chart degrades
+            # gracefully (treats a missing dimension as 0) rather than
+            # crashing in real mode, same as every other CSV-only field here.
+            "Scores": {
+                "Skill": _clean(row.get("Skill Score")),
+                "Project": _clean(row.get("Project Score")),
+                "Certificate": _clean(row.get("Certificate Score")),
+                "Contribute": _clean(row.get("Contribute Score")),
+                "Soft Skill": _clean(row.get("Soft Skill Score")),
+                "Cultural Fit": _clean(row.get("Cultural Fit Score")),
+                "Effort": _clean(row.get("Effort Score")),
+                "Experience": _clean(row.get("Experience Score")),
+                "JD Match": _clean(row.get("JD Match Score")),
+                "Semantic Match": _clean(row.get("Semantic Match Score")),
+            },
         })
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)

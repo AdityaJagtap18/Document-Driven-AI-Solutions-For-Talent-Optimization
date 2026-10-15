@@ -50,6 +50,11 @@ function App() {
   var userState = React.useState(loadStoredUser);
   var user = userState[0];
   var setUser = userState[1];
+  // Admin-only sub-tab (Dashboard vs Reports) -- every other role still
+  // has exactly one view, nothing to tab between.
+  var adminTabState = React.useState("dashboard");
+  var adminTab = adminTabState[0];
+  var setAdminTab = adminTabState[1];
 
   function handleLogin(loggedInUser) {
     storeUser(loggedInUser);
@@ -65,10 +70,28 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
+  var isAdmin = user.view === "dashboard";
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="app-title">CDPI</div>
+        {isAdmin && (
+          <nav className="nav-tabs">
+            <button
+              className={"nav-btn" + (adminTab === "dashboard" ? " nav-btn-active" : "")}
+              onClick={function () { setAdminTab("dashboard"); }}
+            >
+              Dashboard
+            </button>
+            <button
+              className={"nav-btn" + (adminTab === "reports" ? " nav-btn-active" : "")}
+              onClick={function () { setAdminTab("reports"); }}
+            >
+              Reports
+            </button>
+          </nav>
+        )}
         <div className="app-user-indicator">
           {user.name} &middot; <strong>{user.roleLabel}</strong>
         </div>
@@ -79,7 +102,8 @@ function App() {
       </header>
 
       <main className="app-main">
-        {user.view === "dashboard" && <Dashboard api={api} />}
+        {user.view === "dashboard" && adminTab === "dashboard" && <Dashboard api={api} />}
+        {user.view === "dashboard" && adminTab === "reports" && <AdminReports api={api} />}
         {user.view === "review" && <ReviewQueue api={api} />}
         {user.view === "portal" && <CandidatePortal api={api} />}
       </main>

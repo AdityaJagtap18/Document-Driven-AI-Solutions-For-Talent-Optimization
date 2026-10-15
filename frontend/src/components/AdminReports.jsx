@@ -1,0 +1,213 @@
+/**
+ * Admin Reports: 8 charts for reporting/transparency, built from the same
+ * api.listCandidates()/api.observabilitySummary() data the Dashboard
+ * already uses (not a separate data source) -- so this works identically
+ * in mock and real mode, same fidelity caveats as everywhere else in
+ * mock mode (see frontend/README.md).
+ *
+ * Chart.js (CDN, see index.html) draws into plain <canvas> elements via
+ * ChartCanvas below -- no react-chartjs-2 wrapper (no npm/bundler here),
+ * just the imperative Chart.js API driven from a useEffect.
+ *
+ * The "Average score by dimension" radar chart is the explainability
+ * piece: it's not just "here's the tier breakdown" but "here's WHY
+ * Fast-Track candidates and Rejected candidates ended up where they did,
+ * dimension by dimension" -- using the raw per-dimension scores
+ * (candidate.Scores, see export_real_candidates.py), not just the single
+ * final Resume Strength Score. Candidates from a real/Cosmos backend
+ * won't have .Scores yet (not in candidate.schema.json) -- missing
+ * dimensions are treated as 0 in the average rather than crashing.
+ */
+var CHART_COLORS = {
+  accent: "#1f6f5c", good: "#1f6f5c", bad: "#a4402f", neutral: "#8a6d3b",
+  blue: "#3b6ea5", purple: "#7b5ea7", teal: "#2a9d8f", amber: "#c98a2b",
+  gray: "#6b6758",
+};
+var PALETTE = [CHART_COLORS.accent, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.purple,
+  CHART_COLORS.teal, CHART_COLORS.bad, CHART_COLORS.gray, CHART_COLORS.neutral];
+
+function ChartCanvas(props) {
+  var canvasRef = React.useRef(null);
+
+  React.useEffect(function () {
+    if (!canvasRef.current) return undefined;
+    var chart = new Chart(canvasRef.current, props.config);
+    return function () { chart.destroy(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(props.config)]);
+
+  return <canvas ref={canvasRef}></canvas>;
+}
+
+function ChartCard(props) {
+  return (
+    <div className="chart-card">
+      <h4>{props.title}</h4>
+      <div className="chart-card-canvas">{props.children}</div>
+    </div>
+  );
+}
+
+function countBy(items, keyFn) {
+  var counts = {};
+  items.forEach(function (item) {
+    var key = keyFn(item) || "Unspecified";
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  return counts;
+}
+
+function avg(nums) {
+  var valid = nums.filter(function (n) { return typeof n === "number" && !isNaN(n); });
+  if (!valid.length) return 0;
+  return valid.reduce(function (a, b) { return a + b; }, 0) / valid.length;
+}
+
+function AdminReports(props) {
+  var api = props.api;
+  var state = React.useState({ loading: true, error: null, candidates: [], observability: null });
+  var data = state[0];
+  var setData = state[1];
+
+  React.useEffect(function () {
+    Promise.all([api.listCandidates(), api.observabilitySummary()])
+      .then(function (results) {
+        setData({ loading: false, error: null, candidates: results[0].candidates, observability: results[1] });
+      })
+      .catch(function (err) {
+        setData({ loading: false, error: err.message, candidates: [], observability: null });
+      });
+  }, []);
+
+  if (data.loading) return <div className="view"><h2>Reports</h2><p className="muted">Loading…</p></div>;
+  if (data.error) return <div className="view"><h2>Reports</h2><div className="banner banner-error">{data.error}</div></div>;
+
+  var candidates = data.candidates;
+
+  // 1. Tier distribution (Pie)
+  var tierCounts = countBy(candidates, function (c) { return c.ranking_tier; });
+  var tierConfig = {
+    type: "pie",
+    data: {
+      labels: Object.keys(tierCounts),
+      datasets: [{ data: Object.values(tierCounts), backgroundColor: [CHART_COLORS.good, CHART_COLORS.neutral, CHART_COLORS.bad] }],
+    },
+  };
+
+  // 2. Candidate Type distribution (Doughnut)
+  var typeCounts = countBy(candidates, function (c) { return c["Candidate Type"]; });
+  var typeConfig = {
+    type: "doughnut",
+    data: { labels: Object.keys(typeCounts), datasets: [{ data: Object.values(typeCounts), backgroundColor: PALETTE }] },
+  };
+
+  // 3. Resume Strength Score histogram (Bar)
+  var buckets = ["0-2", "2-4", "4-6", "6-8", "8-10"];
+  var bucketCounts = [0, 0, 0, 0, 0];
+  candidates.forEach(function (c) {
+    var s = c["Resume Strength Score"];
+    if (typeof s !== "number") return;
+    var idx = Math.min(4, Math.floor(s / 2));
+    bucketCounts[idx] += 1;
+  });
+  var scoreHistConfig = {
+    type: "bar",
+    data: { labels: buckets, datasets: [{ label: "Candidates", data: bucketCounts, backgroundColor: CHART_COLORS.blue }] },
+    options: { plugins: { legend: { display: false } } },
+  };
+
+  // 4. Normalized Weighted Score by rank (Line)
+  var sorted = candidates.slice().sort(function (a, b) {
+    return (b.normalized_weighted_score || 0) - (a.normalized_weighted_score || 0);
+  });
+  var rankLineConfig = {
+    type: "line",
+    data: {
+      labels: sorted.map(function (c, i) { return i + 1; }),
+      datasets: [{
+        label: "Normalized Weighted Score", data: sorted.map(function (c) { return c.normalized_weighted_score; }),
+        borderColor: CHART_COLORS.accent, backgroundColor: "transparent", tension: 0.15,
+      }],
+    },
+    options: { plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: "Rank" } } } },
+  };
+
+  // 5. Top industries (horizontal Bar)
+  var industryCounts = countBy(candidates, function (c) { return c["Industry Experience"]; });
+  var topIndustries = Object.entries(industryCounts).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8);
+  var industryConfig = {
+    type: "bar",
+    data: {
+      labels: topIndustries.map(function (e) { return e[0]; }),
+      datasets: [{ label: "Candidates", data: topIndustries.map(function (e) { return e[1]; }), backgroundColor: CHART_COLORS.teal }],
+    },
+    options: { indexAxis: "y", plugins: { legend: { display: false } } },
+  };
+
+  // 6. Top matching skills (PolarArea)
+  var skillCounts = {};
+  candidates.forEach(function (c) {
+    (c["Top Matching Keywords"] || []).forEach(function (skill) {
+      skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+    });
+  });
+  var topSkills = Object.entries(skillCounts).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 8);
+  var skillsConfig = {
+    type: "polarArea",
+    data: {
+      labels: topSkills.map(function (e) { return e[0]; }),
+      datasets: [{ data: topSkills.map(function (e) { return e[1]; }), backgroundColor: PALETTE }],
+    },
+  };
+
+  // 7. Average score by dimension, Fast-Track vs Rejected (Radar)
+  var dimensions = ["Skill", "Project", "Certificate", "Contribute", "Soft Skill", "Cultural Fit", "Effort", "Experience"];
+  function avgByTier(tier) {
+    var inTier = candidates.filter(function (c) { return c.ranking_tier === tier; });
+    return dimensions.map(function (dim) {
+      return avg(inTier.map(function (c) { return c.Scores ? c.Scores[dim] : undefined; }));
+    });
+  }
+  var radarConfig = {
+    type: "radar",
+    data: {
+      labels: dimensions,
+      datasets: [
+        { label: "Recommended for Fast-Track", data: avgByTier("Recommended for Fast-Track"), borderColor: CHART_COLORS.good, backgroundColor: "rgba(31,111,92,0.2)" },
+        { label: "Rejected", data: avgByTier("Rejected"), borderColor: CHART_COLORS.bad, backgroundColor: "rgba(164,64,47,0.2)" },
+      ],
+    },
+  };
+
+  // 8. LLM tokens by call label (Bar)
+  var byLabel = (data.observability && data.observability.by_label) || {};
+  var labelEntries = Object.entries(byLabel);
+  var tokensConfig = {
+    type: "bar",
+    data: {
+      labels: labelEntries.map(function (e) { return e[0]; }),
+      datasets: [{ label: "Tokens used", data: labelEntries.map(function (e) { return e[1].tokens; }), backgroundColor: CHART_COLORS.purple }],
+    },
+    options: { plugins: { legend: { display: false } } },
+  };
+
+  return (
+    <div className="view">
+      <h2>Reports</h2>
+      <p className="muted">
+        {candidates.length} candidate(s). Built from the same data as the Dashboard — nothing here is
+        separately maintained or hand-curated.
+      </p>
+      <div className="chart-grid">
+        <ChartCard title="Tier Distribution"><ChartCanvas config={tierConfig} /></ChartCard>
+        <ChartCard title="Candidate Type Distribution"><ChartCanvas config={typeConfig} /></ChartCard>
+        <ChartCard title="Resume Strength Score Distribution"><ChartCanvas config={scoreHistConfig} /></ChartCard>
+        <ChartCard title="Normalized Weighted Score by Rank"><ChartCanvas config={rankLineConfig} /></ChartCard>
+        <ChartCard title="Top Industries"><ChartCanvas config={industryConfig} /></ChartCard>
+        <ChartCard title="Top Matching Skills"><ChartCanvas config={skillsConfig} /></ChartCard>
+        <ChartCard title="Avg Score by Dimension — Fast-Track vs Rejected"><ChartCanvas config={radarConfig} /></ChartCard>
+        <ChartCard title="LLM Tokens Used by Call Type"><ChartCanvas config={tokensConfig} /></ChartCard>
+      </div>
+    </div>
+  );
+}

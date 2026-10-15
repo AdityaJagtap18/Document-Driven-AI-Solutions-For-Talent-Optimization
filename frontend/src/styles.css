@@ -174,8 +174,21 @@ body {
 .application-form textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; font-family: inherit; resize: vertical; width: 100%; box-sizing: border-box; }
 .application-form .btn { align-self: flex-start; }
 
+.nav-tabs { display: flex; gap: 8px; margin-right: 12px; }
+
+.chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 18px; }
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.chart-card h4 { margin: 0 0 12px; font-size: 0.85rem; color: var(--fg-muted); }
+.chart-card-canvas { position: relative; height: 260px; }
+
 @media (max-width: 600px) {
   .app-main { padding: 16px; }
   .review-card { flex-direction: column; align-items: flex-start; }
   .application-form-grid { grid-template-columns: 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
 }
