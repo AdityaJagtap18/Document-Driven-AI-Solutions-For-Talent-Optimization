@@ -1,11 +1,9 @@
 streamlit
 pandas
-SpeechRecognition
 openai
 langchain
 langchain-openai
-elevenlabs
-pyaudio
+azure-cognitiveservices-speech
 numpy
 python-dotenv
 streamlit-webrtc

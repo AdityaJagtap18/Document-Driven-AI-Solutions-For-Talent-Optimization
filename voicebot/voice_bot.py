@@ -1,10 +1,9 @@
 import pandas as pd
-import speech_recognition as sr
 import json
 import sys
 import time
 from pathlib import Path
-from elevenlabs_utils import speak
+from azure_speech_utils import speak, listen
 import openai
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
@@ -45,34 +44,6 @@ def ask_openai(prompt, label="voicebot_call"):
         print(f"[LangChain/OpenAI Error]: {e}")
         return "Thanks for your response! Let's continue."
 
-
-def listen(save_path=None):
-    r = sr.Recognizer()
-    r.energy_threshold = 300
-    r.pause_threshold = 2.0
-    r.dynamic_energy_threshold = True
-
-    with sr.Microphone() as source:
-        print("Listening... Speak freely. Stop when you're done.")
-        try:
-            audio = r.listen(source)
-        except Exception as e:
-            print("Mic Error:", e)
-            return "", None
-
-    try:
-        text = r.recognize_google(audio)
-        print("User:", text)
-        # Save audio
-        if save_path:
-            with open(save_path, "wb") as f:
-                f.write(audio.get_wav_data())
-        return text.strip(), save_path
-    except sr.UnknownValueError:
-        return "", None
-    except sr.RequestError as e:
-        print("API error:", e)
-        return "", None
 
 def run_voice_interview():
     df = pd.read_csv("resume_summary.csv")
