@@ -4,6 +4,7 @@ before committing it) — no running Functions host needed, no real Cosmos
 DB needed. repositories.* is monkeypatched per test so these never touch
 a network."""
 
+import base64
 import json
 
 import azure.functions as func
@@ -12,6 +13,7 @@ import pytest
 import api_blueprint as api
 import repositories
 import jd_manager
+import blob_store
 
 
 def _req(method="GET", route_params=None, body=None):
@@ -169,6 +171,108 @@ class TestCandidateByEmail:
         monkeypatch.setattr(repositories, "find_candidate_by_email", lambda email: None)
         resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "nobody@example.com"}))
         assert resp.status_code == 404
+
+
+class TestSubmitApplication:
+    def _body(self, **overrides):
+        base = {
+            "full_name": "Jane Doe", "email": "jane@example.com", "phone": "5551234567",
+            "resume_base64": base64.b64encode(b"%PDF-1.4 fake pdf bytes").decode(),
+            "resume_filename": "jane_doe_resume.pdf",
+        }
+        base.update(overrides)
+        return base
+
+    def test_golden_uploads_and_logs_audit_entry(self, monkeypatch):
+        uploaded = {}
+        monkeypatch.setattr(
+            blob_store, "upload_resume_bytes",
+            lambda container, path, data: uploaded.update(container=container, path=path, data=data),
+        )
+        logged = {}
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.update(entry))
+
+        resp = api.submit_application_endpoint(_req(body=self._body()))
+        assert resp.status_code == 202
+        body = json.loads(resp.get_body())
+        assert body["status"] == "submitted"
+        assert "candidate_id" in body
+
+        assert uploaded["container"] == "raw-resumes"
+        assert uploaded["path"] == "jane_doe_resume.pdf"
+        assert uploaded["data"] == b"%PDF-1.4 fake pdf bytes"
+
+        assert logged["action"] == "application_submitted"
+        assert logged["email"] == "jane@example.com"
+        assert logged["candidate_id"] == body["candidate_id"]
+
+    def test_golden_candidate_id_matches_real_pipeline_convention(self, monkeypatch):
+        # candidate_id must be computed the exact same way ResumeParser.py's
+        # dual-write will compute it later for the same filename, or status
+        # lookups after processing would never find this candidate.
+        from candidate_id import candidate_id_for
+
+        monkeypatch.setattr(blob_store, "upload_resume_bytes", lambda container, path, data: None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: entry)
+
+        resp = api.submit_application_endpoint(_req(body=self._body(resume_filename="unique_name_123.pdf")))
+        body = json.loads(resp.get_body())
+        assert body["candidate_id"] == candidate_id_for("unique_name_123.pdf")
+
+    def test_edge_missing_full_name_returns_400(self, monkeypatch):
+        resp = api.submit_application_endpoint(_req(body=self._body(full_name="")))
+        assert resp.status_code == 400
+
+    def test_edge_missing_email_returns_400(self, monkeypatch):
+        resp = api.submit_application_endpoint(_req(body=self._body(email="")))
+        assert resp.status_code == 400
+
+    def test_edge_missing_resume_returns_400(self, monkeypatch):
+        resp = api.submit_application_endpoint(_req(body=self._body(resume_base64="")))
+        assert resp.status_code == 400
+
+    def test_edge_non_pdf_filename_rejected(self, monkeypatch):
+        resp = api.submit_application_endpoint(_req(body=self._body(resume_filename="resume.docx")))
+        assert resp.status_code == 400
+
+    def test_adversarial_invalid_base64_returns_400(self, monkeypatch):
+        resp = api.submit_application_endpoint(_req(body=self._body(resume_base64="not valid base64!!!")))
+        assert resp.status_code == 400
+
+    def test_adversarial_path_traversal_filename_sanitized(self, monkeypatch):
+        uploaded = {}
+        monkeypatch.setattr(
+            blob_store, "upload_resume_bytes",
+            lambda container, path, data: uploaded.update(path=path),
+        )
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: entry)
+
+        resp = api.submit_application_endpoint(
+            _req(body=self._body(resume_filename="../../etc/passwd_evil.pdf"))
+        )
+        assert resp.status_code == 202
+        assert uploaded["path"] == "passwd_evil.pdf"
+        assert ".." not in uploaded["path"]
+
+    def test_adversarial_blob_storage_unavailable_returns_503(self, monkeypatch):
+        def broken(container, path, data):
+            raise RuntimeError("Missing required secret(s): BLOB_CONNECTION_STRING")
+
+        monkeypatch.setattr(blob_store, "upload_resume_bytes", broken)
+        resp = api.submit_application_endpoint(_req(body=self._body()))
+        assert resp.status_code == 503
+
+    def test_adversarial_audit_log_failure_does_not_break_response(self, monkeypatch):
+        monkeypatch.setattr(blob_store, "upload_resume_bytes", lambda container, path, data: None)
+
+        def broken_audit(entry):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "append_audit_log", broken_audit)
+        resp = api.submit_application_endpoint(_req(body=self._body()))
+        # the upload already succeeded -- an audit-log failure must not be
+        # reported back as if the application submission itself failed
+        assert resp.status_code == 202
 
 
 class TestReviewCandidate:

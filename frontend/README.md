@@ -44,7 +44,7 @@ Nothing else needs to change — `App.jsx` picks `window.CDPI_REAL_API` or `wind
 |---|---|---|
 | Dashboard | Recruiter/Admin Dashboard + HR Reporting Dashboard (combined — see below) | Working: candidate list, tier filter, funnel counts, cost/token stats |
 | Human Review Queue | FDE Stage 23 (HITL) | Working: lists "To be Considered" tier, approve/reject calls the real review endpoint shape, requires a reviewer name |
-| Candidate Portal | Candidate Self-Service Portal | Status check fully working (`GET /candidates/by-email/{email}`). Apply is a **visible, labeled placeholder** — no backend endpoint exists yet; see below. Self-schedule interview was removed per user request rather than left as a placeholder |
+| Candidate Portal | Candidate Self-Service Portal | Status check working (`GET /candidates/by-email/{email}`). Apply is now a real, working form — `POST /applications`, see below. Self-schedule interview was removed per user request rather than left as a placeholder |
 
 **Dashboard + HR Reporting combined into one view**: the backlog lists these as two separate features, but HR Reporting was scoped as "extends the Recruiter/Admin Dashboard with exportable reports" — there's no exportable-report endpoint yet either, so there was nothing distinct to build as a second view. Revisit once a reports/export endpoint exists.
 
@@ -70,13 +70,22 @@ python frontend/export_real_candidates.py
 
 Reads `CandidateMetrics_Folder/candidate_ranking_metrics.csv`, writes `src/data/candidates.json` with the same `candidate_id` the real pipeline would assign (via `context-lake/candidate_id.py`'s deterministic uuid5), so these ids stay consistent with whatever ends up in Cosmos DB once that's provisioned. `mockApiClient.js` falls back to a small hardcoded set if this file is missing (e.g. on a fresh checkout before anyone's run the script).
 
+## Application submission (real, wired up)
+
+The "Submit a new application" form (`ApplicationForm` in `CandidatePortal.jsx`) is a real, comprehensive form — full name, email, phone, LinkedIn, which open role (sourced from `GET /jds`, see Phase 6), a cover note, and a required resume PDF — that calls `POST /applications` (new endpoint in `azure-functions/api_blueprint.py`, ANONYMOUS, 10 unit tests in `tests/test_api_blueprint.py`'s `TestSubmitApplication`).
+
+It uploads the resume straight to the `raw-resumes` Blob container; the existing blob-triggered function from Phase 3 (`function_app.py`'s `resume_blob_trigger`) already watches that container and runs the normal `ResumeParser.py` pipeline automatically — nothing new needed there. In **mock mode** (the default, see `config.js`) this validates input the same way the real endpoint does but doesn't actually upload or process anything (no Blob Storage to call); switch to `mode: "real"` against a deployed API (see `infra/deploy.ps1`) to see it go through the real pipeline.
+
+**Real scope limit, not hidden**: `jd_id` and `cover_note` are collected and recorded in the `audit_log` entry for a human to read, but nothing in `ResumeMEtrics.py`/`ResumeParser.py` reads either one — candidates are scored against every active JD (see `jd_manager.py`), not targeted at the one the applicant picked, and cover notes aren't fed into scoring at all. The form doesn't pretend otherwise.
+
+Browser-tool limitation, not a code gap: file-picker interaction couldn't be driven by this session's browser automation, so the live end-to-end upload (through an actual browser click) wasn't exercised here — verified instead via the endpoint's unit tests (upload call, audit log, all the validation/error paths) and the rest of the form's behavior (rendering, client-side validation blocking submission without a file).
+
 ## What's NOT built (real gaps, not hidden)
 
 - **Dev persona view** — not started.
 - **Real RBAC / Entra ID auth** — the demo login above only gates which view renders; it's not a real identity check. A real implementation needs an Azure AD App Registration (external Azure setup the user needs to do) and MSAL.js integration.
 - **URL routing** — view switching is in-memory React state only (no router library, not worth the dependency for 3 views with no bundler). Browser back/refresh loses your place. A real router (React Router, or Vite's file-based routing) should come with the eventual Vite migration.
-- **Application submission (resume upload)** — needs a new API endpoint (file upload → Blob Storage write → trigger processing) that doesn't exist in `azure-functions/api_blueprint.py` yet. The UI placeholder is honest about this rather than faking a working form.
-- **Interview self-scheduling** — removed from the UI per user request (was a placeholder section). Still needs the application-submission flow above plus a scheduling endpoint, neither of which exist, if it comes back later.
+- **Interview self-scheduling** — removed from the UI per user request (was a placeholder section). Would need its own scheduling endpoint if it comes back later.
 - **`candidates/by-email/{email}` security gap** (inherited from the API layer, not introduced here): nothing stops looking up a different candidate's status by guessing their email. Documented in `azure-functions/api_blueprint.py`'s docstring too.
 
 ## Hosting

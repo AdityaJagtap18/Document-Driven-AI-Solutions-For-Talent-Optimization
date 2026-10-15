@@ -157,6 +157,44 @@ window.CDPI_MOCK_API = {
     });
   },
 
+  submitApplication: function (fields) {
+    // Mock mode has no Blob Storage / blob-triggered function to actually
+    // run -- this validates the same way the real endpoint does and
+    // returns a believable receipt, but nothing is actually uploaded or
+    // processed. See apiClient.js's submitApplication for the real call.
+    if (!fields.fullName || !fields.fullName.trim()) {
+      var err1 = new Error("'full_name' is required."); err1.status = 400; return Promise.reject(err1);
+    }
+    if (!fields.email || !fields.email.trim()) {
+      var err2 = new Error("'email' is required."); err2.status = 400; return Promise.reject(err2);
+    }
+    if (!fields.resumeBase64) {
+      var err3 = new Error("'resume_base64' is required."); err3.status = 400; return Promise.reject(err3);
+    }
+    if (!fields.resumeFilename || !/\.pdf$/i.test(fields.resumeFilename)) {
+      var err4 = new Error("'resume_filename' must end in '.pdf'."); err4.status = 400; return Promise.reject(err4);
+    }
+    return mockDelay({
+      candidate_id: "mock-" + fields.resumeFilename.replace(/[^a-zA-Z0-9]/g, "-"),
+      status: "submitted",
+      message: "(Mock mode) Received, but nothing is actually processed -- no Blob Storage or Function host is running. "
+        + "Switch config.js to mode: \"real\" against a deployed API to see this go through the real pipeline.",
+    });
+  },
+
+  listJds: function () {
+    // Real jd_folder/ contents aren't exported to the frontend (unlike
+    // candidates.json) -- these are illustrative mock JDs only, not a
+    // snapshot of real data.
+    return mockDelay({
+      count: 2,
+      jds: [
+        { jd_id: "ml_developer", jd_filename: "ml_developer.txt" },
+        { jd_id: "data_analyst", jd_filename: "data_analyst.txt" },
+      ],
+    });
+  },
+
   observabilitySummary: function () {
     return mockDelay({
       total_calls: 23, total_tokens: 15420, total_cost_usd: 0.028114,

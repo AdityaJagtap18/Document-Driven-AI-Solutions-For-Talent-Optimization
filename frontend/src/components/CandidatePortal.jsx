@@ -1,12 +1,19 @@
 /**
- * Candidate Self-Service Portal. This pass covers the "track status" half
- * (GET /api/candidates/by-email/{email} — the one real endpoint that
- * exists for candidates) in full. The "apply + upload docs" half is a
- * visible, clearly-labeled placeholder, not wired to a real endpoint —
- * see frontend/README.md for why (no application-submission endpoint
- * exists yet in azure-functions/api_blueprint.py; building one needs a
- * resume-upload + Blob Storage write flow that's its own real scope,
- * not something to fake just to fill the screen).
+ * Candidate Self-Service Portal.
+ *
+ * "Check status" covers the one real read endpoint for candidates
+ * (GET /api/candidates/by-email/{email}) in full.
+ *
+ * "Submit a new application" is now a real, working form — POST
+ * /api/applications (azure-functions/api_blueprint.py), which uploads the
+ * resume to Blob Storage and lets the existing blob-triggered function
+ * (Phase 3) pick it up and run the normal ResumeParser.py pipeline. In
+ * mock mode (the default here, see frontend/README.md) this validates
+ * input the same way but doesn't actually upload or process anything —
+ * switch config.js to mode: "real" against a deployed API to exercise it
+ * for real. jd_id/cover_note are collected and sent (visible in the
+ * audit log) but NOT acted on by the scoring pipeline yet — see the
+ * endpoint's docstring for why; not faked as if they influenced ranking.
  */
 function CandidatePortal(props) {
   var api = props.api;
@@ -63,20 +70,160 @@ function CandidatePortal(props) {
         )}
       </section>
 
-      <section className="portal-section portal-section-placeholder">
-        <h3>Submit a new application</h3>
-        <p className="muted">
-          Not wired up yet — no application-submission API endpoint exists. Building this needs a
-          real resume-upload flow (file input → Blob Storage → trigger processing), which is its
-          own scope, not something to fake here. See frontend/README.md.
-        </p>
-        <div className="placeholder-form" aria-hidden="true">
-          <input type="text" disabled placeholder="Full name" />
-          <input type="email" disabled placeholder="Email" />
-          <input type="file" disabled />
-          <button className="btn" disabled>Submit Application</button>
-        </div>
-      </section>
+      <ApplicationForm api={api} />
     </div>
+  );
+}
+
+var EMPTY_APPLICATION = {
+  fullName: "", email: "", phone: "", linkedin: "", jdId: "", coverNote: "",
+  resumeFile: null,
+};
+
+function ApplicationForm(props) {
+  var api = props.api;
+  var formState = React.useState(EMPTY_APPLICATION);
+  var form = formState[0];
+  var setForm = formState[1];
+  var jdsState = React.useState([]);
+  var jds = jdsState[0];
+  var setJds = jdsState[1];
+  var submitState = React.useState({ submitting: false, result: null, error: null });
+  var submit = submitState[0];
+  var setSubmit = submitState[1];
+
+  React.useEffect(function () {
+    api.listJds()
+      .then(function (r) { setJds(r.jds || []); })
+      .catch(function () { setJds([]); }); // non-fatal -- the JD dropdown just stays empty/"Not specified"
+  }, []);
+
+  function setField(name) {
+    return function (e) {
+      var value = e.target.value;
+      setForm(function (f) {
+        var updated = Object.assign({}, f);
+        updated[name] = value;
+        return updated;
+      });
+    };
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        // reader.result is "data:application/pdf;base64,AAAA..." -- strip the prefix
+        var commaIndex = reader.result.indexOf(",");
+        resolve(reader.result.slice(commaIndex + 1));
+      };
+      reader.onerror = function () { reject(new Error("Could not read the selected file.")); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.resumeFile) {
+      setSubmit({ submitting: false, result: null, error: "Please choose a resume PDF to upload." });
+      return;
+    }
+    setSubmit({ submitting: true, result: null, error: null });
+
+    readFileAsBase64(form.resumeFile)
+      .then(function (resumeBase64) {
+        return api.submitApplication({
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim() || null,
+          linkedin: form.linkedin.trim() || null,
+          jdId: form.jdId || null,
+          coverNote: form.coverNote.trim() || null,
+          resumeBase64: resumeBase64,
+          resumeFilename: form.resumeFile.name,
+        });
+      })
+      .then(function (result) {
+        setSubmit({ submitting: false, result: result, error: null });
+        setForm(EMPTY_APPLICATION);
+      })
+      .catch(function (err) {
+        setSubmit({ submitting: false, result: null, error: err.message });
+      });
+  }
+
+  return (
+    <section className="portal-section">
+      <h3>Submit a new application</h3>
+      <p className="muted">
+        Fields marked * are required. Everything you enter here is recorded with your submission
+        (see frontend/README.md) — resume parsing (name, email, skills, experience, etc.) is done
+        fresh from the resume itself, not from what you type below.
+      </p>
+
+      <form className="application-form" onSubmit={handleSubmit}>
+        <div className="application-form-grid">
+          <label className="login-field">
+            Full name *
+            <input type="text" required value={form.fullName} onChange={setField("fullName")} />
+          </label>
+          <label className="login-field">
+            Email *
+            <input type="email" required value={form.email} onChange={setField("email")} />
+          </label>
+          <label className="login-field">
+            Phone
+            <input type="tel" value={form.phone} onChange={setField("phone")} />
+          </label>
+          <label className="login-field">
+            LinkedIn URL
+            <input type="url" placeholder="https://linkedin.com/in/..." value={form.linkedin} onChange={setField("linkedin")} />
+          </label>
+          <label className="login-field">
+            Applying for
+            <select value={form.jdId} onChange={setField("jdId")}>
+              <option value="">Not specified</option>
+              {jds.map(function (jd) {
+                return <option key={jd.jd_id} value={jd.jd_id}>{jd.jd_filename}</option>;
+              })}
+            </select>
+          </label>
+        </div>
+
+        <label className="login-field">
+          Cover note
+          <textarea
+            rows={4}
+            placeholder="Why are you interested in this role?"
+            value={form.coverNote}
+            onChange={setField("coverNote")}
+          />
+        </label>
+
+        <label className="login-field">
+          Resume (PDF) *
+          <input
+            type="file"
+            accept="application/pdf"
+            required
+            onChange={function (e) {
+              var file = e.target.files && e.target.files[0];
+              setForm(function (f) { return Object.assign({}, f, { resumeFile: file || null }); });
+            }}
+          />
+        </label>
+
+        <button className="btn btn-primary" type="submit" disabled={submit.submitting}>
+          {submit.submitting ? "Submitting…" : "Submit Application"}
+        </button>
+      </form>
+
+      {submit.result && (
+        <div className="banner banner-success">{submit.result.message || "Application submitted."}</div>
+      )}
+      {submit.error && (
+        <div className="banner banner-error">{submit.error}</div>
+      )}
+    </section>
   );
 }

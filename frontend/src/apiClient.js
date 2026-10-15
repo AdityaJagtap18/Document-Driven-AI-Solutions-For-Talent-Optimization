@@ -19,7 +19,7 @@ async function cdpiRequest(path, options) {
   var cfg = window.CDPI_CONFIG;
   var base = cfg.baseUrl.endsWith("/") ? cfg.baseUrl : cfg.baseUrl + "/";
   var url = new URL(path.replace(/^\//, ""), base);
-  if (cfg.functionKey && path.indexOf("/health") === -1 && path.indexOf("/by-email/") === -1) {
+  if (cfg.functionKey && path.indexOf("/health") === -1 && path.indexOf("/by-email/") === -1 && path.indexOf("/applications") === -1) {
     url.searchParams.set("code", cfg.functionKey);
   }
 
@@ -63,5 +63,18 @@ window.CDPI_REAL_API = {
   },
   observabilitySummary: function () {
     return cdpiRequest("/api/observability/summary");
+  },
+  submitApplication: function (fields) {
+    return cdpiRequest("/api/applications", {
+      method: "POST",
+      body: JSON.stringify({
+        full_name: fields.fullName, email: fields.email, phone: fields.phone,
+        linkedin: fields.linkedin, jd_id: fields.jdId, cover_note: fields.coverNote,
+        resume_base64: fields.resumeBase64, resume_filename: fields.resumeFilename,
+      }),
+    });
+  },
+  listJds: function () {
+    return cdpiRequest("/api/jds");
   },
 };

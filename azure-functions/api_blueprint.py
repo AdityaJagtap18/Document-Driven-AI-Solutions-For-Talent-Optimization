@@ -28,6 +28,7 @@ to real Entra ID auth is explicit follow-up work, not done here.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -64,6 +65,14 @@ def _error_response(message: str, status_code=500) -> func.HttpResponse:
 def _cosmos_unavailable_response(exception) -> func.HttpResponse:
     return _error_response(
         f"Context lake (Cosmos DB) is not available: {exception}. "
+        "See docs/azure-provisioning/phase2-cosmos-storage-keyvault.md.",
+        status_code=503,
+    )
+
+
+def _blob_unavailable_response(exception) -> func.HttpResponse:
+    return _error_response(
+        f"Blob Storage is not available: {exception}. "
         "See docs/azure-provisioning/phase2-cosmos-storage-keyvault.md.",
         status_code=503,
     )
@@ -154,6 +163,105 @@ def get_candidate_by_email_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         "ingested_at": candidate.get("ingested_at"),
     }
     return _json_response(safe_fields)
+
+
+@bp.route(route="applications", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def submit_application_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Candidate Self-Service Portal: Submit a new application. ANONYMOUS
+    by necessity, same reasoning as candidates/by-email/{email} above — a
+    first-time applicant has no function key.
+
+    Body: {"full_name": "...", "email": "...", "phone": "..." (optional),
+    "linkedin": "..." (optional), "jd_id": "..." (optional, see GET /jds),
+    "cover_note": "..." (optional), "resume_base64": "...",
+    "resume_filename": "something.pdf"}.
+
+    Uploads the resume to the raw-resumes Blob container. The existing
+    blob-triggered function (function_app.py's resume_blob_trigger, built
+    in Phase 3) picks it up automatically and runs the normal
+    ResumeParser.py pipeline — no parsing logic is duplicated here. The
+    response is a receipt confirming the file was received, not a parsed
+    result; ResumeParser.py runs asynchronously after this returns 202.
+
+    Every field here is recorded in the audit_log entry below (so there's
+    a record of what the applicant actually claimed/submitted), but only
+    full_name/email/phone have any real meaning downstream today, and
+    even those are NOT written into the candidate record —
+    ResumeParser.py's own LLM parsing extracts Name/Email/Phone fresh
+    from the resume content, which stays the only source of truth for
+    that data. jd_id and cover_note are REAL GAPS, not silently faked:
+    nothing in ResumeParser.py/ResumeMEtrics.py reads jd_id to target
+    scoring at one specific JD (see jd_manager.py — candidates are scored
+    against every active JD, not a chosen one), and nothing reads
+    cover_note at all yet. Both are captured for a human reviewer to read
+    in the audit log, not acted on by the pipeline.
+    """
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    full_name = (body.get("full_name") or "").strip()
+    email = (body.get("email") or "").strip()
+    phone = (body.get("phone") or "").strip() or None
+    linkedin = (body.get("linkedin") or "").strip() or None
+    jd_id = (body.get("jd_id") or "").strip() or None
+    cover_note = (body.get("cover_note") or "").strip() or None
+    resume_base64 = body.get("resume_base64")
+    resume_filename = (body.get("resume_filename") or "").strip()
+
+    if not full_name:
+        return _error_response("'full_name' is required.", status_code=400)
+    if not email:
+        return _error_response("'email' is required.", status_code=400)
+    if not resume_base64:
+        return _error_response("'resume_base64' is required.", status_code=400)
+    if not resume_filename.lower().endswith(".pdf"):
+        return _error_response(
+            "'resume_filename' must end in '.pdf' — the processing pipeline only picks up PDFs.",
+            status_code=400,
+        )
+
+    # Strip any path components the caller might (deliberately or not)
+    # have included — the filename becomes a blob path, so this is the
+    # same defense as a file-upload endpoint sanitizing a path.
+    safe_filename = os.path.basename(resume_filename)
+
+    import base64
+    try:
+        file_bytes = base64.b64decode(resume_base64, validate=True)
+    except Exception:
+        return _error_response("'resume_base64' is not valid base64.", status_code=400)
+
+    try:
+        import blob_store
+        blob_store.upload_resume_bytes("raw-resumes", safe_filename, file_bytes)
+    except Exception as e:
+        return _blob_unavailable_response(e)
+
+    from candidate_id import candidate_id_for
+    cid = candidate_id_for(safe_filename)
+
+    try:
+        repositories.append_audit_log({
+            "candidate_id": cid,
+            "action": "application_submitted",
+            "full_name": full_name,
+            "email": email,
+            "phone": phone,
+            "linkedin": linkedin,
+            "jd_id": jd_id,
+            "cover_note": cover_note,
+            "resume_filename": safe_filename,
+        })
+    except Exception:
+        pass  # best-effort — the upload itself already succeeded, which is what actually matters here
+
+    return _json_response({
+        "candidate_id": cid,
+        "status": "submitted",
+        "message": "Your application was received and is being processed. Check back in a few minutes using your email.",
+    }, status_code=202)
 
 
 @bp.route(route="candidates/{candidate_id}/review", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)

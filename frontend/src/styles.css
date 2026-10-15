@@ -67,6 +67,8 @@ body {
   border-radius: 6px;
   font-size: 0.9rem;
   color: var(--fg);
+  width: 100%;
+  box-sizing: border-box;
 }
 .login-demo-hint { font-size: 0.75rem; margin-top: 4px; }
 
@@ -79,6 +81,7 @@ body {
 .banner { padding: 10px 14px; border-radius: 8px; margin: 10px 0; font-size: 0.9rem; }
 .banner-error { background: #fbeae7; color: var(--bad); border: 1px solid #f0c5bc; }
 .banner-error-inline { color: var(--bad); font-size: 0.8rem; }
+.banner-success { background: #e3f1ec; color: var(--good); border: 1px solid #bfe2d3; }
 
 .stat-row { display: flex; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
 .stat-tile {
@@ -162,15 +165,17 @@ body {
   margin-bottom: 16px;
 }
 .portal-section h3 { margin-top: 0; }
-.portal-section-placeholder { opacity: 0.7; }
 
 .status-form { display: flex; gap: 8px; }
 .status-result { margin-top: 14px; }
 
-.placeholder-form { display: flex; flex-direction: column; gap: 8px; max-width: 320px; margin-top: 10px; }
-.placeholder-form input, .placeholder-form button { padding: 8px 10px; }
+.application-form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; max-width: 640px; }
+.application-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.application-form textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; font-family: inherit; resize: vertical; width: 100%; box-sizing: border-box; }
+.application-form .btn { align-self: flex-start; }
 
 @media (max-width: 600px) {
   .app-main { padding: 16px; }
   .review-card { flex-direction: column; align-items: flex-start; }
+  .application-form-grid { grid-template-columns: 1fr; }
 }
