@@ -66,6 +66,7 @@ var MOCK_INTERVIEWS = {
 };
 
 var MOCK_AUDIT_LOG = [];
+var MOCK_BULK_DECISIONS = [];
 
 var DEFAULT_PIPELINE_STAGES = [
   "Shortlisted", "Aptitude Exam", "Technical Exam",
@@ -74,10 +75,19 @@ var DEFAULT_PIPELINE_STAGES = [
 ];
 var MOCK_PIPELINE_STAGES = DEFAULT_PIPELINE_STAGES.slice();
 
+// Full timeline -- recruiter/admin facing (StageTimelineModal). Includes
+// notes/performance, the recruiter's internal assessment.
 function stageTimelineFor(candidateId) {
   return MOCK_AUDIT_LOG
     .filter(function (e) { return e.candidate_id === candidateId && e.action === "stage_update"; })
-    .map(function (e) { return { stage: e.stage, updated_by: e.updated_by, notes: e.notes, logged_at: e.logged_at }; });
+    .map(function (e) { return { stage: e.stage, updated_by: e.updated_by, notes: e.notes, performance: e.performance, logged_at: e.logged_at }; });
+}
+
+// Candidate-facing timeline -- deliberately strips notes/performance/
+// updated_by, same privacy boundary the real by-email endpoint enforces
+// (see api_blueprint.py's _stage_timeline_for_candidate docstring).
+function stageTimelineForCandidate(candidateId) {
+  return stageTimelineFor(candidateId).map(function (t) { return { stage: t.stage, logged_at: t.logged_at }; });
 }
 
 function mockDelay(value) {
@@ -152,7 +162,7 @@ window.CDPI_MOCK_API = {
       return mockDelay({
         Name: found.Name, resume_name: found.resume_name,
         ranking_tier: found.ranking_tier, ingested_at: found.ingested_at,
-        stage_timeline: stageTimelineFor(found.candidate_id),
+        stage_timeline: stageTimelineForCandidate(found.candidate_id),
         pipeline_stages: MOCK_PIPELINE_STAGES.slice(),
       });
     });
@@ -175,21 +185,55 @@ window.CDPI_MOCK_API = {
     return mockDelay({ candidate_id: candidateId, timeline: stageTimelineFor(candidateId) });
   },
 
-  advanceCandidateStage: function (candidateId, stage, updatedBy, notes) {
+  advanceCandidateStage: function (candidateId, stage, updatedBy, notes, performance) {
+    var PERFORMANCE_RATINGS = ["Excellent", "Good", "Average", "Poor"];
     if (!stage) {
       var err1 = new Error("'stage' is required."); err1.status = 400; return Promise.reject(err1);
     }
     if (!updatedBy) {
       var err2 = new Error("'updated_by' is required."); err2.status = 400; return Promise.reject(err2);
     }
+    if (!notes || !notes.trim()) {
+      var err2b = new Error("'notes' is required -- record how the candidate actually did at this stage.");
+      err2b.status = 400; return Promise.reject(err2b);
+    }
+    if (performance && PERFORMANCE_RATINGS.indexOf(performance) === -1) {
+      var err2c = new Error("'performance' must be one of " + PERFORMANCE_RATINGS.join(", ") + " if given.");
+      err2c.status = 400; return Promise.reject(err2c);
+    }
     if (MOCK_PIPELINE_STAGES.indexOf(stage) === -1) {
       var err3 = new Error("'" + stage + "' is not a configured pipeline stage. Configured stages: " + MOCK_PIPELINE_STAGES.join(", ") + ".");
       err3.status = 400;
       return Promise.reject(err3);
     }
+    // No skipping ahead -- same rule the real endpoint enforces.
+    var pastStages = stageTimelineFor(candidateId).map(function (t) { return t.stage; });
+    var currentStage = pastStages.length ? pastStages[pastStages.length - 1] : null;
+    var expectedNext;
+    if (currentStage === null) {
+      expectedNext = MOCK_PIPELINE_STAGES[0];
+    } else if (MOCK_PIPELINE_STAGES.indexOf(currentStage) === -1) {
+      var err4 = new Error("Candidate's current stage '" + currentStage + "' is no longer in the configured pipeline.");
+      err4.status = 409; return Promise.reject(err4);
+    } else {
+      var idx = MOCK_PIPELINE_STAGES.indexOf(currentStage);
+      if (idx === MOCK_PIPELINE_STAGES.length - 1) {
+        var err5 = new Error("'" + currentStage + "' is already the final configured stage — there's nothing to advance to.");
+        err5.status = 400; return Promise.reject(err5);
+      }
+      expectedNext = MOCK_PIPELINE_STAGES[idx + 1];
+    }
+    if (stage !== expectedNext) {
+      var err6 = new Error(
+        "Candidates can only be advanced one stage at a time, in order. Current stage: "
+        + (currentStage || "(not started)") + ". Next allowed stage: '" + expectedNext + "'. Got: '" + stage + "'."
+      );
+      err6.status = 400; return Promise.reject(err6);
+    }
+
     MOCK_AUDIT_LOG.push({
       candidate_id: candidateId, action: "stage_update", stage: stage, updated_by: updatedBy,
-      notes: notes || "", logged_at: new Date().toISOString(),
+      notes: notes, performance: performance || null, logged_at: new Date().toISOString(),
     });
     return mockDelay({ candidate_id: candidateId, stage: stage, status: "recorded" });
   },
@@ -264,6 +308,82 @@ window.CDPI_MOCK_API = {
     // no entries here (honest: there's no real history for them to show).
     var filtered = action ? MOCK_AUDIT_LOG.filter(function (e) { return e.action === action; }) : MOCK_AUDIT_LOG;
     return mockDelay({ count: filtered.length, entries: filtered.slice() });
+  },
+
+  proposeBulkDecision: function (decision, candidateIds, proposedBy, notes) {
+    if (decision !== "approve" && decision !== "reject") {
+      var err1 = new Error("'decision' must be 'approve' or 'reject'."); err1.status = 400; return Promise.reject(err1);
+    }
+    if (!candidateIds || !candidateIds.length) {
+      var err2 = new Error("'candidate_ids' must be a non-empty list."); err2.status = 400; return Promise.reject(err2);
+    }
+    if (!proposedBy) {
+      var err3 = new Error("'proposed_by' is required."); err3.status = 400; return Promise.reject(err3);
+    }
+    var doc = {
+      id: "bd-" + Math.random().toString(36).slice(2, 9), decision: decision, candidate_ids: candidateIds,
+      proposed_by: proposedBy, notes: notes || "", status: "pending",
+      proposed_at: new Date().toISOString(), reviewed_by: null, reviewed_at: null,
+    };
+    MOCK_BULK_DECISIONS.push(doc);
+    return mockDelay({
+      id: doc.id, decision: decision, candidate_count: candidateIds.length, status: "pending",
+      message: "Proposal recorded — no candidates changed yet. An admin must approve it first.",
+    });
+  },
+
+  listBulkDecisions: function (status) {
+    var filtered = status ? MOCK_BULK_DECISIONS.filter(function (d) { return d.status === status; }) : MOCK_BULK_DECISIONS;
+    return mockDelay({ count: filtered.length, decisions: filtered.slice().reverse() });
+  },
+
+  approveBulkDecision: function (decisionId, reviewedBy) {
+    if (!reviewedBy) {
+      var err1 = new Error("'reviewed_by' is required."); err1.status = 400; return Promise.reject(err1);
+    }
+    var doc = MOCK_BULK_DECISIONS.filter(function (d) { return d.id === decisionId; })[0];
+    if (!doc) {
+      var err2 = new Error("Bulk decision '" + decisionId + "' not found."); err2.status = 404; return Promise.reject(err2);
+    }
+    if (doc.status !== "pending") {
+      var err3 = new Error("This proposal is already '" + doc.status + "' — it can't be approved again."); err3.status = 409; return Promise.reject(err3);
+    }
+    return loadCandidates().then(function (all) {
+      var results = doc.candidate_ids.map(function (candidateId) {
+        var found = all.filter(function (c) { return c.candidate_id === candidateId; })[0];
+        if (!found) return { candidate_id: candidateId, status: "skipped: not found" };
+        found.ranking_tier = doc.decision === "approve" ? "Recommended for Fast-Track" : "Rejected";
+        MOCK_AUDIT_LOG.push({
+          candidate_id: candidateId, action: "human_review_" + doc.decision,
+          reviewer: "bulk_decision:" + doc.id + " (approved by " + reviewedBy + ")", notes: doc.notes,
+          logged_at: new Date().toISOString(),
+        });
+        return { candidate_id: candidateId, status: "applied", whatsapp_notification: "skipped: mock mode" };
+      });
+      doc.status = "approved";
+      doc.reviewed_by = reviewedBy;
+      doc.reviewed_at = new Date().toISOString();
+      doc.results = results;
+      return mockDelay({ id: decisionId, status: "approved", results: results });
+    });
+  },
+
+  rejectBulkDecision: function (decisionId, reviewedBy, notes) {
+    if (!reviewedBy) {
+      var err1 = new Error("'reviewed_by' is required."); err1.status = 400; return Promise.reject(err1);
+    }
+    var doc = MOCK_BULK_DECISIONS.filter(function (d) { return d.id === decisionId; })[0];
+    if (!doc) {
+      var err2 = new Error("Bulk decision '" + decisionId + "' not found."); err2.status = 404; return Promise.reject(err2);
+    }
+    if (doc.status !== "pending") {
+      var err3 = new Error("This proposal is already '" + doc.status + "' — it can't be rejected again."); err3.status = 409; return Promise.reject(err3);
+    }
+    doc.status = "rejected";
+    doc.reviewed_by = reviewedBy;
+    doc.reviewed_at = new Date().toISOString();
+    doc.review_notes = notes || "";
+    return mockDelay({ id: decisionId, status: "rejected" });
   },
 
   observabilitySummary: function () {

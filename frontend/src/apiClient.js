@@ -89,10 +89,31 @@ window.CDPI_REAL_API = {
   getCandidateTimeline: function (candidateId) {
     return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/timeline");
   },
-  advanceCandidateStage: function (candidateId, stage, updatedBy, notes) {
+  advanceCandidateStage: function (candidateId, stage, updatedBy, notes, performance) {
     return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/stage", {
       method: "POST",
-      body: JSON.stringify({ stage: stage, updated_by: updatedBy, notes: notes }),
+      body: JSON.stringify({ stage: stage, updated_by: updatedBy, notes: notes, performance: performance }),
+    });
+  },
+  proposeBulkDecision: function (decision, candidateIds, proposedBy, notes) {
+    return cdpiRequest("/api/bulk-decisions", {
+      method: "POST",
+      body: JSON.stringify({ decision: decision, candidate_ids: candidateIds, proposed_by: proposedBy, notes: notes }),
+    });
+  },
+  listBulkDecisions: function (status) {
+    return cdpiRequest("/api/bulk-decisions" + (status ? "?status=" + encodeURIComponent(status) : ""));
+  },
+  approveBulkDecision: function (decisionId, reviewedBy) {
+    return cdpiRequest("/api/bulk-decisions/" + encodeURIComponent(decisionId) + "/approve", {
+      method: "POST",
+      body: JSON.stringify({ reviewed_by: reviewedBy }),
+    });
+  },
+  rejectBulkDecision: function (decisionId, reviewedBy, notes) {
+    return cdpiRequest("/api/bulk-decisions/" + encodeURIComponent(decisionId) + "/reject", {
+      method: "POST",
+      body: JSON.stringify({ reviewed_by: reviewedBy, notes: notes }),
     });
   },
 };
