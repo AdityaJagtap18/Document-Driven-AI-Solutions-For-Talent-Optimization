@@ -68,6 +68,254 @@ var MOCK_INTERVIEWS = {
 var MOCK_AUDIT_LOG = [];
 var MOCK_BULK_DECISIONS = [];
 
+// ---------------------------------------------------------------------------
+// IAM/RBAC mock substrate -- mirrors auth.py's PERMISSIONS/DEFAULT_ROLES and
+// api_blueprint.py's /auth/* + /admin/* endpoints, same "duplicated on
+// purpose, kept in sync by hand" convention this file already uses for
+// DEFAULT_PIPELINE_STAGES above (there's no bundler to share one source of
+// truth between Python and this plain <script> file). Passwords here are
+// plaintext in a JS array purely because this is a demo-data mock with NO
+// real backend behind it in mock mode -- the REAL login (apiClient.js,
+// azure-functions/api_blueprint.py) always bcrypt-hashes and never stores
+// or compares plaintext. Switch config.js to mode:"real" against a
+// deployed API for actual authentication.
+// ---------------------------------------------------------------------------
+var MOCK_PERMISSIONS = {
+  "users.read": { label: "View users", description: "List and view user accounts.", module: "User Management" },
+  "users.create": { label: "Create users", description: "Create new user accounts.", module: "User Management" },
+  "users.update": { label: "Edit users", description: "Edit user profile fields and reset passwords.", module: "User Management" },
+  "users.disable": { label: "Enable/disable users", description: "Activate or deactivate user accounts.", module: "User Management" },
+  "roles.read": { label: "View roles", description: "List and view role definitions and their permissions.", module: "Role & Permission Management" },
+  "roles.create": { label: "Create roles", description: "Create new custom roles.", module: "Role & Permission Management" },
+  "roles.update": { label: "Edit role permissions", description: "Change which permissions a role grants.", module: "Role & Permission Management" },
+  "roles.assign": { label: "Assign roles to users", description: "Grant or remove a role from a user account.", module: "Role & Permission Management" },
+  "candidates.read": { label: "View candidates", description: "View candidate records, profiles, and scores.", module: "Candidate Management" },
+  "candidates.update": { label: "Review candidates", description: "Approve/reject candidates individually.", module: "Candidate Management" },
+  "resumes.upload": { label: "Submit applications", description: "Submit a resume/application.", module: "Resume Upload and Parsing" },
+  "jds.read": { label: "View job descriptions", description: "View the active job descriptions used for resume matching.", module: "Resume-JD Matching" },
+  "interviews.read": { label: "View hiring-stage timelines", description: "View a candidate's hiring-stage/interview timeline.", module: "Interview Management" },
+  "interviews.manage": { label: "Manage hiring stages", description: "Record stage progress and configure the pipeline stage list.", module: "Interview Management" },
+  "documents.verify": { label: "Verify documents", description: "Run certificate/marksheet verification.", module: "Document Verification" },
+  "analytics.read": { label: "View analytics", description: "View executive-summary and observability reports.", module: "Analytics and Reports" },
+  "audit.read": { label: "View audit log", description: "View the immutable audit log of recorded actions.", module: "Audit Logs" },
+  "screening.propose": { label: "Propose bulk decisions", description: "Propose a bulk accept/reject on screening-phase candidates.", module: "Candidate Management" },
+  "screening.approve": { label: "Approve bulk decisions", description: "Approve or reject a recruiter's bulk-decision proposal.", module: "Candidate Management" },
+  "pages.manage": { label: "Manage page access", description: "View the page registry and configure which roles may navigate to which pages.", module: "Page Access Management" },
+};
+var MOCK_PERMISSION_IDS = Object.keys(MOCK_PERMISSIONS);
+
+var MOCK_ROLES = [
+  { id: "admin", role_key: "admin", display_name: "Admin", is_system: true,
+    description: "Full platform access: users, roles and permissions, and every application module -- the top-level role (no separate Super Admin tier).",
+    permission_ids: MOCK_PERMISSION_IDS.slice() },
+  { id: "recruiter", role_key: "recruiter", display_name: "Recruiter", is_system: true,
+    description: "Screens candidates, manages interview stages, proposes (but cannot approve) bulk decisions.",
+    permission_ids: ["candidates.read", "candidates.update", "resumes.upload", "jds.read",
+      "interviews.read", "interviews.manage", "documents.verify", "analytics.read", "screening.propose"] },
+  { id: "interviewer", role_key: "interviewer", display_name: "Interviewer", is_system: true,
+    description: "Views candidates and interview timelines, records stage feedback.",
+    permission_ids: ["candidates.read", "interviews.read", "interviews.manage"] },
+  { id: "candidate", role_key: "candidate", display_name: "Candidate", is_system: true,
+    description: "No administrative or recruiter permissions.", permission_ids: [] },
+];
+
+var MOCK_USERS = [
+  { id: "u-admin", username: "admin", password: "Admin#12345", display_name: "Alex Admin",
+    email: "admin@example.com", role_keys: ["admin"], status: "active", created_at: "2026-01-01T00:00:00Z" },
+  { id: "u-recruiter", username: "recruiter", password: "Recruiter#123", display_name: "Robin Recruiter",
+    email: "recruiter@example.com", role_keys: ["recruiter"], status: "active", created_at: "2026-01-01T00:00:00Z" },
+  { id: "u-interviewer", username: "interviewer", password: "Interviewer#123", display_name: "Ivy Interviewer",
+    email: "interviewer@example.com", role_keys: ["interviewer"], status: "active", created_at: "2026-01-01T00:00:00Z" },
+  { id: "u-candidate", username: "candidate", password: "Candidate#123", display_name: "Cam Candidate",
+    email: "candidate@example.com", role_keys: ["candidate"], status: "active", created_at: "2026-01-01T00:00:00Z" },
+];
+
+var MOCK_SESSIONS = {}; // token -> user_id
+var _mockAuthToken = null;
+
+function _mockSafeUser(u) {
+  return { id: u.id, username: u.username, display_name: u.display_name, email: u.email,
+    role_keys: u.role_keys, status: u.status, created_at: u.created_at };
+}
+
+function _mockGetRole(roleKey) {
+  return MOCK_ROLES.filter(function (r) { return r.role_key === roleKey; })[0] || null;
+}
+
+function _mockEffectivePermissions(user) {
+  var set = {};
+  (user.role_keys || []).forEach(function (key) {
+    var role = _mockGetRole(key);
+    if (role) (role.permission_ids || []).forEach(function (p) { set[p] = true; });
+  });
+  return Object.keys(set);
+}
+
+function _mockCountActiveWithRole(roleKey, excludeUserId) {
+  return MOCK_USERS.filter(function (u) {
+    return u.status === "active" && u.role_keys.indexOf(roleKey) !== -1 && u.id !== excludeUserId;
+  }).length;
+}
+
+// Mirrors require_permission()/_authenticate() in api_blueprint.py --
+// resolves the current session token to a real (mock) user, re-reading
+// status/roles fresh every call, same guarantees as the real backend.
+function _mockRequireAuth() {
+  var userId = MOCK_SESSIONS[_mockAuthToken];
+  var user = userId && MOCK_USERS.filter(function (u) { return u.id === userId; })[0];
+  if (!user || user.status !== "active") {
+    var err = new Error("Missing or invalid session. Log in again."); err.status = 401; throw err;
+  }
+  return user;
+}
+
+function _mockRequirePermission(permissionId) {
+  var user = _mockRequireAuth();
+  if (_mockEffectivePermissions(user).indexOf(permissionId) === -1) {
+    var err = new Error("Forbidden: your account doesn't have the '" + permissionId + "' permission required for this action.");
+    err.status = 403; throw err;
+  }
+  return user;
+}
+
+function _mockRequireAnyPermission(permissionIds) {
+  var user = _mockRequireAuth();
+  var granted = _mockEffectivePermissions(user);
+  var hasAny = permissionIds.some(function (p) { return granted.indexOf(p) !== -1; });
+  if (!hasAny) {
+    var err = new Error("Forbidden: your account needs one of " + permissionIds.join(", ") + " for this action.");
+    err.status = 403; throw err;
+  }
+  return user;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Page Access Management mock substrate -- mirrors auth.PAGES /
+// repositories.sync_pages() / api_blueprint.py's admin/pages* endpoints.
+// This app has no client-side router (see App.jsx's doc comment), so the
+// catalog below IS this app's route registry, same "code-defined catalog
+// instead of a real router to scan" adaptation the real backend uses --
+// see auth.py's PAGES docstring for the full rationale.
+// ---------------------------------------------------------------------------
+var MOCK_PAGES_CATALOG = [
+  { page_id: "dashboard", name: "Dashboard", route: "dashboard", module: "Candidate Management",
+    route_type: "page", is_protected: true, required_permission: "candidates.read",
+    description: "Recruiter/Admin dashboard: candidate list, scores, tier distribution." },
+  { page_id: "admin_reports", name: "Admin Reports", route: "reports", module: "Analytics and Reports",
+    route_type: "page", is_protected: true, required_permission: "analytics.read",
+    description: "Exec-style analytics: token/cost usage, candidate tier distribution, approval rate." },
+  { page_id: "pipeline", name: "Applicant Pipeline", route: "pipeline", module: "Interview Management",
+    route_type: "page", is_protected: true, required_permission: "interviews.manage",
+    description: "Kanban-style hiring-stage pipeline board, including the bulk-decision approvals queue." },
+  { page_id: "review_queue", name: "Review Queue", route: "review", module: "Candidate Management",
+    route_type: "page", is_protected: true, required_permission: "candidates.update",
+    description: "Human Review Queue: individual approve/reject and bulk-propose accept/reject." },
+  { page_id: "recruiter_reports", name: "Recruiter Reports", route: "recruiter-reports", module: "Analytics and Reports",
+    route_type: "page", is_protected: true, required_permission: "screening.propose",
+    description: "Recruiter-facing reports: stage funnel, performance ratings, bulk-proposal status." },
+  { page_id: "user_management", name: "Users", route: "users", module: "User Management",
+    route_type: "page", is_protected: true, required_permission: "users.read",
+    description: "Admin Panel: create/edit/disable user accounts, assign roles." },
+  { page_id: "role_management", name: "Roles & Permissions", route: "roles", module: "Role & Permission Management",
+    route_type: "page", is_protected: true, required_permission: "roles.read",
+    description: "Admin Panel: the permission catalog grouped by module, and every role's grants." },
+  { page_id: "page_access_management", name: "Page Access", route: "page-access", module: "Page Access Management",
+    route_type: "page", is_protected: true, required_permission: "pages.manage",
+    description: "Admin Panel: this page -- the page registry and the per-role page-access policy editor." },
+  { page_id: "candidate_portal", name: "Candidate Portal", route: "portal", module: "Resume Upload and Parsing",
+    route_type: "page", is_protected: true, required_permission: null,
+    description: "Candidate self-service: submit an application, check status. Gated by the 'candidate' role directly." },
+];
+var MOCK_PAGE_IDS = MOCK_PAGES_CATALOG.map(function (p) { return p.page_id; });
+
+var MOCK_PAGES = []; // persisted page docs -- populated by _mockSyncPages()
+var MOCK_PAGE_ACCESS_POLICIES = []; // [{page_id, role_key, allowed, created_by, updated_by, updated_at}]
+
+function _mockGetPage(pageId) {
+  return MOCK_PAGES.filter(function (p) { return p.page_id === pageId; })[0] || null;
+}
+
+function _mockPageAccessPolicies(pageId) {
+  return MOCK_PAGE_ACCESS_POLICIES.filter(function (p) { return p.page_id === pageId; });
+}
+
+function _mockSetPageAccess(pageId, roleKey, allowed, actor) {
+  var existing = MOCK_PAGE_ACCESS_POLICIES.filter(function (p) { return p.page_id === pageId && p.role_key === roleKey; })[0];
+  if (existing) {
+    existing.allowed = !!allowed;
+    existing.updated_by = actor;
+    existing.updated_at = new Date().toISOString();
+  } else {
+    MOCK_PAGE_ACCESS_POLICIES.push({
+      page_id: pageId, role_key: roleKey, allowed: !!allowed,
+      created_by: actor, updated_by: actor, updated_at: new Date().toISOString(),
+    });
+  }
+}
+
+// Mirrors repositories.sync_pages() -- see that function's docstring for
+// the full discovery/lifecycle rules (secure defaults for new pages,
+// rediscovery preserves policies, stale pages are marked not deleted).
+function _mockSyncPages() {
+  var isFirstRun = MOCK_PAGES.length === 0;
+  var now = new Date().toISOString();
+  var newIds = [], updatedIds = [], staleIds = [];
+  var trackedFields = ["name", "route", "module", "required_permission", "is_protected", "route_type"];
+
+  MOCK_PAGES_CATALOG.forEach(function (page) {
+    var prior = _mockGetPage(page.page_id);
+    var hasPolicies = isFirstRun || _mockPageAccessPolicies(page.page_id).length > 0;
+    var doc = {
+      page_id: page.page_id, name: page.name, route: page.route, module: page.module,
+      description: page.description, required_permission: page.required_permission,
+      route_type: page.route_type, is_protected: page.is_protected,
+      discovery_status: hasPolicies ? "configured" : "discovered",
+      last_discovered_at: now, first_discovered_at: prior ? prior.first_discovered_at : now,
+    };
+    if (!prior) {
+      newIds.push(page.page_id);
+      MOCK_PAGES.push(doc);
+    } else {
+      if (trackedFields.some(function (f) { return prior[f] !== doc[f]; })) updatedIds.push(page.page_id);
+      MOCK_PAGES = MOCK_PAGES.map(function (p) { return p.page_id === page.page_id ? doc : p; });
+    }
+  });
+
+  MOCK_PAGES.forEach(function (prior) {
+    if (MOCK_PAGE_IDS.indexOf(prior.page_id) === -1 && prior.discovery_status !== "stale") {
+      prior.discovery_status = "stale";
+      staleIds.push(prior.page_id);
+    }
+  });
+
+  if (isFirstRun) {
+    MOCK_PAGES_CATALOG.forEach(function (page) {
+      MOCK_ROLES.forEach(function (role) {
+        var allowed = page.required_permission === null
+          ? (page.page_id === "candidate_portal" && role.role_key === "candidate")
+          : role.permission_ids.indexOf(page.required_permission) !== -1;
+        _mockSetPageAccess(page.page_id, role.role_key, allowed, "system:initial_seed");
+      });
+    });
+  }
+
+  return { new: newIds, updated: updatedIds, stale: staleIds, first_run: isFirstRun };
+}
+
+function _mockEffectivePages(user) {
+  var roleKeys = user.role_keys || [];
+  var allowed = {};
+  MOCK_PAGE_ACCESS_POLICIES.forEach(function (p) {
+    if (roleKeys.indexOf(p.role_key) !== -1 && p.allowed) allowed[p.page_id] = true;
+  });
+  return Object.keys(allowed);
+}
+
+// Mirrors Function App startup calling repositories.sync_pages() once --
+// the registry is ready and the initial access policies are seeded
+// before any login happens, same as the real backend's bootstrap_iam.py.
+_mockSyncPages();
+
 var DEFAULT_PIPELINE_STAGES = [
   "Shortlisted", "Aptitude Exam", "Technical Exam",
   "Online Interview", "Offline Interview", "HR Round",
@@ -121,11 +369,264 @@ function loadCandidates() {
 }
 
 window.CDPI_MOCK_API = {
+  setAuthToken: function (token) { _mockAuthToken = token; },
+
   health: function () {
     return mockDelay({ status: "ok" });
   },
 
+  login: function (username, password) {
+    var user = MOCK_USERS.filter(function (u) { return u.username === (username || "").trim().toLowerCase(); })[0];
+    if (!user || user.password !== password) {
+      var err = new Error("Invalid username or password."); err.status = 401; return Promise.reject(err);
+    }
+    if (user.status !== "active") {
+      var err2 = new Error("This account has been disabled."); err2.status = 403; return Promise.reject(err2);
+    }
+    var token = "mock-token-" + user.id + "-" + Math.random().toString(36).slice(2, 10);
+    MOCK_SESSIONS[token] = user.id;
+    return mockDelay({ token: token, user: _mockSafeUser(user) });
+  },
+
+  getMe: function () {
+    try {
+      var user = _mockRequireAuth();
+      return mockDelay({
+        user: _mockSafeUser(user), permissions: _mockEffectivePermissions(user).sort(),
+        pages: _mockEffectivePages(user).sort(),
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listPages: function (filters) {
+    try {
+      _mockRequirePermission("pages.manage");
+      filters = filters || {};
+      var pages = MOCK_PAGES.filter(function (p) {
+        if (filters.module && p.module !== filters.module) return false;
+        if (filters.discovery_status && p.discovery_status !== filters.discovery_status) return false;
+        if (filters.is_protected !== undefined && p.is_protected !== filters.is_protected) return false;
+        return true;
+      }).map(function (p) {
+        var granted = _mockPageAccessPolicies(p.page_id).filter(function (pol) { return pol.allowed; }).map(function (pol) { return pol.role_key; }).sort();
+        return Object.assign({}, p, { roles_granted: granted, roles_granted_count: granted.length });
+      });
+      return mockDelay({ count: pages.length, pages: pages });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  syncPages: function () {
+    try {
+      var actor = _mockRequirePermission("pages.manage");
+      var result = _mockSyncPages();
+      return mockDelay(result);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getPageAccess: function (pageId) {
+    try {
+      _mockRequirePermission("pages.manage");
+      var page = _mockGetPage(pageId);
+      if (!page) { var err = new Error("Page '" + pageId + "' not found."); err.status = 404; throw err; }
+      var policies = _mockPageAccessPolicies(pageId);
+      var allowedByRole = {};
+      policies.forEach(function (p) { allowedByRole[p.role_key] = p.allowed; });
+      var access = MOCK_ROLES.map(function (r) {
+        return { role_key: r.role_key, role_display_name: r.display_name, allowed: !!allowedByRole[r.role_key] };
+      });
+      return mockDelay({ page: page, access: access });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  setPageAccess: function (pageId, policies) {
+    try {
+      var actor = _mockRequirePermission("pages.manage");
+      if (!Array.isArray(policies) || !policies.length) {
+        var err1 = new Error("'policies' must be a non-empty list of {role_key, allowed}."); err1.status = 400; throw err1;
+      }
+      var page = _mockGetPage(pageId);
+      if (!page) { var err2 = new Error("Page '" + pageId + "' not found."); err2.status = 404; throw err2; }
+      for (var i = 0; i < policies.length; i++) {
+        if (!_mockGetRole(policies[i].role_key)) {
+          var err3 = new Error("Unknown role '" + policies[i].role_key + "'."); err3.status = 400; throw err3;
+        }
+      }
+      policies.forEach(function (entry) { _mockSetPageAccess(pageId, entry.role_key, entry.allowed, actor.username); });
+      if (page.discovery_status !== "configured") page.discovery_status = "configured";
+      return window.CDPI_MOCK_API.getPageAccess(pageId);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listPermissions: function () {
+    try {
+      _mockRequirePermission("roles.read");
+      return mockDelay({ permissions: MOCK_PERMISSIONS });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listRoles: function () {
+    try {
+      _mockRequirePermission("roles.read");
+      return mockDelay({ count: MOCK_ROLES.length, roles: MOCK_ROLES.slice() });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  createRole: function (role) {
+    try {
+      _mockRequirePermission("roles.create");
+      if (!role.role_key || !role.display_name) {
+        var err1 = new Error("'role_key' and 'display_name' are required."); err1.status = 400; throw err1;
+      }
+      var roleKey = role.role_key.trim().toLowerCase().replace(/\s+/g, "_");
+      if (_mockGetRole(roleKey)) {
+        var err2 = new Error("Role '" + roleKey + "' already exists."); err2.status = 409; throw err2;
+      }
+      var unknown = (role.permission_ids || []).filter(function (p) { return MOCK_PERMISSION_IDS.indexOf(p) === -1; });
+      if (unknown.length) {
+        var err3 = new Error("Unknown permission id(s): " + unknown.join(", ")); err3.status = 400; throw err3;
+      }
+      var doc = { id: roleKey, role_key: roleKey, display_name: role.display_name, description: role.description || "",
+        is_system: false, permission_ids: (role.permission_ids || []).slice() };
+      MOCK_ROLES.push(doc);
+      return mockDelay(doc);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  updateRole: function (roleKey, fields) {
+    try {
+      _mockRequirePermission("roles.update");
+      var role = _mockGetRole(roleKey);
+      if (!role) { var err1 = new Error("Role '" + roleKey + "' not found."); err1.status = 404; throw err1; }
+      if (role.is_system) {
+        var err2 = new Error("'" + roleKey + "' is a built-in system role and can't be edited. Create a custom role instead.");
+        err2.status = 403; throw err2;
+      }
+      if (fields.permission_ids) {
+        var unknown = fields.permission_ids.filter(function (p) { return MOCK_PERMISSION_IDS.indexOf(p) === -1; });
+        if (unknown.length) {
+          var err3 = new Error("Unknown permission id(s): " + unknown.join(", ")); err3.status = 400; throw err3;
+        }
+        role.permission_ids = fields.permission_ids.slice();
+      }
+      if (fields.display_name) role.display_name = fields.display_name;
+      if ("description" in fields) role.description = fields.description;
+      return mockDelay(role);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listUsers: function () {
+    try {
+      _mockRequirePermission("users.read");
+      return mockDelay({ count: MOCK_USERS.length, users: MOCK_USERS.map(_mockSafeUser) });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getUser: function (userId) {
+    try {
+      _mockRequirePermission("users.read");
+      var user = MOCK_USERS.filter(function (u) { return u.id === userId; })[0];
+      if (!user) { var err = new Error("User '" + userId + "' not found."); err.status = 404; throw err; }
+      return mockDelay(_mockSafeUser(user));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  createUser: function (user) {
+    try {
+      var actor = _mockRequirePermission("users.create");
+      if (!user.username || !user.password || !user.display_name) {
+        var err1 = new Error("'username', 'password', and 'display_name' are required."); err1.status = 400; throw err1;
+      }
+      if (user.password.length < 8) {
+        var err2 = new Error("'password' must be at least 8 characters."); err2.status = 400; throw err2;
+      }
+      var username = user.username.trim().toLowerCase();
+      if (MOCK_USERS.some(function (u) { return u.username === username; })) {
+        var err3 = new Error("Username '" + username + "' is already taken."); err3.status = 409; throw err3;
+      }
+      var roleKeys = user.role_keys || [];
+      var unknownRoles = roleKeys.filter(function (k) { return !_mockGetRole(k); });
+      if (unknownRoles.length) {
+        var err4 = new Error("Unknown role '" + unknownRoles[0] + "'."); err4.status = 400; throw err4;
+      }
+      var actorIsAdmin = actor.role_keys.indexOf("admin") !== -1;
+      if (roleKeys.indexOf("admin") !== -1 && !actorIsAdmin) {
+        var err5 = new Error("Only an existing Admin can grant the Admin role to a user."); err5.status = 403; throw err5;
+      }
+      var doc = { id: "u-" + Math.random().toString(36).slice(2, 10), username: username, password: user.password,
+        display_name: user.display_name, email: user.email || "", role_keys: roleKeys.slice(),
+        status: "active", created_at: new Date().toISOString() };
+      MOCK_USERS.push(doc);
+      return mockDelay(_mockSafeUser(doc));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  updateUser: function (userId, fields) {
+    try {
+      _mockRequirePermission("users.update");
+      var user = MOCK_USERS.filter(function (u) { return u.id === userId; })[0];
+      if (!user) { var err = new Error("User '" + userId + "' not found."); err.status = 404; throw err; }
+      if (fields.display_name) user.display_name = fields.display_name;
+      if ("email" in fields) user.email = fields.email;
+      if (fields.password) {
+        if (fields.password.length < 8) {
+          var err2 = new Error("'password' must be at least 8 characters."); err2.status = 400; throw err2;
+        }
+        user.password = fields.password;
+      }
+      return mockDelay(_mockSafeUser(user));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  setUserStatus: function (userId, status) {
+    try {
+      var actor = _mockRequirePermission("users.disable");
+      if (status !== "active" && status !== "disabled") {
+        var err1 = new Error("'status' must be 'active' or 'disabled'."); err1.status = 400; throw err1;
+      }
+      if (status === "disabled" && userId === actor.id) {
+        var err2 = new Error("You cannot disable your own account."); err2.status = 403; throw err2;
+      }
+      var user = MOCK_USERS.filter(function (u) { return u.id === userId; })[0];
+      if (!user) { var err3 = new Error("User '" + userId + "' not found."); err3.status = 404; throw err3; }
+      if (status === "disabled" && user.role_keys.indexOf("admin") !== -1
+          && _mockCountActiveWithRole("admin", userId) < 1) {
+        var err4 = new Error("Can't disable the last active Admin account. Promote another account to Admin first.");
+        err4.status = 409; throw err4;
+      }
+      user.status = status;
+      return mockDelay(_mockSafeUser(user));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  setUserRoles: function (userId, roleKeys) {
+    try {
+      var actor = _mockRequirePermission("roles.assign");
+      if (userId === actor.id) {
+        var err1 = new Error("You cannot change your own role assignments."); err1.status = 403; throw err1;
+      }
+      var user = MOCK_USERS.filter(function (u) { return u.id === userId; })[0];
+      if (!user) { var err2 = new Error("User '" + userId + "' not found."); err2.status = 404; throw err2; }
+      var unknownRoles = roleKeys.filter(function (k) { return !_mockGetRole(k); });
+      if (unknownRoles.length) {
+        var err3 = new Error("Unknown role '" + unknownRoles[0] + "'."); err3.status = 400; throw err3;
+      }
+      var actorIsAdmin = actor.role_keys.indexOf("admin") !== -1;
+      var hadAdmin = user.role_keys.indexOf("admin") !== -1;
+      var willHaveAdmin = roleKeys.indexOf("admin") !== -1;
+      if (willHaveAdmin && !hadAdmin && !actorIsAdmin) {
+        var err4 = new Error("Only an existing Admin can grant the Admin role."); err4.status = 403; throw err4;
+      }
+      if (hadAdmin && !willHaveAdmin && _mockCountActiveWithRole("admin", userId) < 1) {
+        var err5 = new Error("Can't remove Admin from the last active account that holds it. Promote another account to Admin first.");
+        err5.status = 409; throw err5;
+      }
+      user.role_keys = roleKeys.slice();
+      return mockDelay(_mockSafeUser(user));
+    } catch (e) { return Promise.reject(e); }
+  },
+
   listCandidates: function (rankingTier) {
+    try { _mockRequirePermission("candidates.read"); } catch (e) { return Promise.reject(e); }
     return loadCandidates().then(function (all) {
       var filtered = rankingTier
         ? all.filter(function (c) { return c.ranking_tier === rankingTier; })
@@ -135,6 +636,7 @@ window.CDPI_MOCK_API = {
   },
 
   getCandidate: function (candidateId) {
+    try { _mockRequirePermission("candidates.read"); } catch (e) { return Promise.reject(e); }
     return loadCandidates().then(function (all) {
       var found = all.filter(function (c) { return c.candidate_id === candidateId; })[0];
       if (!found) {
@@ -147,6 +649,7 @@ window.CDPI_MOCK_API = {
   },
 
   getCandidateInterviews: function (candidateId) {
+    try { _mockRequirePermission("interviews.read"); } catch (e) { return Promise.reject(e); }
     var interviews = MOCK_INTERVIEWS[candidateId] || [];
     return mockDelay({ candidate_id: candidateId, count: interviews.length, interviews: interviews });
   },
@@ -169,10 +672,12 @@ window.CDPI_MOCK_API = {
   },
 
   getPipelineConfig: function () {
+    try { _mockRequirePermission("interviews.read"); } catch (e) { return Promise.reject(e); }
     return mockDelay({ stages: MOCK_PIPELINE_STAGES.slice() });
   },
 
   updatePipelineConfig: function (stages) {
+    try { _mockRequirePermission("interviews.manage"); } catch (e) { return Promise.reject(e); }
     if (!Array.isArray(stages) || !stages.length) {
       var err = new Error("'stages' must be a non-empty list of stage names."); err.status = 400;
       return Promise.reject(err);
@@ -182,10 +687,12 @@ window.CDPI_MOCK_API = {
   },
 
   getCandidateTimeline: function (candidateId) {
+    try { _mockRequirePermission("interviews.read"); } catch (e) { return Promise.reject(e); }
     return mockDelay({ candidate_id: candidateId, timeline: stageTimelineFor(candidateId) });
   },
 
   advanceCandidateStage: function (candidateId, stage, updatedBy, notes, performance) {
+    try { _mockRequirePermission("interviews.manage"); } catch (e) { return Promise.reject(e); }
     var PERFORMANCE_RATINGS = ["Excellent", "Good", "Average", "Poor"];
     if (!stage) {
       var err1 = new Error("'stage' is required."); err1.status = 400; return Promise.reject(err1);
@@ -239,6 +746,7 @@ window.CDPI_MOCK_API = {
   },
 
   reviewCandidate: function (candidateId, decision, reviewer, notes) {
+    try { _mockRequirePermission("candidates.update"); } catch (e) { return Promise.reject(e); }
     return loadCandidates().then(function (all) {
       var found = all.filter(function (c) { return c.candidate_id === candidateId; })[0];
       if (!found) {
@@ -288,6 +796,7 @@ window.CDPI_MOCK_API = {
   },
 
   listJds: function () {
+    try { _mockRequirePermission("jds.read"); } catch (e) { return Promise.reject(e); }
     // Real jd_folder/ contents aren't exported to the frontend (unlike
     // candidates.json) -- these are illustrative mock JDs only, not a
     // snapshot of real data.
@@ -301,6 +810,7 @@ window.CDPI_MOCK_API = {
   },
 
   listAuditLog: function (action) {
+    try { _mockRequirePermission("audit.read"); } catch (e) { return Promise.reject(e); }
     // Real audit_log entries, same array reviewCandidate()/submitApplication()
     // write to above -- so the Pipeline view reflects actual actions taken
     // in this session, not canned data. The 42 CSV-sourced candidates never
@@ -311,6 +821,7 @@ window.CDPI_MOCK_API = {
   },
 
   proposeBulkDecision: function (decision, candidateIds, proposedBy, notes) {
+    try { _mockRequirePermission("screening.propose"); } catch (e) { return Promise.reject(e); }
     if (decision !== "approve" && decision !== "reject") {
       var err1 = new Error("'decision' must be 'approve' or 'reject'."); err1.status = 400; return Promise.reject(err1);
     }
@@ -333,11 +844,13 @@ window.CDPI_MOCK_API = {
   },
 
   listBulkDecisions: function (status) {
+    try { _mockRequireAnyPermission(["screening.propose", "screening.approve"]); } catch (e) { return Promise.reject(e); }
     var filtered = status ? MOCK_BULK_DECISIONS.filter(function (d) { return d.status === status; }) : MOCK_BULK_DECISIONS;
     return mockDelay({ count: filtered.length, decisions: filtered.slice().reverse() });
   },
 
   approveBulkDecision: function (decisionId, reviewedBy) {
+    try { _mockRequirePermission("screening.approve"); } catch (e) { return Promise.reject(e); }
     if (!reviewedBy) {
       var err1 = new Error("'reviewed_by' is required."); err1.status = 400; return Promise.reject(err1);
     }
@@ -369,6 +882,7 @@ window.CDPI_MOCK_API = {
   },
 
   rejectBulkDecision: function (decisionId, reviewedBy, notes) {
+    try { _mockRequirePermission("screening.approve"); } catch (e) { return Promise.reject(e); }
     if (!reviewedBy) {
       var err1 = new Error("'reviewed_by' is required."); err1.status = 400; return Promise.reject(err1);
     }
@@ -387,6 +901,7 @@ window.CDPI_MOCK_API = {
   },
 
   observabilitySummary: function () {
+    try { _mockRequirePermission("analytics.read"); } catch (e) { return Promise.reject(e); }
     return mockDelay({
       total_calls: 23, total_tokens: 15420, total_cost_usd: 0.028114,
       by_label: {

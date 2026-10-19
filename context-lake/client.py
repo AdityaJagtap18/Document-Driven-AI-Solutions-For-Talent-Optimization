@@ -23,6 +23,31 @@ COSMOS_CONTAINERS = {
     # Partitioned by /id since these are read/listed as a whole set
     # (pending-approvals queue), not scoped to one candidate.
     "bulk_decisions": "/id",
+    # Real user accounts (replaces the fully client-side demo login in
+    # Login.jsx). Role assignments are embedded as a list of role_keys on
+    # the user document itself, not a separate join-table container --
+    # idiomatic for Cosmos/NoSQL and this app's scale (a handful of roles
+    # per user). Partition key /id since users are listed/looked-up by
+    # username, not scoped to any other entity.
+    "users": "/id",
+    # Role definitions (role_key, display_name, permission_ids list).
+    # Permission *definitions* themselves are a static, code-defined
+    # catalog (auth.PERMISSIONS) -- tied to actual code paths, not
+    # admin-editable data -- but which permissions each role grants is
+    # stored here so Admin can edit non-system (custom) roles' grants.
+    "roles": "/id",
+    # Registered application pages (auth.PAGES is the code-defined catalog
+    # -- this app's "route registry", see that list's docstring; this
+    # container is what repositories.sync_pages() reconciles it against).
+    # Partition key /id (= page_id) since pages are listed/searched as a
+    # whole set in the Admin Panel's Page Access Management table.
+    "pages": "/id",
+    # Per-(page, role) access decisions -- deny-by-default; a page with no
+    # policy document for a given role is NOT accessible to that role. id
+    # is "{page_id}:{role_key}" so each pair has exactly one document
+    # (upsert-to-update, no duplicate-policy risk). Partition key /id for
+    # the same "read as a whole set" reason as pages above.
+    "page_access_policies": "/id",
 }
 
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]

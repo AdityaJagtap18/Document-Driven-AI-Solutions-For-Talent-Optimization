@@ -77,3 +77,23 @@ function IconSearch(props) {
     </svg>
   );
 }
+
+function IconUsers(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20" />
+      <path d="M16 8.5a3 3 0 1 1 1 5.83" />
+      <path d="M21.5 20v-1.2a4.3 4.3 0 0 0-3-4.1" />
+    </svg>
+  );
+}
+
+function IconShield(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3z" />
+      <path d="M9.5 12l1.8 1.8L15 10" />
+    </svg>
+  );
+}

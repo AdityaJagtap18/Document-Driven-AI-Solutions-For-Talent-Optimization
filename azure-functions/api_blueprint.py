@@ -38,6 +38,7 @@ _repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo_root))
 sys.path.insert(0, str(_repo_root / "context-lake"))
 import repositories  # noqa: E402
+import auth as auth_module  # noqa: E402
 
 bp = func.Blueprint()
 
@@ -78,9 +79,192 @@ def _blob_unavailable_response(exception) -> func.HttpResponse:
     )
 
 
+def _safe_user(user: dict) -> dict:
+    """Never return password_hash to any client, ever -- the one and only
+    place a user document is translated into something that leaves this
+    process. Every endpoint below that returns a user must route it
+    through this."""
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "display_name": user.get("display_name"),
+        "email": user.get("email"),
+        "role_keys": user.get("role_keys", []),
+        "status": user.get("status"),
+        "created_at": user.get("created_at"),
+        "created_by": user.get("created_by"),
+        "updated_at": user.get("updated_at"),
+    }
+
+
+def _authenticate(req: func.HttpRequest):
+    """Resolves the Authorization header to a real, currently-active user
+    -- no permission check yet, just identity. Returns the raw user dict
+    (never return it directly to a client -- route through _safe_user())
+    or a func.HttpResponse(401) to return immediately.
+
+    This is the ONLY identity input this app trusts: a valid signed JWT
+    issued by POST /auth/login after a real bcrypt password check (see
+    auth.py) -- never a role or user id the frontend merely claims. The
+    user's current status/roles are re-read from the `users`/`roles`
+    containers on every call rather than trusted from the token's own
+    claims, so a disabled account or a role change takes effect on the
+    very next request, not only once a long-lived token expires.
+    """
+    header = req.headers.get("Authorization") or ""
+    if not header.startswith("Bearer "):
+        return _error_response(
+            "Missing or invalid Authorization header. Log in via POST /auth/login first.", status_code=401,
+        )
+    token = header[len("Bearer "):].strip()
+
+    import jwt as pyjwt
+    try:
+        payload = auth_module.verify_token(token)
+    except pyjwt.InvalidTokenError:
+        return _error_response("Invalid or expired session. Please log in again.", status_code=401)
+    except RuntimeError as e:
+        return _error_response(str(e), status_code=503)
+
+    try:
+        user = repositories.get_user(payload.get("sub"))
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None or user.get("status") != "active":
+        return _error_response("This account no longer exists or has been disabled.", status_code=401)
+    return user
+
+
+def require_permission(req: func.HttpRequest, permission_id: str):
+    """The real, backend-enforced authorization gate used by every
+    protected endpoint below. Returns the authenticated user's RAW dict
+    on success (route through _safe_user() before it touches a
+    response), or a func.HttpResponse (401/403) to return immediately."""
+    user = _authenticate(req)
+    if isinstance(user, func.HttpResponse):
+        return user
+    try:
+        permissions = _effective_permissions_for(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if permission_id not in permissions:
+        return _error_response(
+            f"Forbidden: your account doesn't have the '{permission_id}' permission required for this action.",
+            status_code=403,
+        )
+    return user
+
+
+def require_any_permission(req: func.HttpRequest, permission_ids: list):
+    """Same as require_permission(), but passes if the user holds ANY one
+    of the given permissions -- used for the couple of endpoints shared
+    across roles with no single permission in common (e.g. the
+    bulk-decisions list is read by both the recruiter who proposed
+    entries, screening.propose, and the admin who approves them,
+    screening.approve)."""
+    user = _authenticate(req)
+    if isinstance(user, func.HttpResponse):
+        return user
+    try:
+        permissions = _effective_permissions_for(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if not permissions.intersection(permission_ids):
+        return _error_response(
+            f"Forbidden: your account needs one of {permission_ids} for this action.", status_code=403,
+        )
+    return user
+
+
 @bp.route(route="health", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def health(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"status": "ok"})
+
+
+@bp.route(route="auth/login", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def login_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The ONLY real entry point into this app's identity system. Body:
+    {"username": "...", "password": "..."}. ANONYMOUS by necessity -- a
+    user has no token yet when logging in. Replaces Login.jsx's old
+    fully-client-side demo account check; see that file's rewrite."""
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    if not username or not password:
+        return _error_response("'username' and 'password' are required.", status_code=400)
+
+    try:
+        user = repositories.get_user_by_username(username)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    # Same generic message whether the username doesn't exist or the
+    # password is wrong -- never reveal which, that's a username-
+    # enumeration leak. Never log the password or the hash anywhere.
+    invalid = _error_response("Invalid username or password.", status_code=401)
+    if user is None:
+        return invalid
+    if user.get("status") != "active":
+        return _error_response("This account has been disabled.", status_code=403)
+    if not auth_module.verify_password(password, user.get("password_hash", "")):
+        try:
+            repositories.append_audit_log({
+                "candidate_id": "_system", "action": "login_failed", "username": username,
+            })
+        except Exception:
+            pass
+        return invalid
+
+    try:
+        token = auth_module.create_token(user)
+    except RuntimeError as e:
+        return _error_response(str(e), status_code=503)
+
+    try:
+        repositories.append_audit_log({
+            "candidate_id": "_system", "action": "login_success", "username": username, "user_id": user["id"],
+        })
+    except Exception:
+        pass
+
+    return _json_response({"token": token, "user": _safe_user(user)})
+
+
+@bp.route(route="auth/me", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def me_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Lets the frontend restore a session on page load/reload -- resolves
+    whatever's in localStorage (the token, nothing else trusted) back to
+    real, current account data, rather than the old pattern of trusting a
+    {name, roleLabel, view} object a client kept in localStorage as if it
+    were authoritative."""
+    user = _authenticate(req)
+    if isinstance(user, func.HttpResponse):
+        return user
+    try:
+        permissions = _effective_permissions_for(user)
+        pages = _effective_pages_for(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({
+        "user": _safe_user(user), "permissions": sorted(permissions), "pages": sorted(pages),
+    })
+
+
+def _effective_permissions_for(user: dict) -> set:
+    role_docs = [r for r in (repositories.get_role(k) for k in user.get("role_keys", [])) if r]
+    return auth_module.effective_permissions(role_docs)
+
+
+def _effective_pages_for(user: dict) -> set:
+    """The set of page_ids this user may navigate to -- see
+    auth.effective_pages()'s docstring (deny-by-default: a page with no
+    policy for any of this user's roles is not included)."""
+    policies = repositories.list_all_page_access_policies()
+    return auth_module.effective_pages(user.get("role_keys", []), policies)
 
 
 @bp.route(route="jds", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
@@ -94,6 +278,9 @@ def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     by ResumeMEtrics.py (see jd_manager.py) — not exposed by this endpoint,
     since that data isn't in candidate.schema.json yet (CSV/scoring_history
     only); filtering candidates by jd_id is follow-up work once it is."""
+    auth_result = require_permission(req, "jds.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     sys.path.insert(0, str(_repo_root))
     import jd_manager
 
@@ -108,6 +295,9 @@ def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 def list_candidates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard: list candidates, optionally filtered by
     ?ranking_tier=Recommended%20for%20Fast-Track (etc)."""
+    auth_result = require_permission(req, "candidates.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     ranking_tier = req.params.get("ranking_tier")
     try:
         candidates = repositories.list_candidates(ranking_tier=ranking_tier)
@@ -118,6 +308,9 @@ def list_candidates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="candidates/{candidate_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def get_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "candidates.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         candidate = repositories.get_candidate(candidate_id)
@@ -130,6 +323,9 @@ def get_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="candidates/{candidate_id}/interviews", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def get_candidate_interviews_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "interviews.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         transcripts = repositories.list_interview_transcripts(candidate_id)
@@ -308,6 +504,9 @@ def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     "reviewer": "...", "notes": "..."}. Logs to the immutable audit_log
     (FDE Stage 25 evidence) rather than just overwriting ranking_tier with
     no trace of who decided what or why."""
+    auth_result = require_permission(req, "candidates.update")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -384,6 +583,9 @@ def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     immediately -- that's a recruiter's individual decision on one
     candidate, already a real human-in-the-loop action, not an AI output
     being rubber-stamped in bulk."""
+    auth_result = require_permission(req, "screening.propose")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     try:
         body = req.get_json()
     except ValueError:
@@ -414,8 +616,13 @@ def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
 @bp.route(route="bulk-decisions", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_bulk_decisions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
-    """Admin's approval queue. ?status=pending|approved|rejected to filter,
-    omit for everything (useful for an audit trail of past decisions too)."""
+    """Admin's approval queue -- also read by recruiters to see the status
+    of their own proposals (RecruiterReports.jsx). ?status=pending|
+    approved|rejected to filter, omit for everything (useful for an audit
+    trail of past decisions too)."""
+    auth_result = require_any_permission(req, ["screening.propose", "screening.approve"])
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     status = req.params.get("status")
     try:
         decisions = repositories.list_bulk_decisions(status=status)
@@ -457,6 +664,9 @@ def approve_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Admin approves a pending bulk proposal -- this is the ONLY place a
     bulk accept/reject actually takes effect on candidate records. Body:
     {"reviewed_by": "..."}."""
+    auth_result = require_permission(req, "screening.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     decision_id = req.route_params.get("decision_id")
     try:
         body = req.get_json()
@@ -493,6 +703,9 @@ def reject_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     the proposal is just marked rejected (kept for the audit trail, not
     deleted). Body: {"reviewed_by": "...", "notes": "..." (optional, why
     it was rejected)}."""
+    auth_result = require_permission(req, "screening.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     decision_id = req.route_params.get("decision_id")
     try:
         body = req.get_json()
@@ -523,6 +736,9 @@ def get_pipeline_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     list for now, not per-JD -- see repositories.get_pipeline_config()'s
     docstring. Defaults to DEFAULT_PIPELINE_STAGES if nobody's configured
     one yet, so this never 404s."""
+    auth_result = require_permission(req, "interviews.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     try:
         stages = repositories.get_pipeline_config()
     except Exception as e:
@@ -537,6 +753,9 @@ def update_pipeline_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     Existing candidates already past a stage that gets removed keep their
     recorded history (audit_log is immutable) -- only future stage-advance
     calls are validated against the new list."""
+    auth_result = require_permission(req, "interviews.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     try:
         body = req.get_json()
     except ValueError:
@@ -561,6 +780,9 @@ def get_candidate_timeline_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     every stage_update audit_log entry for them, oldest first. Current
     stage is the last entry, if any (nobody advanced yet = no entries,
     not an error)."""
+    auth_result = require_permission(req, "interviews.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         entries = repositories.list_audit_log(candidate_id)
@@ -617,6 +839,9 @@ def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse
     notes/performance are NEVER returned to the candidate-facing
     endpoint (candidates/by-email/{email}) -- see
     _stage_timeline_for_candidate()'s docstring."""
+    auth_result = require_permission(req, "interviews.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -712,6 +937,9 @@ def verify_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     confidence-flagging (NOT a real forgery detector — see that module's
     docstring). No external institution/board verification.
     """
+    auth_result = require_permission(req, "documents.verify")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -783,6 +1011,9 @@ def executive_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     overwritten on every review decision (see review_candidate_endpoint)
     -- the audit_log is the only place "how many approvals vs rejections
     actually happened" survives as a count, per entry, immutably."""
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     try:
         candidates = repositories.list_candidates()
         audit_entries = repositories.list_all_audit_log()
@@ -823,6 +1054,9 @@ def list_audit_log_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     than a true push-based live feed -- there's no websocket/SignalR
     layer here, see Pipeline.jsx's doc comment for why that's an honest
     label, not "real-time" overclaimed."""
+    auth_result = require_permission(req, "audit.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     action = req.params.get("action")
     try:
         entries = repositories.list_all_audit_log(action=action)
@@ -836,6 +1070,9 @@ def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard's cost/token usage view. Doesn't touch
     Cosmos DB at all — reads logs/llm_observability.jsonl directly, so this
     endpoint works today even with zero Azure resources provisioned."""
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from observability import LOG_PATH
 
@@ -871,3 +1108,570 @@ def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         "total_cost_usd": round(total_cost, 6),
         "by_label": by_label,
     })
+
+
+# ---------------------------------------------------------------------------
+# Admin Panel: User Management (/admin/users*) and Role & Permission
+# Management (/admin/roles*, /admin/permissions). Every endpoint below is
+# gated by require_permission() -- there is no separate/looser path into
+# any of this; the frontend's UserManagement.jsx/RoleManagement.jsx call
+# these same endpoints, nothing is client-side-only.
+# ---------------------------------------------------------------------------
+def _audit_admin_action(action: str, actor: dict, **fields) -> None:
+    """Admin actions get their own audit_log trail, partitioned under a
+    fixed '_system' candidate_id (these aren't about any one candidate).
+    Never includes a password or password_hash in any field -- every
+    call site below passes only ids/usernames/role_keys."""
+    try:
+        repositories.append_audit_log({
+            "candidate_id": "_system", "action": action,
+            "actor_id": actor["id"], "actor_username": actor["username"],
+            **fields,
+        })
+    except Exception:
+        pass
+
+
+@bp.route(route="admin/permissions", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_permissions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The full permission catalog, grouped by module -- powers the Roles
+    & Permissions admin page's checkbox grid. Requires roles.read, same
+    as viewing roles themselves (the catalog is read-only reference data
+    either way)."""
+    auth_result = require_permission(req, "roles.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    return _json_response({"permissions": auth_module.PERMISSIONS})
+
+
+@bp.route(route="admin/roles", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "roles.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        roles = repositories.list_roles()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(roles), "roles": roles})
+
+
+@bp.route(route="admin/roles", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def create_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Create a new CUSTOM role. Body: {"role_key": "hiring_manager",
+    "display_name": "Hiring Manager", "description": "...",
+    "permission_ids": ["candidates.read", ...]}.
+
+    Requires roles.create -- deliberately a DIFFERENT permission from
+    roles.assign (granting an existing role to a user), so Admin (which
+    only has roles.assign) cannot define what a role grants, only Super
+    Admin (which has both) can -- this is the concrete difference
+    between the two roles the spec called for."""
+    auth_result = require_permission(req, "roles.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    role_key = (body.get("role_key") or "").strip().lower().replace(" ", "_")
+    display_name = (body.get("display_name") or "").strip()
+    description = (body.get("description") or "").strip()
+    permission_ids = body.get("permission_ids") or []
+
+    if not role_key or not display_name:
+        return _error_response("'role_key' and 'display_name' are required.", status_code=400)
+    unknown = [p for p in permission_ids if p not in auth_module.PERMISSIONS]
+    if unknown:
+        return _error_response(f"Unknown permission id(s): {unknown}.", status_code=400)
+
+    try:
+        if repositories.get_role(role_key) is not None:
+            return _error_response(f"Role '{role_key}' already exists.", status_code=409)
+        doc = repositories.create_role(role_key, display_name, description, permission_ids, is_system=False)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("role_created", actor, role_key=role_key, permission_ids=permission_ids)
+    return _json_response(doc, status_code=201)
+
+
+@bp.route(route="admin/roles/{role_key}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def update_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Edit a role's permission grants. Body: {"display_name": "..."
+    (optional), "description": "..." (optional), "permission_ids": [...] (optional)}.
+
+    Requires roles.update. System roles (Admin, Recruiter,
+    Interviewer, Candidate) are READ-ONLY here -- their grants are the
+    deliberately-designed least-privilege baseline the spec called for,
+    and editing them in place (e.g. quietly widening Recruiter to include
+    screening.approve) would silently break the separation the whole
+    bulk-decision-approval feature depends on. Only custom roles created
+    via POST /admin/roles can be edited."""
+    auth_result = require_permission(req, "roles.update")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    role_key = req.route_params.get("role_key")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    try:
+        role = repositories.get_role(role_key)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if role is None:
+        return _error_response(f"Role '{role_key}' not found.", status_code=404)
+    if role.get("is_system"):
+        return _error_response(
+            f"'{role_key}' is a built-in system role and can't be edited. Create a custom role instead.",
+            status_code=403,
+        )
+
+    if "permission_ids" in body:
+        unknown = [p for p in body["permission_ids"] if p not in auth_module.PERMISSIONS]
+        if unknown:
+            return _error_response(f"Unknown permission id(s): {unknown}.", status_code=400)
+        role["permission_ids"] = body["permission_ids"]
+    if "display_name" in body and body["display_name"]:
+        role["display_name"] = body["display_name"]
+    if "description" in body:
+        role["description"] = body["description"]
+
+    try:
+        doc = repositories.update_role(role)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("role_updated", actor, role_key=role_key)
+    return _json_response(doc)
+
+
+@bp.route(route="admin/users", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_users_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "users.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        users = repositories.list_users()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(users), "users": [_safe_user(u) for u in users]})
+
+
+@bp.route(route="admin/users/{user_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "users.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    user_id = req.route_params.get("user_id")
+    try:
+        user = repositories.get_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None:
+        return _error_response(f"User '{user_id}' not found.", status_code=404)
+    return _json_response(_safe_user(user))
+
+
+@bp.route(route="admin/users", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def create_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Create a new user account. Body: {"username": "...", "password": "...",
+    "display_name": "...", "email": "...", "role_keys": ["recruiter"]}.
+
+    Requires users.create. The password is hashed with bcrypt immediately
+    and the plaintext is never stored, logged, or echoed back in the
+    response -- see auth.hash_password(). Admin is the top-level role in
+    this app (no separate Super Admin tier) -- granting the admin role at
+    creation time still requires the ACTOR to already hold admin
+    themselves, so a lesser custom role that happens to combine
+    users.create with roles.assign still can't mint a brand-new peer
+    Admin. Same rule, same reasoning, applied in PUT .../roles below."""
+    auth_result = require_permission(req, "users.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    display_name = (body.get("display_name") or "").strip()
+    email = (body.get("email") or "").strip()
+    role_keys = body.get("role_keys") or []
+
+    if not username or not password or not display_name:
+        return _error_response("'username', 'password', and 'display_name' are required.", status_code=400)
+    if len(password) < 8:
+        return _error_response("'password' must be at least 8 characters.", status_code=400)
+    if not isinstance(role_keys, list):
+        return _error_response("'role_keys' must be a list.", status_code=400)
+
+    try:
+        actor_role_docs = [r for r in (repositories.get_role(k) for k in actor.get("role_keys", [])) if r]
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    actor_is_admin = "admin" in {r["role_key"] for r in actor_role_docs}
+    if "admin" in role_keys and not actor_is_admin:
+        return _error_response(
+            "Only an existing Admin can grant the Admin role to a user.", status_code=403,
+        )
+
+    try:
+        if repositories.get_user_by_username(username) is not None:
+            return _error_response(f"Username '{username}' is already taken.", status_code=409)
+        for key in role_keys:
+            if repositories.get_role(key) is None:
+                return _error_response(f"Unknown role '{key}'.", status_code=400)
+        password_hash = auth_module.hash_password(password)
+        user = repositories.create_user(username, password_hash, display_name, email, role_keys, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("user_created", actor, target_user_id=user["id"], target_username=username, role_keys=role_keys)
+    return _json_response(_safe_user(user), status_code=201)
+
+
+@bp.route(route="admin/users/{user_id}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def update_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Edit a user's profile and/or reset their password. Body (all
+    optional): {"display_name": "...", "email": "...", "password": "..."}.
+    Requires users.update. Role changes go through PUT .../roles below
+    (a separate endpoint/permission boundary: roles.assign), not here."""
+    auth_result = require_permission(req, "users.update")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    user_id = req.route_params.get("user_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    try:
+        user = repositories.get_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None:
+        return _error_response(f"User '{user_id}' not found.", status_code=404)
+
+    if "display_name" in body and body["display_name"]:
+        user["display_name"] = body["display_name"]
+    if "email" in body:
+        user["email"] = body["email"]
+    if body.get("password"):
+        if len(body["password"]) < 8:
+            return _error_response("'password' must be at least 8 characters.", status_code=400)
+        user["password_hash"] = auth_module.hash_password(body["password"])
+
+    try:
+        updated = repositories.update_user(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("user_updated", actor, target_user_id=user_id, fields=list(body.keys()))
+    return _json_response(_safe_user(updated))
+
+
+@bp.route(route="admin/users/{user_id}/status", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def set_user_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Enable/disable a user account. Body: {"status": "active"|"disabled"}.
+    Requires users.disable.
+
+    Administrative safeguard (explicit spec requirement): a user cannot
+    disable their own account (self-lockout prevention, and incidentally
+    also blocks a self-escalation vector where a user disables themselves
+    to dodge an audit trail), and the last ACTIVE account holding the
+    admin role (the top-level role in this app) can never be disabled --
+    there must always be at least one active Admin who can fix a
+    misconfiguration."""
+    auth_result = require_permission(req, "users.disable")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    user_id = req.route_params.get("user_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    new_status = body.get("status")
+    if new_status not in ("active", "disabled"):
+        return _error_response("'status' must be 'active' or 'disabled'.", status_code=400)
+
+    if new_status == "disabled" and user_id == actor["id"]:
+        return _error_response("You cannot disable your own account.", status_code=403)
+
+    try:
+        user = repositories.get_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None:
+        return _error_response(f"User '{user_id}' not found.", status_code=404)
+
+    if new_status == "disabled" and "admin" in user.get("role_keys", []):
+        try:
+            remaining = repositories.count_active_users_with_role("admin", exclude_user_id=user_id)
+        except Exception as e:
+            return _cosmos_unavailable_response(e)
+        if remaining < 1:
+            return _error_response(
+                "Can't disable the last active Admin account. Promote another account to Admin first.",
+                status_code=409,
+            )
+
+    user["status"] = new_status
+    try:
+        updated = repositories.update_user(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("user_status_changed", actor, target_user_id=user_id, new_status=new_status)
+    return _json_response(_safe_user(updated))
+
+
+@bp.route(route="admin/users/{user_id}/roles", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def set_user_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Replace a user's role assignments. Body: {"role_keys": ["recruiter", "interviewer"]}.
+    Requires roles.assign.
+
+    Administrative safeguards (explicit spec requirements):
+    - NO SELF-ESCALATION: a user cannot change their own role assignments
+      at all, full stop -- not even an actor who already holds
+      roles.assign can grant themselves a new role via this endpoint.
+    - Granting or keeping the admin role (the top-level role in this app)
+      for someone else requires the ACTOR to already be an Admin
+      themselves (a lesser custom role with roles.assign cannot mint a
+      peer Admin).
+    - PROTECT THE LAST ADMIN: removing admin from the last active account
+      that holds it is blocked, same rule as disabling that account
+      above."""
+    auth_result = require_permission(req, "roles.assign")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    user_id = req.route_params.get("user_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    role_keys = body.get("role_keys")
+    if not isinstance(role_keys, list):
+        return _error_response("'role_keys' must be a list.", status_code=400)
+
+    if user_id == actor["id"]:
+        return _error_response("You cannot change your own role assignments.", status_code=403)
+
+    try:
+        user = repositories.get_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None:
+        return _error_response(f"User '{user_id}' not found.", status_code=404)
+
+    try:
+        for key in role_keys:
+            if repositories.get_role(key) is None:
+                return _error_response(f"Unknown role '{key}'.", status_code=400)
+        actor_role_docs = [r for r in (repositories.get_role(k) for k in actor.get("role_keys", [])) if r]
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    actor_is_admin = "admin" in {r["role_key"] for r in actor_role_docs}
+
+    had_admin = "admin" in user.get("role_keys", [])
+    will_have_admin = "admin" in role_keys
+    if will_have_admin and not had_admin and not actor_is_admin:
+        return _error_response("Only an existing Admin can grant the Admin role.", status_code=403)
+
+    if had_admin and not will_have_admin:
+        try:
+            remaining = repositories.count_active_users_with_role("admin", exclude_user_id=user_id)
+        except Exception as e:
+            return _cosmos_unavailable_response(e)
+        if remaining < 1:
+            return _error_response(
+                "Can't remove Admin from the last active account that holds it. "
+                "Promote another account to Admin first.",
+                status_code=409,
+            )
+
+    user["role_keys"] = role_keys
+    try:
+        updated = repositories.update_user(user)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("roles_assigned", actor, target_user_id=user_id, role_keys=role_keys)
+    return _json_response(_safe_user(updated))
+
+
+# ---------------------------------------------------------------------------
+# Dynamic Page Access Management (/admin/pages*). See auth.PAGES's
+# docstring for the architecture note this whole feature rests on: this
+# app has no client-side router, so the code-defined PAGES catalog IS the
+# route registry (the same pattern already used for PERMISSIONS/
+# DEFAULT_ROLES), and repositories.sync_pages() -- not a frontend-
+# triggerable endpoint, see sync_pages_endpoint below -- is the discovery
+# mechanism. Every endpoint here requires pages.manage, same gate pattern
+# as every other admin/* route; GET /auth/me (above) is the only place a
+# non-admin user's own effective page set is exposed, read-only, no
+# separate endpoint needed for that.
+# ---------------------------------------------------------------------------
+def _page_with_summary(page: dict, policies_by_page: dict) -> dict:
+    policies = policies_by_page.get(page["page_id"], [])
+    granted = sorted(p["role_key"] for p in policies if p.get("allowed"))
+    return dict(page, roles_granted=granted, roles_granted_count=len(granted))
+
+
+@bp.route(route="admin/pages", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Page & Access Management table. Optional query filters:
+    ?module=..., ?discovery_status=discovered|configured|stale,
+    ?is_protected=true|false -- all applied client-side-equivalent here
+    (small dataset, a handful of pages, no pagination needed)."""
+    auth_result = require_permission(req, "pages.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        pages = repositories.list_pages()
+        all_policies = repositories.list_all_page_access_policies()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    policies_by_page = {}
+    for p in all_policies:
+        policies_by_page.setdefault(p["page_id"], []).append(p)
+
+    module = req.params.get("module")
+    discovery_status = req.params.get("discovery_status")
+    is_protected = req.params.get("is_protected")
+
+    result = []
+    for page in pages:
+        if module and page.get("module") != module:
+            continue
+        if discovery_status and page.get("discovery_status") != discovery_status:
+            continue
+        if is_protected is not None and str(page.get("is_protected")).lower() != is_protected.lower():
+            continue
+        result.append(_page_with_summary(page, policies_by_page))
+
+    return _json_response({"count": len(result), "pages": result})
+
+
+@bp.route(route="admin/pages/sync", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def sync_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Reconciles the code-defined PAGES catalog against the persisted
+    registry -- see repositories.sync_pages()'s docstring. Not something a
+    frontend page click strictly needs to trigger for normal operation
+    (the registry is also reconciled at Function App startup, same
+    pattern as ensure_default_roles()), but exposed here so an
+    administrator can force a re-sync (e.g. right after a deploy that
+    added a page) without redeploying or restarting anything, and so this
+    is independently testable."""
+    auth_result = require_permission(req, "pages.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        result = repositories.sync_pages()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    for pid in result["new"]:
+        _audit_admin_action("page_discovered", actor, page_id=pid)
+    for pid in result["updated"]:
+        _audit_admin_action("page_metadata_changed", actor, page_id=pid)
+    for pid in result["stale"]:
+        _audit_admin_action("page_marked_stale", actor, page_id=pid)
+
+    return _json_response(result)
+
+
+@bp.route(route="admin/pages/{page_id}/access", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Page metadata plus the full role x allowed access matrix (every
+    role in the system, not just roles with an explicit policy -- a role
+    with no policy document is reported as allowed=False, reflecting the
+    real deny-by-default effective state, not just "no opinion recorded")."""
+    auth_result = require_permission(req, "pages.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    page_id = req.route_params.get("page_id")
+    try:
+        page = repositories.get_page(page_id)
+        if page is None:
+            return _error_response(f"Page '{page_id}' not found.", status_code=404)
+        roles = repositories.list_roles()
+        policies = repositories.get_page_access_policies(page_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    allowed_by_role = {p["role_key"]: p.get("allowed", False) for p in policies}
+    matrix = [
+        {"role_key": r["role_key"], "role_display_name": r["display_name"], "allowed": allowed_by_role.get(r["role_key"], False)}
+        for r in roles
+    ]
+    return _json_response({"page": page, "access": matrix})
+
+
+@bp.route(route="admin/pages/{page_id}/access", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def set_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Grant/revoke page access per role. Body: {"policies": [{"role_key":
+    "recruiter", "allowed": true}, ...]} -- a batch of one or more
+    (role_key, allowed) pairs, so the whole table on the config screen can
+    be saved in one call. Each pair is validated and persisted
+    independently; an unknown role_key in the batch fails the whole
+    request (400) before anything is written, so a typo can't leave the
+    policy set half-updated."""
+    auth_result = require_permission(req, "pages.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    page_id = req.route_params.get("page_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    policies = body.get("policies")
+    if not isinstance(policies, list) or not policies:
+        return _error_response("'policies' must be a non-empty list of {role_key, allowed}.", status_code=400)
+    for entry in policies:
+        if not isinstance(entry, dict) or "role_key" not in entry or "allowed" not in entry:
+            return _error_response("Each policy entry needs 'role_key' and 'allowed'.", status_code=400)
+        if not isinstance(entry["allowed"], bool):
+            return _error_response(f"'allowed' must be a boolean for role '{entry.get('role_key')}'.", status_code=400)
+
+    try:
+        page = repositories.get_page(page_id)
+        if page is None:
+            return _error_response(f"Page '{page_id}' not found.", status_code=404)
+        for entry in policies:
+            if repositories.get_role(entry["role_key"]) is None:
+                return _error_response(f"Unknown role '{entry['role_key']}'.", status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    try:
+        for entry in policies:
+            repositories.set_page_access(page_id, entry["role_key"], entry["allowed"], actor["username"])
+        # A page that had zero policies (discovery_status="discovered")
+        # just received its first configuration -- flip it to
+        # "configured" so the Admin Panel's warning banner clears
+        # immediately, without waiting for the next sync.
+        if page.get("discovery_status") != "configured":
+            page["discovery_status"] = "configured"
+            repositories.update_page(page)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("page_access_changed", actor, page_id=page_id, policies=policies)
+    return get_page_access_endpoint(req)

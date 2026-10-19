@@ -287,3 +287,275 @@ def mark_bulk_decision_reviewed(decision_id: str, status: str, reviewed_by: str,
     if extra:
         doc.update(extra)
     return update_bulk_decision(doc)
+
+
+# ---------------------------------------------------------------------------
+# users (real accounts -- see auth.py. password_hash is a bcrypt hash,
+# never a plaintext password; nothing in this module or api_blueprint.py
+# ever returns password_hash to a client -- see _safe_user() there.)
+# ---------------------------------------------------------------------------
+def create_user(username: str, password_hash: str, display_name: str, email: str, role_keys: list, created_by: str) -> dict:
+    doc = {
+        "id": str(uuid.uuid4()),
+        "username": username.strip().lower(),
+        "password_hash": password_hash,
+        "display_name": display_name,
+        "email": email,
+        "role_keys": list(role_keys),
+        "status": "active",
+        "created_at": _now(),
+        "created_by": created_by,
+        "updated_at": _now(),
+    }
+    return get_container("users").upsert_item(doc)
+
+
+def get_user(user_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("users").read_item(item=user_id, partition_key=user_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def get_user_by_username(username: str):
+    container = get_container("users")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.username = @u",
+            parameters=[{"name": "@u", "value": username.strip().lower()}],
+            enable_cross_partition_query=True,
+        )
+    )
+    return items[0] if items else None
+
+
+def list_users() -> list:
+    container = get_container("users")
+    return list(container.query_items(query="SELECT * FROM c ORDER BY c.created_at ASC", enable_cross_partition_query=True))
+
+
+def update_user(doc: dict) -> dict:
+    """Caller passes the full document back (read, mutate, save) -- same
+    convention as update_bulk_decision()."""
+    doc["updated_at"] = _now()
+    return get_container("users").upsert_item(doc)
+
+
+def count_active_users_with_role(role_key: str, exclude_user_id: str = None) -> int:
+    """Used to enforce "protect the last active Admin" -- see
+    api_blueprint.py's safeguards before disabling a user or removing a
+    role from one."""
+    users = [u for u in list_users() if u.get("status") == "active" and role_key in u.get("role_keys", [])]
+    if exclude_user_id:
+        users = [u for u in users if u["id"] != exclude_user_id]
+    return len(users)
+
+
+# ---------------------------------------------------------------------------
+# roles (role_key is the Cosmos id -- role keys are stable identifiers like
+# "admin"/"recruiter", not random UUIDs, since they're referenced
+# directly by users.role_keys and by code in a few places like
+# auth.DEFAULT_ROLES). Permission *definitions* are the static auth.PERMISSIONS
+# catalog, not stored here -- only which permissions each role grants.
+# ---------------------------------------------------------------------------
+def create_role(role_key: str, display_name: str, description: str, permission_ids: list, is_system: bool = False) -> dict:
+    doc = {
+        "id": role_key,
+        "role_key": role_key,
+        "display_name": display_name,
+        "description": description,
+        "is_system": is_system,
+        "permission_ids": list(permission_ids),
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    return get_container("roles").upsert_item(doc)
+
+
+def get_role(role_key: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("roles").read_item(item=role_key, partition_key=role_key)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def list_roles() -> list:
+    container = get_container("roles")
+    return list(container.query_items(query="SELECT * FROM c ORDER BY c.display_name ASC", enable_cross_partition_query=True))
+
+
+def update_role(doc: dict) -> dict:
+    doc["updated_at"] = _now()
+    return get_container("roles").upsert_item(doc)
+
+
+def ensure_default_roles() -> list:
+    """Seeds auth.DEFAULT_ROLES into the roles container on first run
+    (idempotent -- upsert, so re-running after an Admin edits a custom
+    role's description/permissions does NOT clobber their edit, since it
+    only inserts roles that don't exist yet -- system roles are read-only
+    anyway, see api_blueprint.py's update_role_endpoint). Called once at
+    Function App startup (function_app.py) and also safe to call from
+    tests/scripts."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from auth import DEFAULT_ROLES  # noqa: E402
+
+    created = []
+    for role in DEFAULT_ROLES:
+        if get_role(role["role_key"]) is None:
+            create_role(role["role_key"], role["display_name"], role["description"], role["permission_ids"], is_system=True)
+            created.append(role["role_key"])
+    return created
+
+
+# ---------------------------------------------------------------------------
+# pages (the Dynamic Page Access Management registry -- see auth.PAGES'
+# docstring for why this app's "route registry" is a code-defined catalog
+# rather than something scanned from a client-side router that doesn't
+# exist here) and page_access_policies (per page+role access decisions,
+# deny-by-default -- see auth.effective_pages()'s docstring).
+# ---------------------------------------------------------------------------
+def get_page(page_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("pages").read_item(item=page_id, partition_key=page_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def list_pages() -> list:
+    container = get_container("pages")
+    return list(container.query_items(query="SELECT * FROM c ORDER BY c.module ASC, c.name ASC", enable_cross_partition_query=True))
+
+
+def update_page(doc: dict) -> dict:
+    """Caller passes the full document back (read via get_page(), mutate,
+    then save) -- same upsert-the-whole-thing convention as update_user()/
+    update_role()."""
+    return get_container("pages").upsert_item(doc)
+
+
+def _page_access_policy_id(page_id: str, role_key: str) -> str:
+    return f"{page_id}:{role_key}"
+
+
+def get_page_access_policies(page_id: str) -> list:
+    container = get_container("page_access_policies")
+    return list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.page_id = @pid",
+            parameters=[{"name": "@pid", "value": page_id}],
+            enable_cross_partition_query=True,
+        )
+    )
+
+
+def list_all_page_access_policies() -> list:
+    container = get_container("page_access_policies")
+    return list(container.query_items(query="SELECT * FROM c", enable_cross_partition_query=True))
+
+
+def set_page_access(page_id: str, role_key: str, allowed: bool, actor: str) -> dict:
+    """Upsert-to-update, keyed by "{page_id}:{role_key}" -- a page/role pair
+    always has exactly one policy document, so re-saving the same
+    configuration never creates a duplicate or conflicting record."""
+    doc_id = _page_access_policy_id(page_id, role_key)
+    container = get_container("page_access_policies")
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        existing = container.read_item(item=doc_id, partition_key=doc_id)
+        created_by = existing.get("created_by", actor)
+    except CosmosResourceNotFoundError:
+        created_by = actor
+
+    doc = {
+        "id": doc_id, "page_id": page_id, "role_key": role_key, "allowed": bool(allowed),
+        "created_by": created_by, "updated_by": actor, "updated_at": _now(),
+    }
+    return container.upsert_item(doc)
+
+
+def sync_pages() -> dict:
+    """Reconciles the code-defined route registry (auth.PAGES -- this app's
+    "route-registration mechanism", see that list's docstring) against the
+    persisted `pages` container. THIS is the discovery mechanism: a page
+    only has to exist in auth.PAGES (added by a developer alongside the
+    App.jsx nav entry it describes) to be picked up here -- nobody has to
+    hand-create a database row for it first.
+
+    Returns {"new": [...], "updated": [...], "stale": [...], "first_run": bool}
+    (page_id lists) for the caller (api_blueprint.py's sync_pages_endpoint)
+    to audit-log and for the Admin Panel to surface as "newly discovered"
+    / "metadata changed" / "stale".
+
+    SECURE DEFAULTS: a brand new page_id gets NO page_access_policies at
+    all here -- deny-by-default, per the spec. The one exception is the
+    very first time this ever runs against a completely empty `pages`
+    container: that run seeds auth.default_page_access_policies(), which
+    reproduces the access every role already implicitly had via its
+    operation permissions -- so shipping this feature doesn't regress
+    every existing page to "nobody can reach it" on day one. Any page
+    added to auth.PAGES after that first run starts with zero policies.
+
+    REDISCOVERY PRESERVES POLICIES: this only ever upserts a page's
+    *metadata* fields -- it never writes to page_access_policies for a
+    page that already has any, so an admin's saved configuration survives
+    being "rediscovered" on every later call.
+
+    STALE PAGES: a page_id present in the persisted container but absent
+    from auth.PAGES now is marked discovery_status="stale", never
+    deleted -- its policies are left untouched too, in case the page
+    comes back (e.g. a route temporarily missing from a dev build)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from auth import PAGES, PAGE_IDS, default_page_access_policies  # noqa: E402
+
+    container = get_container("pages")
+    existing_docs = list_pages()
+    existing_by_id = {d["page_id"]: d for d in existing_docs}
+    is_first_run = len(existing_docs) == 0
+    now = _now()
+
+    new_ids, updated_ids, stale_ids = [], [], []
+    tracked_fields = ("name", "route", "module", "required_permission", "is_protected", "route_type")
+
+    for page in PAGES:
+        pid = page["page_id"]
+        prior = existing_by_id.get(pid)
+        # On the very first run, every page is about to get seeded with
+        # policies below (default_page_access_policies()) -- treat it as
+        # "will have policies" now so the status this call returns matches
+        # what a GET right after it would show, rather than lagging one
+        # sync call behind.
+        has_policies = is_first_run or bool(get_page_access_policies(pid))
+        doc = {
+            "id": pid, "page_id": pid, "name": page["name"], "route": page["route"],
+            "module": page["module"], "description": page.get("description", ""),
+            "required_permission": page.get("required_permission"),
+            "route_type": page.get("route_type", "page"), "is_protected": page.get("is_protected", True),
+            "discovery_status": "configured" if has_policies else "discovered",
+            "last_discovered_at": now,
+            "first_discovered_at": (prior or {}).get("first_discovered_at", now),
+        }
+        if prior is None:
+            new_ids.append(pid)
+        elif any(prior.get(f) != doc[f] for f in tracked_fields):
+            updated_ids.append(pid)
+        container.upsert_item(doc)
+
+    for pid, prior in existing_by_id.items():
+        if pid not in PAGE_IDS and prior.get("discovery_status") != "stale":
+            prior["discovery_status"] = "stale"
+            container.upsert_item(prior)
+            stale_ids.append(pid)
+
+    if is_first_run:
+        for policy in default_page_access_policies():
+            set_page_access(policy["page_id"], policy["role_key"], policy["allowed"], actor="system:initial_seed")
+
+    return {"new": new_ids, "updated": updated_ids, "stale": stale_ids, "first_run": is_first_run}

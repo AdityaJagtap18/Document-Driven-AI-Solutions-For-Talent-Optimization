@@ -14,15 +14,15 @@ import api_blueprint as api
 import repositories
 import jd_manager
 import blob_store
+import auth
 
-
-def _req(method="GET", route_params=None, body=None):
-    return func.HttpRequest(
-        method=method,
-        url="/api/test",
-        body=json.dumps(body).encode() if body is not None else None,
-        route_params=route_params or {},
-    )
+# _req()/_FIXTURE_ADMIN/_FIXTURE_ADMIN_ROLE/_fixture_token and the
+# autouse _default_iam_fixtures fixture live in conftest.py, not here --
+# that fixture needs to apply repo-wide (test_page_access.py uses the
+# same fixture account), and pytest autouse fixtures only apply within
+# the module/conftest scope they're actually DEFINED in. See conftest.py
+# for the full rationale.
+from conftest import _FIXTURE_ADMIN, _FIXTURE_ADMIN_ROLE, _fixture_token, _req  # noqa: E402,F401
 
 
 class TestHealth:
@@ -411,7 +411,10 @@ class TestReviewCandidate:
         assert resp.status_code == 404
 
     def test_adversarial_non_json_body(self):
-        req = func.HttpRequest(method="POST", url="/api/test", body=b"not json", route_params={"candidate_id": "abc"})
+        req = func.HttpRequest(
+            method="POST", url="/api/test", body=b"not json", route_params={"candidate_id": "abc"},
+            headers={"Authorization": "Bearer " + _fixture_token()},
+        )
         resp = api.review_candidate_endpoint(req)
         assert resp.status_code == 400
 
@@ -470,7 +473,10 @@ class TestListBulkDecisions:
             repositories, "list_bulk_decisions",
             lambda status=None: captured.update(status=status) or [{"id": "bd1", "status": "pending"}],
         )
-        req = func.HttpRequest(method="GET", url="/api/test", body=None, params={"status": "pending"})
+        req = func.HttpRequest(
+            method="GET", url="/api/test", body=None, params={"status": "pending"},
+            headers={"Authorization": "Bearer " + _fixture_token()},
+        )
         resp = api.list_bulk_decisions_endpoint(req)
         assert resp.status_code == 200
         body = json.loads(resp.get_body())
@@ -811,7 +817,10 @@ class TestListAuditLog:
             repositories, "list_all_audit_log",
             lambda action=None: captured.update(action=action) or [],
         )
-        req = func.HttpRequest(method="GET", url="/api/test", body=None, params={"action": "human_review_approve"})
+        req = func.HttpRequest(
+            method="GET", url="/api/test", body=None, params={"action": "human_review_approve"},
+            headers={"Authorization": "Bearer " + _fixture_token()},
+        )
         api.list_audit_log_endpoint(req)
         assert captured["action"] == "human_review_approve"
 
@@ -967,3 +976,356 @@ class TestVerifyDocument:
         ))
         assert resp.status_code == 200
         assert json.loads(resp.get_body())["summary"].startswith("OK:")
+
+
+# ---------------------------------------------------------------------------
+# IAM/RBAC: login, session resolution, and backend permission enforcement.
+# ---------------------------------------------------------------------------
+_RECRUITER_USER = {
+    "id": "user-recruiter-1", "username": "pat_recruiter", "password_hash": auth.hash_password("correct-password-1"),
+    "display_name": "Pat Recruiter", "email": "pat@example.com", "role_keys": ["recruiter"], "status": "active",
+}
+_DISABLED_USER = {
+    "id": "user-disabled-1", "username": "disabled_dana", "password_hash": auth.hash_password("whatever-1"),
+    "display_name": "Disabled Dana", "email": "", "role_keys": ["recruiter"], "status": "disabled",
+}
+_RECRUITER_ROLE = {
+    "id": "recruiter", "role_key": "recruiter", "is_system": True,
+    "permission_ids": next(r for r in auth.DEFAULT_ROLES if r["role_key"] == "recruiter")["permission_ids"],
+}
+
+
+def _recruiter_token():
+    return auth.create_token(_RECRUITER_USER)
+
+
+class TestLogin:
+    def test_golden_correct_credentials_returns_token_and_safe_user(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: _RECRUITER_USER if u == "pat_recruiter" else None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.login_endpoint(_req(method="POST", body={"username": "pat_recruiter", "password": "correct-password-1"}))
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert "token" in body
+        assert body["user"]["username"] == "pat_recruiter"
+        assert "password_hash" not in body["user"]
+        assert "password" not in json.dumps(body)
+
+    def test_adversarial_wrong_password_returns_401_generic_message(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: _RECRUITER_USER if u == "pat_recruiter" else None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.login_endpoint(_req(method="POST", body={"username": "pat_recruiter", "password": "wrong"}))
+        assert resp.status_code == 401
+        assert "Invalid username or password" in json.loads(resp.get_body())["error"]
+
+    def test_adversarial_unknown_username_returns_same_401_message(self, monkeypatch):
+        """Same error text as a wrong password -- never leak whether a
+        username exists (username-enumeration protection)."""
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: None)
+        resp = api.login_endpoint(_req(method="POST", body={"username": "ghost", "password": "anything"}))
+        assert resp.status_code == 401
+        assert "Invalid username or password" in json.loads(resp.get_body())["error"]
+
+    def test_adversarial_disabled_account_cannot_log_in(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: _DISABLED_USER if u == "disabled_dana" else None)
+        resp = api.login_endpoint(_req(method="POST", body={"username": "disabled_dana", "password": "whatever-1"}))
+        assert resp.status_code == 403
+
+    def test_edge_missing_fields_returns_400(self):
+        resp = api.login_endpoint(_req(method="POST", body={"username": "pat_recruiter"}))
+        assert resp.status_code == 400
+
+
+class TestRequirePermission:
+    """Negative-path coverage of the core authorization gate itself --
+    the mechanism every protected endpoint in this file relies on."""
+
+    def test_adversarial_missing_authorization_header_returns_401(self):
+        req = func.HttpRequest(method="GET", url="/api/test", body=None)
+        resp = api.list_candidates_endpoint(req)
+        assert resp.status_code == 401
+
+    def test_adversarial_malformed_authorization_header_returns_401(self):
+        req = func.HttpRequest(method="GET", url="/api/test", body=None, headers={"Authorization": "NotBearer xyz"})
+        resp = api.list_candidates_endpoint(req)
+        assert resp.status_code == 401
+
+    def test_adversarial_garbage_token_returns_401(self):
+        req = func.HttpRequest(method="GET", url="/api/test", body=None, headers={"Authorization": "Bearer not.a.real.jwt"})
+        resp = api.list_candidates_endpoint(req)
+        assert resp.status_code == 401
+
+    def test_adversarial_disabled_users_token_is_rejected(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user", lambda uid: _DISABLED_USER if uid == _DISABLED_USER["id"] else None)
+        token = auth.create_token(_DISABLED_USER)
+        req = func.HttpRequest(method="GET", url="/api/test", body=None, headers={"Authorization": f"Bearer {token}"})
+        resp = api.list_candidates_endpoint(req)
+        assert resp.status_code == 401
+
+    def test_adversarial_user_lacking_permission_gets_403_not_candidate_data(self, monkeypatch):
+        """A real recruiter account (candidates.read, not audit.read)
+        hitting the audit log must be refused -- this is the concrete
+        'frontend can't fake a role' guarantee: no header or body field
+        the client could send would make this succeed."""
+        monkeypatch.setattr(repositories, "get_user", lambda uid: _RECRUITER_USER if uid == _RECRUITER_USER["id"] else None)
+        monkeypatch.setattr(repositories, "get_role", lambda key: _RECRUITER_ROLE if key == "recruiter" else None)
+        req = func.HttpRequest(
+            method="GET", url="/api/test", body=None, headers={"Authorization": f"Bearer {_recruiter_token()}"},
+        )
+        resp = api.list_audit_log_endpoint(req)
+        assert resp.status_code == 403
+
+    def test_golden_user_with_the_right_permission_succeeds(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user", lambda uid: _RECRUITER_USER if uid == _RECRUITER_USER["id"] else None)
+        monkeypatch.setattr(repositories, "get_role", lambda key: _RECRUITER_ROLE if key == "recruiter" else None)
+        monkeypatch.setattr(repositories, "list_candidates", lambda ranking_tier=None: [])
+        req = func.HttpRequest(
+            method="GET", url="/api/test", body=None, headers={"Authorization": f"Bearer {_recruiter_token()}"},
+        )
+        resp = api.list_candidates_endpoint(req)
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Admin Panel: /admin/users*, /admin/roles*, /admin/permissions.
+# ---------------------------------------------------------------------------
+class TestAdminPermissionsAndRoles:
+    def test_golden_list_permissions_returns_full_catalog(self):
+        resp = api.list_permissions_endpoint(_req())
+        body = json.loads(resp.get_body())
+        assert set(body["permissions"].keys()) == set(auth.PERMISSION_IDS)
+
+    def test_golden_list_roles(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_roles", lambda: [_RECRUITER_ROLE])
+        resp = api.list_roles_endpoint(_req())
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["count"] == 1
+
+    def test_golden_create_custom_role(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_role", lambda key: _FIXTURE_ADMIN_ROLE if key == "admin" else None)
+        captured = {}
+        monkeypatch.setattr(
+            repositories, "create_role",
+            lambda role_key, display_name, description, permission_ids, is_system=False: captured.update(
+                role_key=role_key, permission_ids=permission_ids,
+            ) or {"id": role_key, "role_key": role_key, "display_name": display_name, "permission_ids": permission_ids},
+        )
+        resp = api.create_role_endpoint(_req(method="POST", body={
+            "role_key": "hiring_manager", "display_name": "Hiring Manager",
+            "description": "Views pipeline analytics.", "permission_ids": ["candidates.read", "analytics.read"],
+        }))
+        assert resp.status_code == 201
+        assert captured["role_key"] == "hiring_manager"
+
+    def test_adversarial_create_role_rejects_unknown_permission(self):
+        resp = api.create_role_endpoint(_req(method="POST", body={
+            "role_key": "x", "display_name": "X", "permission_ids": ["not.a.real.permission"],
+        }))
+        assert resp.status_code == 400
+
+    def test_adversarial_cannot_edit_a_system_role(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_role", lambda key: _RECRUITER_ROLE if key == "recruiter" else (_FIXTURE_ADMIN_ROLE if key == "admin" else None))
+        resp = api.update_role_endpoint(_req(
+            method="PUT", route_params={"role_key": "recruiter"},
+            body={"permission_ids": list(auth.PERMISSION_IDS)},
+        ))
+        assert resp.status_code == 403
+
+    def test_golden_edit_a_custom_role(self, monkeypatch):
+        custom_role = {"id": "hiring_manager", "role_key": "hiring_manager", "is_system": False, "permission_ids": ["candidates.read"]}
+        monkeypatch.setattr(repositories, "get_role", lambda key: custom_role if key == "hiring_manager" else (_FIXTURE_ADMIN_ROLE if key == "admin" else None))
+        monkeypatch.setattr(repositories, "update_role", lambda doc: doc)
+        resp = api.update_role_endpoint(_req(
+            method="PUT", route_params={"role_key": "hiring_manager"},
+            body={"permission_ids": ["candidates.read", "analytics.read"]},
+        ))
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["permission_ids"] == ["candidates.read", "analytics.read"]
+
+
+class TestAdminUsers:
+    def _actor(self):
+        return dict(_FIXTURE_ADMIN)
+
+    def test_golden_list_users_never_includes_password_hash(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_users", lambda: [_RECRUITER_USER])
+        resp = api.list_users_endpoint(_req())
+        body = json.loads(resp.get_body())
+        assert "password_hash" not in json.dumps(body)
+        assert body["users"][0]["username"] == "pat_recruiter"
+
+    def test_golden_create_user_hashes_password_and_never_returns_it(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: None)
+        monkeypatch.setattr(repositories, "get_role", lambda key: _RECRUITER_ROLE if key == "recruiter" else (_FIXTURE_ADMIN_ROLE if key == "admin" else None))
+        captured = {}
+
+        def fake_create_user(username, password_hash, display_name, email, role_keys, created_by):
+            captured["password_hash"] = password_hash
+            return {"id": "new-user-1", "username": username, "display_name": display_name,
+                    "email": email, "role_keys": role_keys, "status": "active"}
+
+        monkeypatch.setattr(repositories, "create_user", fake_create_user)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+
+        resp = api.create_user_endpoint(_req(method="POST", body={
+            "username": "new_recruiter", "password": "a-real-password-123",
+            "display_name": "New Recruiter", "email": "nr@example.com", "role_keys": ["recruiter"],
+        }))
+        assert resp.status_code == 201
+        body = json.loads(resp.get_body())
+        assert "password" not in json.dumps(body)
+        assert "password_hash" not in json.dumps(body)
+        assert captured["password_hash"] != "a-real-password-123"
+        assert auth.verify_password("a-real-password-123", captured["password_hash"])
+
+    def test_adversarial_create_user_rejects_short_password(self):
+        resp = api.create_user_endpoint(_req(method="POST", body={
+            "username": "x", "password": "short", "display_name": "X", "role_keys": [],
+        }))
+        assert resp.status_code == 400
+
+    def test_adversarial_duplicate_username_returns_409(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: _RECRUITER_USER)
+        resp = api.create_user_endpoint(_req(method="POST", body={
+            "username": "pat_recruiter", "password": "a-real-password-123", "display_name": "Dup", "role_keys": [],
+        }))
+        assert resp.status_code == 409
+
+    def test_adversarial_non_admin_cannot_create_an_admin(self, monkeypatch):
+        """Admin is the top-level role in this app (no separate Super
+        Admin tier). A lesser custom role that happens to combine
+        users.create with roles.assign (but doesn't hold admin itself)
+        must not be able to mint a brand-new peer Admin just by creating
+        a fresh account with that role."""
+        ops_user = {"id": "ops-1", "username": "ops1", "role_keys": ["ops_manager"], "status": "active"}
+        ops_role = {"id": "ops_manager", "role_key": "ops_manager", "permission_ids": ["users.create", "roles.assign"]}
+        monkeypatch.setattr(repositories, "get_user", lambda uid: ops_user if uid == "ops-1" else None)
+        monkeypatch.setattr(repositories, "get_role", lambda key: ops_role if key == "ops_manager" else None)
+        token = auth.create_token(ops_user)
+        resp = api.create_user_endpoint(func.HttpRequest(
+            method="POST", url="/api/test", body=json.dumps({
+                "username": "sneaky", "password": "a-real-password-123", "display_name": "Sneaky",
+                "role_keys": ["admin"],
+            }).encode(),
+            headers={"Authorization": f"Bearer {token}"},
+        ))
+        assert resp.status_code == 403
+
+    def test_golden_update_user_profile(self, monkeypatch):
+        user_doc = dict(_RECRUITER_USER)
+        monkeypatch.setattr(repositories, "get_user", lambda uid: user_doc if uid == "user-recruiter-1" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "update_user", lambda doc: doc)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.update_user_endpoint(_req(
+            method="PUT", route_params={"user_id": "user-recruiter-1"}, body={"display_name": "Patricia Recruiter"},
+        ))
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["display_name"] == "Patricia Recruiter"
+
+    def test_golden_disable_user(self, monkeypatch):
+        user_doc = dict(_RECRUITER_USER)
+        monkeypatch.setattr(repositories, "get_user", lambda uid: user_doc if uid == "user-recruiter-1" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "update_user", lambda doc: doc)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.set_user_status_endpoint(_req(
+            method="PUT", route_params={"user_id": "user-recruiter-1"}, body={"status": "disabled"},
+        ))
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["status"] == "disabled"
+
+    def test_adversarial_cannot_disable_own_account(self):
+        resp = api.set_user_status_endpoint(_req(
+            method="PUT", route_params={"user_id": _FIXTURE_ADMIN["id"]}, body={"status": "disabled"},
+        ))
+        assert resp.status_code == 403
+
+    def test_adversarial_cannot_disable_the_last_active_admin(self, monkeypatch):
+        other_admin = dict(_FIXTURE_ADMIN, id="other-admin-id", username="other_super")
+        monkeypatch.setattr(repositories, "get_user", lambda uid: other_admin if uid == "other-admin-id" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "count_active_users_with_role", lambda role_key, exclude_user_id=None: 0)
+        resp = api.set_user_status_endpoint(_req(
+            method="PUT", route_params={"user_id": "other-admin-id"}, body={"status": "disabled"},
+        ))
+        assert resp.status_code == 409
+
+    def test_golden_can_disable_an_admin_when_another_remains_active(self, monkeypatch):
+        other_admin = dict(_FIXTURE_ADMIN, id="other-admin-id", username="other_super")
+        monkeypatch.setattr(repositories, "get_user", lambda uid: other_admin if uid == "other-admin-id" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "count_active_users_with_role", lambda role_key, exclude_user_id=None: 1)
+        monkeypatch.setattr(repositories, "update_user", lambda doc: doc)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.set_user_status_endpoint(_req(
+            method="PUT", route_params={"user_id": "other-admin-id"}, body={"status": "disabled"},
+        ))
+        assert resp.status_code == 200
+
+
+class TestSetUserRoles:
+    def test_golden_assigns_new_roles(self, monkeypatch):
+        user_doc = dict(_RECRUITER_USER)
+        monkeypatch.setattr(repositories, "get_user", lambda uid: user_doc if uid == "user-recruiter-1" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "get_role", lambda key: ({"id": key, "role_key": key} if key in ("recruiter", "interviewer") else (_FIXTURE_ADMIN_ROLE if key == "admin" else None)))
+        monkeypatch.setattr(repositories, "update_user", lambda doc: doc)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.set_user_roles_endpoint(_req(
+            method="PUT", route_params={"user_id": "user-recruiter-1"}, body={"role_keys": ["recruiter", "interviewer"]},
+        ))
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["role_keys"] == ["recruiter", "interviewer"]
+
+    def test_adversarial_cannot_assign_unknown_role(self, monkeypatch):
+        user_doc = dict(_RECRUITER_USER)
+        monkeypatch.setattr(repositories, "get_user", lambda uid: user_doc if uid == "user-recruiter-1" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "get_role", lambda key: _FIXTURE_ADMIN_ROLE if key == "admin" else None)
+        resp = api.set_user_roles_endpoint(_req(
+            method="PUT", route_params={"user_id": "user-recruiter-1"}, body={"role_keys": ["made_up_role"]},
+        ))
+        assert resp.status_code == 400
+
+    def test_adversarial_no_self_escalation(self):
+        """A user can never change their own role assignments through
+        this endpoint, even one who already holds roles.assign -- the
+        explicit spec requirement this test exists to pin down."""
+        resp = api.set_user_roles_endpoint(_req(
+            method="PUT", route_params={"user_id": _FIXTURE_ADMIN["id"]}, body={"role_keys": ["recruiter"]},
+        ))
+        assert resp.status_code == 403
+
+    def test_adversarial_non_admin_cannot_grant_admin_role(self, monkeypatch):
+        """Same escalation path as test_adversarial_non_admin_cannot_create_an_admin
+        above, but via role re-assignment instead of account creation."""
+        ops_user = {"id": "ops-1", "username": "ops1", "role_keys": ["ops_manager"], "status": "active"}
+        ops_role = {"id": "ops_manager", "role_key": "ops_manager", "permission_ids": ["roles.assign"]}
+        target_user = dict(_RECRUITER_USER)
+
+        def get_user(uid):
+            return ops_user if uid == "ops-1" else (target_user if uid == "user-recruiter-1" else None)
+
+        def get_role(key):
+            if key == "ops_manager":
+                return ops_role
+            if key == "recruiter":
+                return _RECRUITER_ROLE
+            if key == "admin":
+                return {"id": "admin", "role_key": "admin"}
+            return None
+
+        monkeypatch.setattr(repositories, "get_user", get_user)
+        monkeypatch.setattr(repositories, "get_role", get_role)
+        token = auth.create_token(ops_user)
+        resp = api.set_user_roles_endpoint(func.HttpRequest(
+            method="PUT", url="/api/test", route_params={"user_id": "user-recruiter-1"},
+            body=json.dumps({"role_keys": ["admin"]}).encode(),
+            headers={"Authorization": f"Bearer {token}"},
+        ))
+        assert resp.status_code == 403
+
+    def test_adversarial_cannot_remove_admin_from_the_last_holder(self, monkeypatch):
+        last_admin = dict(_FIXTURE_ADMIN, id="last-admin-id", username="last_super")
+        monkeypatch.setattr(repositories, "get_user", lambda uid: last_admin if uid == "last-admin-id" else (_FIXTURE_ADMIN if uid == _FIXTURE_ADMIN["id"] else None))
+        monkeypatch.setattr(repositories, "get_role", lambda key: _FIXTURE_ADMIN_ROLE if key == "admin" else ({"id": "recruiter", "role_key": "recruiter"} if key == "recruiter" else None))
+        monkeypatch.setattr(repositories, "count_active_users_with_role", lambda role_key, exclude_user_id=None: 0)
+        resp = api.set_user_roles_endpoint(_req(
+            method="PUT", route_params={"user_id": "last-admin-id"}, body={"role_keys": ["recruiter"]},
+        ))
+        assert resp.status_code == 409

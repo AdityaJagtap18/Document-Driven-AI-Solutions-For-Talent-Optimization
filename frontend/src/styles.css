@@ -473,3 +473,10 @@ body {
 .stage-config-row input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.88rem; }
 .stage-config-btn { padding: 6px 9px; font-size: 0.78rem; }
 .stage-config-actions { margin-top: 16px; }
+
+/* Admin Panel: User/Role Management (UserManagement.jsx, RoleManagement.jsx) */
+.review-card-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; }
+.review-card-checkbox-label input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.role-permission-editor { padding: 16px 4px; display: flex; flex-direction: column; gap: 16px; }
+.permission-module-group { display: flex; flex-direction: column; gap: 6px; }
+.permission-module-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); font-weight: 700; margin-bottom: 2px; }

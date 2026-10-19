@@ -12,6 +12,8 @@ openai-whisper
 selenium
 langchain-community
 requests
+bcrypt
+PyJWT
 # only needed once Application Insights / Key Vault are provisioned (observability.py, secrets_loader.py):
 # azure-monitor-opentelemetry
 # azure-identity
