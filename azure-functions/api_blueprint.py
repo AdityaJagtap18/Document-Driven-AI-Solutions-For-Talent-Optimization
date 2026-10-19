@@ -450,6 +450,26 @@ def executive_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     })
 
 
+@bp.route(route="audit-log", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_audit_log_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Applicant Pipeline view (Phase 6+): the raw audit_log, optionally
+    filtered by ?action=. One cross-partition read instead of one call
+    per candidate -- repositories.list_all_audit_log() already exists
+    (built for executive_summary_endpoint above), this just exposes it
+    directly so the frontend can compute each candidate's furthest known
+    stage (Applied / Parsed & Scored / Document Verified / Reviewed)
+    client-side from the full entry list, polled periodically rather
+    than a true push-based live feed -- there's no websocket/SignalR
+    layer here, see Pipeline.jsx's doc comment for why that's an honest
+    label, not "real-time" overclaimed."""
+    action = req.params.get("action")
+    try:
+        entries = repositories.list_all_audit_log(action=action)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(entries), "entries": entries})
+
+
 @bp.route(route="observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard's cost/token usage view. Doesn't touch

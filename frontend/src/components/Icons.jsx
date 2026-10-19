@@ -49,6 +49,16 @@ function IconPortal(props) {
   );
 }
 
+function IconPipeline(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="10" y="4" width="5" height="11" rx="1.5" />
+      <rect x="17" y="4" width="5" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
 function IconLogout(props) {
   return (
     <svg {...iconProps(props)}>

@@ -152,7 +152,10 @@ window.CDPI_MOCK_API = {
         return Promise.reject(err);
       }
       found.ranking_tier = decision === "approve" ? "Recommended for Fast-Track" : "Rejected";
-      MOCK_AUDIT_LOG.push({ candidate_id: candidateId, action: "human_review_" + decision, reviewer: reviewer, notes: notes });
+      MOCK_AUDIT_LOG.push({
+        candidate_id: candidateId, action: "human_review_" + decision, reviewer: reviewer, notes: notes,
+        logged_at: new Date().toISOString(),
+      });
       return mockDelay({ candidate_id: candidateId, decision: decision, status: "recorded" });
     });
   },
@@ -174,8 +177,15 @@ window.CDPI_MOCK_API = {
     if (!fields.resumeFilename || !/\.pdf$/i.test(fields.resumeFilename)) {
       var err4 = new Error("'resume_filename' must end in '.pdf'."); err4.status = 400; return Promise.reject(err4);
     }
+    var mockCandidateId = "mock-" + fields.resumeFilename.replace(/[^a-zA-Z0-9]/g, "-");
+    MOCK_AUDIT_LOG.push({
+      candidate_id: mockCandidateId, action: "application_submitted",
+      full_name: fields.fullName, email: fields.email, phone: fields.phone,
+      linkedin: fields.linkedin, jd_id: fields.jdId, cover_note: fields.coverNote,
+      resume_filename: fields.resumeFilename, logged_at: new Date().toISOString(),
+    });
     return mockDelay({
-      candidate_id: "mock-" + fields.resumeFilename.replace(/[^a-zA-Z0-9]/g, "-"),
+      candidate_id: mockCandidateId,
       status: "submitted",
       message: "(Mock mode) Received, but nothing is actually processed -- no Blob Storage or Function host is running. "
         + "Switch config.js to mode: \"real\" against a deployed API to see this go through the real pipeline.",
@@ -193,6 +203,16 @@ window.CDPI_MOCK_API = {
         { jd_id: "data_analyst", jd_filename: "data_analyst.txt", title: "Data Analyst" },
       ],
     });
+  },
+
+  listAuditLog: function (action) {
+    // Real audit_log entries, same array reviewCandidate()/submitApplication()
+    // write to above -- so the Pipeline view reflects actual actions taken
+    // in this session, not canned data. The 42 CSV-sourced candidates never
+    // went through the live submit/review endpoints, so they correctly show
+    // no entries here (honest: there's no real history for them to show).
+    var filtered = action ? MOCK_AUDIT_LOG.filter(function (e) { return e.action === action; }) : MOCK_AUDIT_LOG;
+    return mockDelay({ count: filtered.length, entries: filtered.slice() });
   },
 
   observabilitySummary: function () {

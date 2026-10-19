@@ -57,6 +57,7 @@ var NAV_BY_VIEW = {
   dashboard: [
     { tab: "dashboard", label: "Dashboard", Icon: IconDashboard },
     { tab: "reports", label: "Reports", Icon: IconReports },
+    { tab: "pipeline", label: "Pipeline", Icon: IconPipeline },
   ],
   review: [{ tab: "review", label: "Review Queue", Icon: IconQueue }],
   portal: [{ tab: "portal", label: "Candidate Portal", Icon: IconPortal }],
@@ -142,6 +143,7 @@ function App() {
         <main className="app-main">
           {activeTab === "dashboard" && <Dashboard api={api} />}
           {activeTab === "reports" && <AdminReports api={api} />}
+          {activeTab === "pipeline" && <Pipeline api={api} />}
           {activeTab === "review" && <ReviewQueue api={api} />}
           {activeTab === "portal" && <CandidatePortal api={api} />}
         </main>

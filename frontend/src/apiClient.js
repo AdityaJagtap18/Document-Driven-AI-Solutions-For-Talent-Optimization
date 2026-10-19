@@ -77,4 +77,7 @@ window.CDPI_REAL_API = {
   listJds: function () {
     return cdpiRequest("/api/jds");
   },
+  listAuditLog: function (action) {
+    return cdpiRequest("/api/audit-log" + (action ? "?action=" + encodeURIComponent(action) : ""));
+  },
 };

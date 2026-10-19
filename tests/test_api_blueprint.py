@@ -378,6 +378,46 @@ class TestReviewCandidate:
         assert resp.status_code == 400
 
 
+class TestListAuditLog:
+    def test_golden_returns_all_entries(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(
+            repositories, "list_all_audit_log",
+            lambda action=None: captured.update(action=action) or [
+                {"candidate_id": "1", "action": "application_submitted"},
+                {"candidate_id": "1", "action": "human_review_approve"},
+            ],
+        )
+        resp = api.list_audit_log_endpoint(_req())
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert body["count"] == 2
+        assert captured["action"] is None
+
+    def test_golden_passes_through_action_query_param(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(
+            repositories, "list_all_audit_log",
+            lambda action=None: captured.update(action=action) or [],
+        )
+        req = func.HttpRequest(method="GET", url="/api/test", body=None, params={"action": "human_review_approve"})
+        api.list_audit_log_endpoint(req)
+        assert captured["action"] == "human_review_approve"
+
+    def test_edge_no_entries_returns_empty_list(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_all_audit_log", lambda action=None: [])
+        resp = api.list_audit_log_endpoint(_req())
+        assert json.loads(resp.get_body()) == {"count": 0, "entries": []}
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(action=None):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "list_all_audit_log", broken)
+        resp = api.list_audit_log_endpoint(_req())
+        assert resp.status_code == 503
+
+
 class TestObservabilitySummary:
     def test_golden_aggregates_real_log_file(self, tmp_path, monkeypatch):
         log_path = tmp_path / "llm_observability.jsonl"
