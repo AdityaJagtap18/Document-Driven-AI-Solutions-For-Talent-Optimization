@@ -1,12 +1,27 @@
 /**
- * Human Review Queue — formalizes FDE Stage 23 (HITL). Shows the "To be
- * Considered" tier (the one that previously only got an emailed CSV, per
- * the brownfield audit) and lets a recruiter approve/reject each one,
- * which calls POST /api/candidates/{id}/review and logs to audit_log.
+ * Human Review Queue — formalizes FDE Stage 23 (HITL). Two distinct
+ * actions here:
+ *
+ * 1. Individual approve/reject (unchanged) — a recruiter's own real
+ *    decision on one candidate, calls POST /api/candidates/{id}/review
+ *    immediately. This already was human-in-the-loop, so it doesn't need
+ *    any extra gate.
+ *
+ * 2. Bulk propose (new) — select several candidates (any tier, via the
+ *    filter below, not just "To be Considered") and propose accepting or
+ *    rejecting all of them at once. This does NOT change any candidate —
+ *    it only records a pending proposal (POST /api/bulk-decisions) that
+ *    an admin must separately approve before anything actually happens.
+ *    The point: the AI/scoring pipeline's ranking_tier is only ever a
+ *    RECOMMENDATION, and a recruiter acting on a batch of them in bulk
+ *    doesn't finalize anything either — only an explicit admin approval
+ *    does (see Pipeline.jsx's "Pending Bulk Approvals" panel).
  */
+var TIER_OPTIONS = ["To be Considered", "Recommended for Fast-Track", "Rejected"];
+
 function ReviewQueue(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, candidates: [], reviewerName: "" });
+  var state = React.useState({ loading: true, error: null, candidates: [], reviewerName: "", tier: "To be Considered" });
   var data = state[0];
   var setData = state[1];
   var actionState = React.useState({}); // candidate_id -> "pending" | "done" | error message
@@ -18,19 +33,30 @@ function ReviewQueue(props) {
   var configOpenState = React.useState(false);
   var configOpen = configOpenState[0];
   var setConfigOpen = configOpenState[1];
+  var selectedState = React.useState({}); // candidate_id -> true
+  var selected = selectedState[0];
+  var setSelected = selectedState[1];
+  var bulkState = React.useState({ submitting: false, error: null, result: null });
+  var bulk = bulkState[0];
+  var setBulk = bulkState[1];
 
   function load() {
     setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.listCandidates("To be Considered")
+    api.listCandidates(data.tier)
       .then(function (result) {
         setData(function (d) { return Object.assign({}, d, { loading: false, candidates: result.candidates }); });
+        setSelected({});
       })
       .catch(function (err) {
         setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); });
       });
   }
 
-  React.useEffect(load, []);
+  React.useEffect(load, [data.tier]);
+
+  function setTier(tier) {
+    setData(function (d) { return Object.assign({}, d, { tier: tier }); });
+  }
 
   function handleDecision(candidateId, decision) {
     if (!data.reviewerName.trim()) {
@@ -66,10 +92,37 @@ function ReviewQueue(props) {
       });
   }
 
+  function toggleSelected(candidateId) {
+    setSelected(function (s) {
+      var next = Object.assign({}, s);
+      if (next[candidateId]) delete next[candidateId]; else next[candidateId] = true;
+      return next;
+    });
+  }
+
+  var selectedIds = Object.keys(selected);
+
+  function handleBulkPropose(decision) {
+    if (!data.reviewerName.trim() || selectedIds.length === 0) return;
+    setBulk({ submitting: true, error: null, result: null });
+    api.proposeBulkDecision(decision, selectedIds, data.reviewerName.trim(), "")
+      .then(function (result) {
+        setBulk({ submitting: false, error: null, result: result });
+        setSelected({});
+      })
+      .catch(function (err) {
+        setBulk({ submitting: false, error: err.message, result: null });
+      });
+  }
+
   return (
     <div className="view">
       <h2>Human Review Queue</h2>
-      <p className="muted">Candidates in the "To be Considered" tier — approve or reject each, with a reason trail in the audit log.</p>
+      <p className="muted">
+        The AI only recommends a tier — approve/reject here (individually or, via the checkboxes, as a
+        batch proposal) is what actually decides. Bulk proposals need separate admin approval before
+        anything changes; individual approve/reject below takes effect immediately.
+      </p>
 
       <div className="toolbar">
         <label htmlFor="reviewer-name">Reviewing as</label>
@@ -83,13 +136,44 @@ function ReviewQueue(props) {
             setData(function (d) { return Object.assign({}, d, { reviewerName: value }); });
           }}
         />
+        <label htmlFor="tier-filter">Tier</label>
+        <select id="tier-filter" value={data.tier} onChange={function (e) { setTier(e.target.value); }}>
+          {TIER_OPTIONS.map(function (t) { return <option key={t} value={t}>{t}</option>; })}
+        </select>
         <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
+
+      {selectedIds.length > 0 && (
+        <div className="bulk-toolbar">
+          <span>{selectedIds.length} selected</span>
+          <button
+            className="btn btn-approve"
+            disabled={bulk.submitting || !data.reviewerName.trim()}
+            onClick={function () { handleBulkPropose("approve"); }}
+          >
+            Propose Bulk Accept
+          </button>
+          <button
+            className="btn btn-reject"
+            disabled={bulk.submitting || !data.reviewerName.trim()}
+            onClick={function () { handleBulkPropose("reject"); }}
+          >
+            Propose Bulk Reject
+          </button>
+          {!data.reviewerName.trim() && <span className="banner-error-inline">Enter your name first.</span>}
+        </div>
+      )}
+      {bulk.result && (
+        <div className="banner banner-success">
+          {bulk.result.message} ({bulk.result.candidate_count} candidate(s))
+        </div>
+      )}
+      {bulk.error && <div className="banner banner-error">{bulk.error}</div>}
 
       {data.error && <div className="banner banner-error">Couldn't load queue: {data.error}</div>}
       {data.loading && <p className="muted">Loading…</p>}
       {!data.loading && data.candidates.length === 0 && !data.error && (
-        <p className="muted">Nothing waiting for review.</p>
+        <p className="muted">No candidates in this tier.</p>
       )}
 
       <div className="review-list">
@@ -97,6 +181,12 @@ function ReviewQueue(props) {
           var action = actions[c.candidate_id];
           return (
             <div className="review-card" key={c.candidate_id}>
+              <input
+                type="checkbox"
+                className="review-card-checkbox"
+                checked={!!selected[c.candidate_id]}
+                onChange={function () { toggleSelected(c.candidate_id); }}
+              />
               <div className="review-card-main">
                 <strong>{c.Name}</strong>
                 <span className="muted"> — {c["JD Match"]} match, {c["Candidate Type"]}</span>

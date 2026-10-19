@@ -243,6 +243,13 @@ body {
 }
 .review-summary { margin: 6px 0 0; color: var(--fg-muted); font-size: 0.85rem; }
 .review-card-actions { display: flex; align-items: center; gap: 8px; }
+.review-card-checkbox { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
+
+.bulk-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--primary-soft); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin: 10px 0; font-size: 0.85rem; font-weight: 600; color: var(--primary);
+}
 
 /* ---------------------------------------------------------------------
    Buttons
@@ -331,6 +338,26 @@ body {
 /* ---------------------------------------------------------------------
    Applicant Pipeline (Kanban board)
 --------------------------------------------------------------------- */
+.bulk-approvals-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bulk-approvals-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.bulk-approvals-header h4 { margin: 0; }
+.bulk-approvals-reviewer { flex-direction: row; align-items: center; gap: 8px; font-size: 0.82rem; }
+.bulk-approvals-reviewer input { width: 180px; }
+.bulk-approval-card {
+  display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 14px;
+}
+
 .pipeline-board { display: flex; gap: 16px; margin-top: 18px; overflow-x: auto; padding-bottom: 8px; }
 .pipeline-column {
   background: var(--surface-soft);

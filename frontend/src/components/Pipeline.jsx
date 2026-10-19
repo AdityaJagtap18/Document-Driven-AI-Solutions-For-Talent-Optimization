@@ -66,6 +66,19 @@ function Pipeline(props) {
   var configOpenState = React.useState(false);
   var configOpen = configOpenState[0];
   var setConfigOpen = configOpenState[1];
+  var pendingState = React.useState({ loading: true, error: null, decisions: [] });
+  var pending = pendingState[0];
+  var setPending = pendingState[1];
+
+  function loadPending() {
+    return api.listBulkDecisions("pending")
+      .then(function (result) {
+        setPending({ loading: false, error: null, decisions: result.decisions });
+      })
+      .catch(function (err) {
+        setPending({ loading: false, error: err.message, decisions: [] });
+      });
+  }
 
   function load() {
     return Promise.all([api.listCandidates(), api.listAuditLog()])
@@ -83,7 +96,8 @@ function Pipeline(props) {
 
   React.useEffect(function () {
     load();
-    var interval = setInterval(load, POLL_INTERVAL_MS);
+    loadPending();
+    var interval = setInterval(function () { load(); loadPending(); }, POLL_INTERVAL_MS);
     return function () { clearInterval(interval); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,6 +155,8 @@ function Pipeline(props) {
         <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
 
+      <BulkApprovalsPanel api={api} pending={pending} onReviewed={function () { loadPending(); load(); }} />
+
       <div className="pipeline-board">
         {columns.map(function (col) {
           return (
@@ -185,6 +201,85 @@ function Pipeline(props) {
       {configOpen && (
         <PipelineConfigModal api={api} onClose={function () { setConfigOpen(false); }} />
       )}
+    </div>
+  );
+}
+
+/** Admin's approval queue for recruiter-proposed bulk accept/reject
+ * batches (see ReviewQueue.jsx's doc comment). Nothing a recruiter
+ * proposes in bulk takes effect until it's acted on here -- that's the
+ * entire point of the gate. */
+function BulkApprovalsPanel(props) {
+  var api = props.api;
+  var pending = props.pending;
+  var onReviewed = props.onReviewed;
+  var reviewerState = React.useState("");
+  var reviewerName = reviewerState[0];
+  var setReviewerName = reviewerState[1];
+  var actionState = React.useState({}); // decision id -> "pending" | error message
+  var actions = actionState[0];
+  var setActions = actionState[1];
+
+  function setAction(id, value) {
+    setActions(function (a) {
+      var next = Object.assign({}, a);
+      if (value === null) delete next[id]; else next[id] = value;
+      return next;
+    });
+  }
+
+  function handle(decisionId, type) {
+    if (!reviewerName.trim()) {
+      setAction(decisionId, "Enter your name first.");
+      return;
+    }
+    setAction(decisionId, "pending");
+    var call = type === "approve" ? api.approveBulkDecision(decisionId, reviewerName.trim()) : api.rejectBulkDecision(decisionId, reviewerName.trim(), "");
+    call
+      .then(function () {
+        setAction(decisionId, null);
+        onReviewed();
+      })
+      .catch(function (err) {
+        setAction(decisionId, "Error: " + err.message);
+      });
+  }
+
+  if (pending.loading) return null;
+  if (pending.error) return <div className="banner banner-error">Couldn't load pending approvals: {pending.error}</div>;
+  if (pending.decisions.length === 0) return null;
+
+  return (
+    <div className="bulk-approvals-panel">
+      <div className="bulk-approvals-header">
+        <h4>Pending Bulk Approvals ({pending.decisions.length})</h4>
+        <label className="login-field bulk-approvals-reviewer">
+          Reviewing as
+          <input type="text" value={reviewerName} onChange={function (e) { setReviewerName(e.target.value); }} />
+        </label>
+      </div>
+      {pending.decisions.map(function (d) {
+        var action = actions[d.id];
+        return (
+          <div className="bulk-approval-card" key={d.id}>
+            <div>
+              <strong>{d.decision === "approve" ? "Bulk Accept" : "Bulk Reject"}</strong>
+              <span className="muted"> — {d.candidate_ids.length} candidate(s), proposed by {d.proposed_by}</span>
+              {d.notes && <p className="review-summary">{d.notes}</p>}
+            </div>
+            <div className="review-card-actions">
+              {action === "pending" && <span className="muted">Saving…</span>}
+              {action && action !== "pending" && <span className="banner-error-inline">{action}</span>}
+              {action !== "pending" && (
+                <React.Fragment>
+                  <button className="btn btn-approve" onClick={function () { handle(d.id, "approve"); }}>Approve</button>
+                  <button className="btn btn-reject" onClick={function () { handle(d.id, "reject"); }}>Reject</button>
+                </React.Fragment>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
