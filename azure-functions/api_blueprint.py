@@ -175,25 +175,30 @@ def get_candidate_by_email_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         "resume_name": candidate.get("resume_name"),
         "ranking_tier": candidate.get("ranking_tier"),
         "ingested_at": candidate.get("ingested_at"),
-        "stage_timeline": _stage_timeline_for(candidate.get("candidate_id")),
+        "stage_timeline": _stage_timeline_for_candidate(candidate.get("candidate_id")),
         "pipeline_stages": pipeline_stages,
     }
     return _json_response(safe_fields)
 
 
-def _stage_timeline_for(candidate_id: str) -> list:
-    """[{stage, updated_by, notes, logged_at}] ordered oldest -> newest,
-    filtered from audit_log's immutable event stream down to just the
-    stage_update entries (see advance_candidate_stage_endpoint below) for
-    one candidate. Best-effort: returns [] rather than raising, so a
-    timeline fetch failure never breaks a response that has other real
-    data in it (candidate status, review result, etc.)."""
+def _stage_timeline_for_candidate(candidate_id: str) -> list:
+    """[{stage, logged_at}] ordered oldest -> newest — deliberately NOT the
+    same shape get_candidate_timeline_endpoint returns to recruiters/admin.
+    `notes` and `performance` are the recruiter's internal assessment of
+    how the candidate did at each stage (see advance_candidate_stage_endpoint)
+    -- stripped here at the API level, not just hidden in the frontend,
+    so a candidate inspecting network traffic still can't see them. Same
+    "never show internal evaluation to its subject" precedent as HR
+    Notes/Red Flags already being excluded from this endpoint above.
+    Best-effort: returns [] rather than raising, so a timeline fetch
+    failure never breaks a response that has other real data in it
+    (candidate status, review result, etc.)."""
     try:
         entries = repositories.list_audit_log(candidate_id)
     except Exception:
         return []
     return [
-        {"stage": e.get("stage"), "updated_by": e.get("updated_by"), "notes": e.get("notes"), "logged_at": e.get("logged_at")}
+        {"stage": e.get("stage"), "logged_at": e.get("logged_at")}
         for e in entries if e.get("action") == "stage_update"
     ]
 
@@ -365,6 +370,152 @@ def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
         return f"failed: {e}"
 
 
+@bp.route(route="bulk-decisions", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Recruiter proposes a bulk accept/reject on a batch of screening-
+    phase candidates. Body: {"decision": "approve"|"reject",
+    "candidate_ids": ["...", ...], "proposed_by": "...", "notes": "..." (optional)}.
+
+    Does NOT touch any candidate record -- the AI/scoring pipeline only
+    ever produces a recommendation (ranking_tier), and a recruiter acting
+    in bulk doesn't finalize anything either. This just records a pending
+    proposal; only approve_bulk_decision_endpoint (admin) actually applies
+    it. Contrast with review_candidate_endpoint, which takes effect
+    immediately -- that's a recruiter's individual decision on one
+    candidate, already a real human-in-the-loop action, not an AI output
+    being rubber-stamped in bulk."""
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    decision = body.get("decision")
+    candidate_ids = body.get("candidate_ids")
+    proposed_by = body.get("proposed_by")
+    notes = body.get("notes", "")
+
+    if decision not in ("approve", "reject"):
+        return _error_response("'decision' must be 'approve' or 'reject'.", status_code=400)
+    if not candidate_ids or not isinstance(candidate_ids, list):
+        return _error_response("'candidate_ids' must be a non-empty list.", status_code=400)
+    if not proposed_by:
+        return _error_response("'proposed_by' is required.", status_code=400)
+
+    try:
+        doc = repositories.create_bulk_decision(decision, candidate_ids, proposed_by, notes)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    return _json_response({
+        "id": doc["id"], "decision": decision, "candidate_count": len(candidate_ids),
+        "status": "pending", "message": "Proposal recorded — no candidates changed yet. An admin must approve it first.",
+    }, status_code=202)
+
+
+@bp.route(route="bulk-decisions", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_bulk_decisions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Admin's approval queue. ?status=pending|approved|rejected to filter,
+    omit for everything (useful for an audit trail of past decisions too)."""
+    status = req.params.get("status")
+    try:
+        decisions = repositories.list_bulk_decisions(status=status)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(decisions), "decisions": decisions})
+
+
+def _apply_bulk_decision(decision_id: str, decision: str, candidate_ids: list, reviewed_by: str, proposal_notes: str) -> list:
+    """Applies an approved bulk decision to every candidate in it -- same
+    tier-change + audit_log + best-effort WhatsApp notify as
+    review_candidate_endpoint does for one candidate, just looped.
+    Returns a per-candidate result list so the caller can report
+    partial failures (one bad candidate_id doesn't abort the rest)."""
+    results = []
+    for candidate_id in candidate_ids:
+        try:
+            candidate = repositories.get_candidate(candidate_id)
+            if candidate is None:
+                results.append({"candidate_id": candidate_id, "status": "skipped: not found"})
+                continue
+            candidate["ranking_tier"] = "Recommended for Fast-Track" if decision == "approve" else "Rejected"
+            repositories.upsert_candidate(candidate)
+            repositories.append_audit_log({
+                "candidate_id": candidate_id,
+                "action": f"human_review_{decision}",
+                "reviewer": f"bulk_decision:{decision_id} (approved by {reviewed_by})",
+                "notes": proposal_notes,
+            })
+            whatsapp_status = _notify_candidate_whatsapp(candidate, decision)
+            results.append({"candidate_id": candidate_id, "status": "applied", "whatsapp_notification": whatsapp_status})
+        except Exception as e:
+            results.append({"candidate_id": candidate_id, "status": f"failed: {e}"})
+    return results
+
+
+@bp.route(route="bulk-decisions/{decision_id}/approve", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def approve_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Admin approves a pending bulk proposal -- this is the ONLY place a
+    bulk accept/reject actually takes effect on candidate records. Body:
+    {"reviewed_by": "..."}."""
+    decision_id = req.route_params.get("decision_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    reviewed_by = body.get("reviewed_by")
+    if not reviewed_by:
+        return _error_response("'reviewed_by' is required.", status_code=400)
+
+    try:
+        pending = repositories.get_bulk_decision(decision_id)
+        if pending is None:
+            return _error_response(f"Bulk decision '{decision_id}' not found.", status_code=404)
+        if pending["status"] != "pending":
+            return _error_response(f"This proposal is already '{pending['status']}' — it can't be approved again.", status_code=409)
+
+        results = _apply_bulk_decision(
+            decision_id, pending["decision"], pending["candidate_ids"], reviewed_by, pending.get("notes", ""),
+        )
+        repositories.mark_bulk_decision_reviewed(decision_id, "approved", reviewed_by, extra={"results": results})
+    except ValueError as e:
+        status = 404 if "not found" in str(e) else 409
+        return _error_response(str(e), status_code=status)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    return _json_response({"id": decision_id, "status": "approved", "results": results})
+
+
+@bp.route(route="bulk-decisions/{decision_id}/reject", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def reject_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Admin rejects a pending bulk proposal -- no candidate is touched,
+    the proposal is just marked rejected (kept for the audit trail, not
+    deleted). Body: {"reviewed_by": "...", "notes": "..." (optional, why
+    it was rejected)}."""
+    decision_id = req.route_params.get("decision_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    reviewed_by = body.get("reviewed_by")
+    if not reviewed_by:
+        return _error_response("'reviewed_by' is required.", status_code=400)
+
+    try:
+        repositories.mark_bulk_decision_reviewed(
+            decision_id, "rejected", reviewed_by, extra={"review_notes": body.get("notes", "")},
+        )
+    except ValueError as e:
+        status = 404 if "not found" in str(e) else 409
+        return _error_response(str(e), status_code=status)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    return _json_response({"id": decision_id, "status": "rejected"})
+
+
 @bp.route(route="pipeline-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def get_pipeline_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """The recruiter-configurable ordered list of hiring-process stage
@@ -416,25 +567,56 @@ def get_candidate_timeline_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         return _cosmos_unavailable_response(e)
     timeline = [
-        {"stage": e.get("stage"), "updated_by": e.get("updated_by"), "notes": e.get("notes"), "logged_at": e.get("logged_at")}
+        {
+            "stage": e.get("stage"), "updated_by": e.get("updated_by"), "notes": e.get("notes"),
+            "performance": e.get("performance"), "logged_at": e.get("logged_at"),
+        }
         for e in entries if e.get("action") == "stage_update"
     ]
     return _json_response({"candidate_id": candidate_id, "timeline": timeline})
 
 
+PERFORMANCE_RATINGS = ["Excellent", "Good", "Average", "Poor"]
+
+
 @bp.route(route="candidates/{candidate_id}/stage", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse:
-    """Recruiter/Admin sets a candidate's current hiring stage. Body:
-    {"stage": "Technical Exam", "updated_by": "...", "notes": "..." (optional)}.
+    """Recruiter/Admin sets a candidate's current hiring stage AND records
+    how they did there. Body: {"stage": "Technical Exam", "updated_by": "...",
+    "notes": "...", "performance": "Good" (optional, one of PERFORMANCE_RATINGS)}.
+
+    This is the real point of the stage timeline, not just a progress
+    tracker: a recruiter isn't only approving/rejecting a resume once,
+    they're evaluating a candidate's performance at each individual round
+    (exam score, interview impression, etc.) -- 'notes' is REQUIRED for
+    that reason, not optional metadata; recording that someone reached
+    "Technical Exam" with no assessment of how it went defeats the
+    purpose. 'performance' is an optional structured rating alongside the
+    free-text notes, when the recruiter wants something scannable across
+    a candidate's whole history without reading every note.
 
     'stage' must be one of the currently configured pipeline-config
     stages -- not free text -- so the timeline can't drift from whatever
     the recruiter actually configured (a typo'd stage name would
     otherwise silently create an orphan stage nothing else recognizes).
+
+    NO SKIPPING: 'stage' must be the immediate next stage after whatever
+    this candidate's current stage is (or the first configured stage if
+    they haven't started) -- a recruiter can send a candidate to the next
+    round, never jump several rounds ahead in one call. This also means
+    there's no "moving backward" despite this docstring's note below
+    about history surviving backward moves -- that refers to what
+    happens if the stage *list* is reordered later, not to this endpoint
+    allowing an out-of-order call.
+
     Appends one immutable stage_update audit_log entry; does not
     overwrite or remove any earlier entry, so the full history (which
     stages this candidate actually passed through, and when) survives
-    even if they're moved backward or the config changes later."""
+    even if the config changes later.
+
+    notes/performance are NEVER returned to the candidate-facing
+    endpoint (candidates/by-email/{email}) -- see
+    _stage_timeline_for_candidate()'s docstring."""
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -443,12 +625,17 @@ def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse
 
     stage = body.get("stage")
     updated_by = body.get("updated_by")
-    notes = body.get("notes", "")
+    notes = body.get("notes")
+    performance = body.get("performance")
 
     if not stage:
         return _error_response("'stage' is required.", status_code=400)
     if not updated_by:
         return _error_response("'updated_by' is required.", status_code=400)
+    if not notes or not notes.strip():
+        return _error_response("'notes' is required -- record how the candidate actually did at this stage.", status_code=400)
+    if performance and performance not in PERFORMANCE_RATINGS:
+        return _error_response(f"'performance' must be one of {PERFORMANCE_RATINGS} if given.", status_code=400)
 
     try:
         candidate = repositories.get_candidate(candidate_id)
@@ -462,9 +649,43 @@ def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse
                 status_code=400,
             )
 
+        # No skipping ahead -- a recruiter can only send a candidate to the
+        # immediate next configured stage, never jump several rounds at
+        # once. current_stage is whatever the last stage_update recorded
+        # (None if they haven't started), and the only valid 'stage' value
+        # is configured_stages[current_index + 1] (or configured_stages[0]
+        # if they haven't started yet).
+        past_entries = [e for e in repositories.list_audit_log(candidate_id) if e.get("action") == "stage_update"]
+        current_stage = past_entries[-1]["stage"] if past_entries else None
+
+        if current_stage is None:
+            expected_next = configured_stages[0]
+        elif current_stage not in configured_stages:
+            return _error_response(
+                f"Candidate's current stage '{current_stage}' is no longer in the configured pipeline "
+                "(the stage list was changed after they were placed there) -- fix the pipeline config "
+                "before advancing this candidate further.",
+                status_code=409,
+            )
+        else:
+            current_index = configured_stages.index(current_stage)
+            if current_index == len(configured_stages) - 1:
+                return _error_response(
+                    f"'{current_stage}' is already the final configured stage — there's nothing to advance to.",
+                    status_code=400,
+                )
+            expected_next = configured_stages[current_index + 1]
+
+        if stage != expected_next:
+            return _error_response(
+                f"Candidates can only be advanced one stage at a time, in order. Current stage: "
+                f"{current_stage or '(not started)'}. Next allowed stage: '{expected_next}'. Got: '{stage}'.",
+                status_code=400,
+            )
+
         repositories.append_audit_log({
             "candidate_id": candidate_id, "action": "stage_update",
-            "stage": stage, "updated_by": updated_by, "notes": notes,
+            "stage": stage, "updated_by": updated_by, "notes": notes, "performance": performance,
         })
     except Exception as e:
         return _cosmos_unavailable_response(e)

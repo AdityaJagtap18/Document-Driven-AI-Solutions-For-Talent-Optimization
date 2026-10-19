@@ -416,6 +416,180 @@ class TestReviewCandidate:
         assert resp.status_code == 400
 
 
+class TestProposeBulkDecision:
+    def _body(self, **overrides):
+        base = {"decision": "reject", "candidate_ids": ["c1", "c2"], "proposed_by": "Priyanka", "notes": "Low scores"}
+        base.update(overrides)
+        return base
+
+    def test_golden_records_pending_proposal_without_touching_candidates(self, monkeypatch):
+        created = {}
+        monkeypatch.setattr(
+            repositories, "create_bulk_decision",
+            lambda decision, candidate_ids, proposed_by, notes="": created.update(
+                decision=decision, candidate_ids=candidate_ids, proposed_by=proposed_by, notes=notes,
+            ) or {"id": "bd1"},
+        )
+        touched = {"called": False}
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: touched.update(called=True))
+
+        resp = api.propose_bulk_decision_endpoint(_req(method="POST", body=self._body()))
+        assert resp.status_code == 202
+        body = json.loads(resp.get_body())
+        assert body["status"] == "pending"
+        assert body["candidate_count"] == 2
+        assert created["decision"] == "reject"
+        assert created["candidate_ids"] == ["c1", "c2"]
+        assert touched["called"] is False  # the whole point: nothing applied yet
+
+    def test_edge_invalid_decision_rejected(self, monkeypatch):
+        resp = api.propose_bulk_decision_endpoint(_req(method="POST", body=self._body(decision="maybe")))
+        assert resp.status_code == 400
+
+    def test_edge_empty_candidate_ids_rejected(self, monkeypatch):
+        resp = api.propose_bulk_decision_endpoint(_req(method="POST", body=self._body(candidate_ids=[])))
+        assert resp.status_code == 400
+
+    def test_edge_missing_proposed_by_rejected(self, monkeypatch):
+        resp = api.propose_bulk_decision_endpoint(_req(method="POST", body=self._body(proposed_by="")))
+        assert resp.status_code == 400
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(decision, candidate_ids, proposed_by, notes=""):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "create_bulk_decision", broken)
+        resp = api.propose_bulk_decision_endpoint(_req(method="POST", body=self._body()))
+        assert resp.status_code == 503
+
+
+class TestListBulkDecisions:
+    def test_golden_returns_decisions(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(
+            repositories, "list_bulk_decisions",
+            lambda status=None: captured.update(status=status) or [{"id": "bd1", "status": "pending"}],
+        )
+        req = func.HttpRequest(method="GET", url="/api/test", body=None, params={"status": "pending"})
+        resp = api.list_bulk_decisions_endpoint(req)
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert body["count"] == 1
+        assert captured["status"] == "pending"
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(status=None):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "list_bulk_decisions", broken)
+        resp = api.list_bulk_decisions_endpoint(_req())
+        assert resp.status_code == 503
+
+
+class TestApproveBulkDecision:
+    def test_golden_applies_decision_to_every_candidate(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "get_bulk_decision",
+            lambda decision_id: {"id": decision_id, "status": "pending", "decision": "reject", "candidate_ids": ["c1", "c2"], "notes": "Low scores"},
+        )
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Name": "Jane"})
+        upserted = []
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: upserted.append(dict(c)))
+        logged = []
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.append(entry))
+        marked = {}
+        monkeypatch.setattr(
+            repositories, "mark_bulk_decision_reviewed",
+            lambda decision_id, status, reviewed_by, extra=None: marked.update(
+                decision_id=decision_id, status=status, reviewed_by=reviewed_by, extra=extra,
+            ),
+        )
+
+        resp = api.approve_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert body["status"] == "approved"
+        assert [c["candidate_id"] for c in upserted] == ["c1", "c2"]
+        assert all(c["ranking_tier"] == "Rejected" for c in upserted)
+        assert all(e["action"] == "human_review_reject" for e in logged)
+        assert marked["status"] == "approved"
+        assert marked["reviewed_by"] == "Admin Amit"
+
+    def test_edge_already_reviewed_returns_409(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "get_bulk_decision",
+            lambda decision_id: {"id": decision_id, "status": "approved", "decision": "approve", "candidate_ids": ["c1"]},
+        )
+        resp = api.approve_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 409
+
+    def test_edge_not_found_returns_404(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_bulk_decision", lambda decision_id: None)
+        resp = api.approve_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "missing"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 404
+
+    def test_edge_missing_reviewed_by_returns_400(self, monkeypatch):
+        resp = api.approve_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={}))
+        assert resp.status_code == 400
+
+    def test_adversarial_one_bad_candidate_id_does_not_abort_the_rest(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "get_bulk_decision",
+            lambda decision_id: {"id": decision_id, "status": "pending", "decision": "approve", "candidate_ids": ["missing", "c2"], "notes": ""},
+        )
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: None if cid == "missing" else {"candidate_id": cid})
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: c)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: entry)
+        monkeypatch.setattr(repositories, "mark_bulk_decision_reviewed", lambda *a, **kw: None)
+
+        resp = api.approve_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 200
+        results = json.loads(resp.get_body())["results"]
+        assert results[0]["status"] == "skipped: not found"
+        assert results[1]["status"] == "applied"
+
+
+class TestRejectBulkDecision:
+    def test_golden_marks_rejected_without_touching_candidates(self, monkeypatch):
+        touched = {"called": False}
+        monkeypatch.setattr(repositories, "upsert_candidate", lambda c: touched.update(called=True))
+        marked = {}
+        monkeypatch.setattr(
+            repositories, "mark_bulk_decision_reviewed",
+            lambda decision_id, status, reviewed_by, extra=None: marked.update(
+                decision_id=decision_id, status=status, reviewed_by=reviewed_by, extra=extra,
+            ),
+        )
+
+        resp = api.reject_bulk_decision_endpoint(
+            _req(method="POST", route_params={"decision_id": "bd1"}, body={"reviewed_by": "Admin Amit", "notes": "Too risky"})
+        )
+        assert resp.status_code == 200
+        assert marked["status"] == "rejected"
+        assert marked["extra"] == {"review_notes": "Too risky"}
+        assert touched["called"] is False
+
+    def test_edge_not_found_returns_404(self, monkeypatch):
+        def broken(decision_id, status, reviewed_by, extra=None):
+            raise ValueError(f"Bulk decision '{decision_id}' not found.")
+
+        monkeypatch.setattr(repositories, "mark_bulk_decision_reviewed", broken)
+        resp = api.reject_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "missing"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 404
+
+    def test_edge_already_reviewed_returns_409(self, monkeypatch):
+        def broken(decision_id, status, reviewed_by, extra=None):
+            raise ValueError("This proposal is already 'approved' — it can't be reviewed again.")
+
+        monkeypatch.setattr(repositories, "mark_bulk_decision_reviewed", broken)
+        resp = api.reject_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={"reviewed_by": "Admin Amit"}))
+        assert resp.status_code == 409
+
+    def test_edge_missing_reviewed_by_returns_400(self, monkeypatch):
+        resp = api.reject_bulk_decision_endpoint(_req(method="POST", route_params={"decision_id": "bd1"}, body={}))
+        assert resp.status_code == 400
+
+
 class TestPipelineConfig:
     def test_golden_get_returns_configured_stages(self, monkeypatch):
         monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Technical Exam", "Selected"])
@@ -485,22 +659,74 @@ class TestCandidateTimeline:
 
 
 class TestAdvanceCandidateStage:
+    STAGES = ["Shortlisted", "Aptitude Exam", "Technical Exam", "Selected"]
+
     def _body(self, **overrides):
-        base = {"stage": "Technical Exam", "updated_by": "Priyanka", "notes": "Scored 85%"}
+        base = {"stage": "Shortlisted", "updated_by": "Priyanka", "notes": "Scored 85%", "performance": "Good"}
         base.update(overrides)
         return base
 
-    def test_golden_records_stage_update(self, monkeypatch):
-        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Name": "Jane"})
-        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Technical Exam", "Selected"])
+    def _mock_backend(self, monkeypatch, past_stage_updates=None, candidate=None):
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: candidate or {"candidate_id": cid, "Name": "Jane"})
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: self.STAGES)
+        monkeypatch.setattr(
+            repositories, "list_audit_log",
+            lambda cid: [{"action": "stage_update", "stage": s} for s in (past_stage_updates or [])],
+        )
+
+    def test_golden_first_stage_from_not_started(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=[])
         logged = {}
         monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.update(entry))
 
-        resp = api.advance_candidate_stage_endpoint(_req(method="POST", route_params={"candidate_id": "c1"}, body=self._body()))
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Shortlisted"))
+        )
         assert resp.status_code == 200
         assert logged["action"] == "stage_update"
-        assert logged["stage"] == "Technical Exam"
+        assert logged["stage"] == "Shortlisted"
         assert logged["updated_by"] == "Priyanka"
+        assert logged["performance"] == "Good"
+
+    def test_golden_advances_to_immediate_next_stage(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=["Shortlisted"])
+        logged = {}
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.update(entry))
+
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Aptitude Exam"))
+        )
+        assert resp.status_code == 200
+        assert logged["stage"] == "Aptitude Exam"
+
+    def test_adversarial_cannot_skip_ahead(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=["Shortlisted"])
+        # Technical Exam is 2 stages ahead of Shortlisted -- Aptitude Exam is the only valid next stage
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Technical Exam"))
+        )
+        assert resp.status_code == 400
+
+    def test_adversarial_cannot_skip_ahead_from_not_started(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=[])
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Aptitude Exam"))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_already_at_final_stage_rejected(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=["Shortlisted", "Aptitude Exam", "Technical Exam", "Selected"])
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Selected"))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_current_stage_removed_from_config_returns_409(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=["Phone Screen"])  # not in self.STAGES anymore
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Shortlisted"))
+        )
+        assert resp.status_code == 409
 
     def test_edge_candidate_not_found_returns_404(self, monkeypatch):
         monkeypatch.setattr(repositories, "get_candidate", lambda cid: None)
@@ -508,8 +734,7 @@ class TestAdvanceCandidateStage:
         assert resp.status_code == 404
 
     def test_adversarial_stage_not_in_configured_list_rejected(self, monkeypatch):
-        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid})
-        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Selected"])
+        self._mock_backend(monkeypatch, past_stage_updates=[])
         resp = api.advance_candidate_stage_endpoint(
             _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Made Up Stage"))
         )
@@ -526,6 +751,34 @@ class TestAdvanceCandidateStage:
             _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(updated_by=""))
         )
         assert resp.status_code == 400
+
+    def test_edge_missing_notes_returns_400(self, monkeypatch):
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(notes=""))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_whitespace_only_notes_returns_400(self, monkeypatch):
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(notes="   "))
+        )
+        assert resp.status_code == 400
+
+    def test_adversarial_invalid_performance_rating_rejected(self, monkeypatch):
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(performance="Amazing"))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_performance_is_optional(self, monkeypatch):
+        self._mock_backend(monkeypatch, past_stage_updates=[])
+        logged = {}
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.update(entry))
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Shortlisted", performance=None))
+        )
+        assert resp.status_code == 200
+        assert logged["performance"] is None
 
     def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
         def broken(cid):

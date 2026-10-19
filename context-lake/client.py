@@ -17,6 +17,12 @@ COSMOS_CONTAINERS = {
     # now -- see repositories.get_pipeline_config(). Partition key is just
     # /id since there's only ever the one "default" document.
     "pipeline_config": "/id",
+    # Bulk screening proposals (recruiter proposes accept/reject for a
+    # batch of candidates; nothing happens to any candidate until an
+    # admin approves it) -- see repositories.create_bulk_decision().
+    # Partitioned by /id since these are read/listed as a whole set
+    # (pending-approvals queue), not scoped to one candidate.
+    "bulk_decisions": "/id",
 }
 
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]

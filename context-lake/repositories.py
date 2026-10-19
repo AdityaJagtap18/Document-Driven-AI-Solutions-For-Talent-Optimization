@@ -213,3 +213,77 @@ def set_pipeline_config(stages: list) -> dict:
         raise ValueError("stages must be a non-empty list")
     doc = {"id": "default", "stages": stages, "updated_at": _now()}
     return get_container("pipeline_config").upsert_item(doc)
+
+
+# ---------------------------------------------------------------------------
+# bulk_decisions (recruiter proposes a bulk accept/reject on a batch of
+# candidates from the screening phase; an admin must approve it before any
+# candidate is actually touched -- the AI/scoring pipeline only ever
+# produces a RECOMMENDATION (ranking_tier), it never finalizes an outcome,
+# and neither does a recruiter acting alone in bulk; only an explicit admin
+# approval (api_blueprint.py's approve_bulk_decision_endpoint) applies the
+# change to real candidate records. A single-candidate decision via the
+# Human Review Queue (review_candidate_endpoint) is unaffected by any of
+# this -- that's already a recruiter acting individually on one candidate,
+# not an AI/bulk action, so it doesn't need this extra gate.)
+# ---------------------------------------------------------------------------
+def create_bulk_decision(decision: str, candidate_ids: list, proposed_by: str, notes: str = "") -> dict:
+    doc = {
+        "id": str(uuid.uuid4()),
+        "decision": decision,
+        "candidate_ids": candidate_ids,
+        "proposed_by": proposed_by,
+        "notes": notes,
+        "status": "pending",
+        "proposed_at": _now(),
+        "reviewed_by": None,
+        "reviewed_at": None,
+    }
+    return get_container("bulk_decisions").upsert_item(doc)
+
+
+def get_bulk_decision(decision_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("bulk_decisions").read_item(item=decision_id, partition_key=decision_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def list_bulk_decisions(status: str = None) -> list:
+    container = get_container("bulk_decisions")
+    if status:
+        query = "SELECT * FROM c WHERE c.status = @status ORDER BY c.proposed_at DESC"
+        params = [{"name": "@status", "value": status}]
+    else:
+        query = "SELECT * FROM c ORDER BY c.proposed_at DESC"
+        params = []
+    return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+
+
+def update_bulk_decision(doc: dict) -> dict:
+    """Caller passes the full document back (read via get_bulk_decision(),
+    mutate, then save) -- same upsert-the-whole-thing convention as
+    upsert_candidate()."""
+    return get_container("bulk_decisions").upsert_item(doc)
+
+
+def mark_bulk_decision_reviewed(decision_id: str, status: str, reviewed_by: str, extra: dict = None) -> dict:
+    """Read-modify-write helper so callers (api_blueprint.py) don't need
+    their own timestamp logic -- sets status/reviewed_by/reviewed_at and
+    merges in any extra fields (e.g. {"results": [...]} after applying an
+    approval, or {"review_notes": "..."} after a rejection). Raises
+    ValueError if the decision doesn't exist or isn't still pending --
+    callers translate that into a 404/409."""
+    doc = get_bulk_decision(decision_id)
+    if doc is None:
+        raise ValueError(f"Bulk decision '{decision_id}' not found.")
+    if doc["status"] != "pending":
+        raise ValueError(f"This proposal is already '{doc['status']}' — it can't be reviewed again.")
+    doc["status"] = status
+    doc["reviewed_by"] = reviewed_by
+    doc["reviewed_at"] = _now()
+    if extra:
+        doc.update(extra)
+    return update_bulk_decision(doc)
