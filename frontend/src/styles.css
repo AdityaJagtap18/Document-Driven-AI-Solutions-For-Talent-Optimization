@@ -284,6 +284,19 @@ body {
 .application-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .application-form textarea { padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; font-family: inherit; resize: vertical; width: 100%; box-sizing: border-box; }
 .application-form .btn { align-self: flex-start; }
+.application-form input[type="file"] { font-size: 0.85rem; color: var(--fg-muted); }
+.application-form input[type="file"]::file-selector-button {
+  padding: 8px 16px;
+  margin-right: 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.application-form input[type="file"]::file-selector-button:hover { background: #221f52; }
 
 /* ---------------------------------------------------------------------
    Reports: chart grid + the donut-gauge "source" style card
