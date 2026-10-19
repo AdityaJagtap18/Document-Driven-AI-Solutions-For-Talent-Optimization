@@ -157,18 +157,37 @@ class TestCandidateByEmail:
         monkeypatch.setattr(
             repositories, "find_candidate_by_email",
             lambda email: {
-                "Name": "Jane Doe", "resume_name": "jane.pdf", "ranking_tier": "To be Considered",
+                "candidate_id": "c1", "Name": "Jane Doe", "resume_name": "jane.pdf", "ranking_tier": "To be Considered",
                 "ingested_at": "2026-01-01", "HR Notes": "confidential", "Red Flags & Risk Analysis": ["secret"],
             },
         )
+        monkeypatch.setattr(repositories, "list_audit_log", lambda candidate_id: [])
         resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "jane@example.com"}))
         body = json.loads(resp.get_body())
         assert body == {
             "Name": "Jane Doe", "resume_name": "jane.pdf",
             "ranking_tier": "To be Considered", "ingested_at": "2026-01-01",
+            "stage_timeline": [],
         }
         assert "HR Notes" not in body
         assert "Red Flags & Risk Analysis" not in body
+
+    def test_golden_includes_stage_timeline(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "find_candidate_by_email",
+            lambda email: {"candidate_id": "c1", "Name": "Jane Doe", "resume_name": "jane.pdf", "ranking_tier": "To be Considered", "ingested_at": "2026-01-01"},
+        )
+        monkeypatch.setattr(
+            repositories, "list_audit_log",
+            lambda candidate_id: [
+                {"action": "application_submitted"},  # not a stage_update -- excluded
+                {"action": "stage_update", "stage": "Shortlisted", "updated_by": "Priyanka", "notes": "", "logged_at": "2026-01-02"},
+                {"action": "stage_update", "stage": "Aptitude Exam", "updated_by": "Priyanka", "notes": "", "logged_at": "2026-01-03"},
+            ],
+        )
+        resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "jane@example.com"}))
+        body = json.loads(resp.get_body())
+        assert [t["stage"] for t in body["stage_timeline"]] == ["Shortlisted", "Aptitude Exam"]
 
     def test_edge_not_found(self, monkeypatch):
         monkeypatch.setattr(repositories, "find_candidate_by_email", lambda email: None)
@@ -376,6 +395,126 @@ class TestReviewCandidate:
         req = func.HttpRequest(method="POST", url="/api/test", body=b"not json", route_params={"candidate_id": "abc"})
         resp = api.review_candidate_endpoint(req)
         assert resp.status_code == 400
+
+
+class TestPipelineConfig:
+    def test_golden_get_returns_configured_stages(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Technical Exam", "Selected"])
+        resp = api.get_pipeline_config_endpoint(_req())
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body()) == {"stages": ["Shortlisted", "Technical Exam", "Selected"]}
+
+    def test_adversarial_get_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken():
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "get_pipeline_config", broken)
+        resp = api.get_pipeline_config_endpoint(_req())
+        assert resp.status_code == 503
+
+    def test_golden_put_replaces_stage_list(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(repositories, "set_pipeline_config", lambda stages: captured.update(stages=stages))
+        resp = api.update_pipeline_config_endpoint(_req(method="POST", body={"stages": ["A", "B", "C"]}))
+        assert resp.status_code == 200
+        assert captured["stages"] == ["A", "B", "C"]
+
+    def test_edge_empty_stage_list_rejected(self, monkeypatch):
+        resp = api.update_pipeline_config_endpoint(_req(method="POST", body={"stages": []}))
+        assert resp.status_code == 400
+
+    def test_edge_non_string_stage_rejected(self, monkeypatch):
+        resp = api.update_pipeline_config_endpoint(_req(method="POST", body={"stages": ["A", 5]}))
+        assert resp.status_code == 400
+
+    def test_edge_blank_stage_name_rejected(self, monkeypatch):
+        resp = api.update_pipeline_config_endpoint(_req(method="POST", body={"stages": ["A", "   "]}))
+        assert resp.status_code == 400
+
+    def test_adversarial_missing_stages_key(self, monkeypatch):
+        resp = api.update_pipeline_config_endpoint(_req(method="POST", body={}))
+        assert resp.status_code == 400
+
+
+class TestCandidateTimeline:
+    def test_golden_returns_stage_updates_in_order(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "list_audit_log",
+            lambda candidate_id: [
+                {"action": "stage_update", "stage": "Shortlisted", "updated_by": "Priyanka", "notes": "", "logged_at": "2026-01-01"},
+                {"action": "human_review_approve"},  # not a stage event -- excluded
+                {"action": "stage_update", "stage": "Technical Exam", "updated_by": "Priyanka", "notes": "went well", "logged_at": "2026-01-02"},
+            ],
+        )
+        resp = api.get_candidate_timeline_endpoint(_req(route_params={"candidate_id": "c1"}))
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert [t["stage"] for t in body["timeline"]] == ["Shortlisted", "Technical Exam"]
+
+    def test_edge_no_stage_updates_yet_returns_empty_list(self, monkeypatch):
+        monkeypatch.setattr(repositories, "list_audit_log", lambda candidate_id: [])
+        resp = api.get_candidate_timeline_endpoint(_req(route_params={"candidate_id": "c1"}))
+        assert json.loads(resp.get_body())["timeline"] == []
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(candidate_id):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "list_audit_log", broken)
+        resp = api.get_candidate_timeline_endpoint(_req(route_params={"candidate_id": "c1"}))
+        assert resp.status_code == 503
+
+
+class TestAdvanceCandidateStage:
+    def _body(self, **overrides):
+        base = {"stage": "Technical Exam", "updated_by": "Priyanka", "notes": "Scored 85%"}
+        base.update(overrides)
+        return base
+
+    def test_golden_records_stage_update(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Name": "Jane"})
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Technical Exam", "Selected"])
+        logged = {}
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: logged.update(entry))
+
+        resp = api.advance_candidate_stage_endpoint(_req(method="POST", route_params={"candidate_id": "c1"}, body=self._body()))
+        assert resp.status_code == 200
+        assert logged["action"] == "stage_update"
+        assert logged["stage"] == "Technical Exam"
+        assert logged["updated_by"] == "Priyanka"
+
+    def test_edge_candidate_not_found_returns_404(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: None)
+        resp = api.advance_candidate_stage_endpoint(_req(method="POST", route_params={"candidate_id": "missing"}, body=self._body()))
+        assert resp.status_code == 404
+
+    def test_adversarial_stage_not_in_configured_list_rejected(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid})
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Selected"])
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage="Made Up Stage"))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_missing_stage_returns_400(self, monkeypatch):
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(stage=""))
+        )
+        assert resp.status_code == 400
+
+    def test_edge_missing_updated_by_returns_400(self, monkeypatch):
+        resp = api.advance_candidate_stage_endpoint(
+            _req(method="POST", route_params={"candidate_id": "c1"}, body=self._body(updated_by=""))
+        )
+        assert resp.status_code == 400
+
+    def test_adversarial_cosmos_unavailable_returns_503(self, monkeypatch):
+        def broken(cid):
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "get_candidate", broken)
+        resp = api.advance_candidate_stage_endpoint(_req(method="POST", route_params={"candidate_id": "c1"}, body=self._body()))
+        assert resp.status_code == 503
 
 
 class TestListAuditLog:

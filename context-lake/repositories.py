@@ -173,3 +173,43 @@ def list_all_audit_log(action: str = None) -> list:
         query = "SELECT * FROM c"
         params = []
     return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+
+
+# ---------------------------------------------------------------------------
+# pipeline_config (single document: the recruiter-configurable ordered list
+# of hiring-process stage names candidates move through, e.g. Shortlisted ->
+# Aptitude Exam -> Technical Exam -> ... -> Selected/Rejected). A candidate's
+# CURRENT stage and history live in audit_log as action="stage_update"
+# entries (see api_blueprint.py's advance_candidate_stage_endpoint) rather
+# than a new container -- it's just another immutable event, same as
+# human_review_* already is.
+# ---------------------------------------------------------------------------
+DEFAULT_PIPELINE_STAGES = [
+    "Shortlisted", "Aptitude Exam", "Technical Exam",
+    "Online Interview", "Offline Interview", "HR Round",
+    "Selected", "Rejected",
+]
+
+
+def get_pipeline_config() -> list:
+    """Returns the configured ordered stage list, or DEFAULT_PIPELINE_STAGES
+    if nobody's configured one yet (first run) -- never raises for "not
+    configured", only for a genuine backend problem."""
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    container = get_container("pipeline_config")
+    try:
+        doc = container.read_item(item="default", partition_key="default")
+        return doc.get("stages", DEFAULT_PIPELINE_STAGES)
+    except CosmosResourceNotFoundError:
+        return list(DEFAULT_PIPELINE_STAGES)
+
+
+def set_pipeline_config(stages: list) -> dict:
+    """Recruiter sets the ordered stage list. Whole-list replace, not a
+    merge -- same semantics as upsert_candidate(); the caller sends the
+    full ordered list it wants, not a diff."""
+    if not stages or not isinstance(stages, list):
+        raise ValueError("stages must be a non-empty list")
+    doc = {"id": "default", "stages": stages, "updated_at": _now()}
+    return get_container("pipeline_config").upsert_item(doc)

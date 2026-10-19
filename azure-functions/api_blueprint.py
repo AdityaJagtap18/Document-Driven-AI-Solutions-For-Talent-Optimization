@@ -156,13 +156,35 @@ def get_candidate_by_email_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         return _error_response(f"No application found for '{email}'.", status_code=404)
     # Only status-relevant fields — never the full internal record (HR
     # Notes, Red Flags & Risk Analysis, etc.) to a candidate-facing endpoint.
+    # stage_timeline included here (not a separate endpoint) because this
+    # is the only candidate-facing read today, and it's already scoped to
+    # "whoever knows this email" — the same access boundary as everything
+    # else returned here, see the docstring's REAL GAP note above.
     safe_fields = {
         "Name": candidate.get("Name"),
         "resume_name": candidate.get("resume_name"),
         "ranking_tier": candidate.get("ranking_tier"),
         "ingested_at": candidate.get("ingested_at"),
+        "stage_timeline": _stage_timeline_for(candidate.get("candidate_id")),
     }
     return _json_response(safe_fields)
+
+
+def _stage_timeline_for(candidate_id: str) -> list:
+    """[{stage, updated_by, notes, logged_at}] ordered oldest -> newest,
+    filtered from audit_log's immutable event stream down to just the
+    stage_update entries (see advance_candidate_stage_endpoint below) for
+    one candidate. Best-effort: returns [] rather than raising, so a
+    timeline fetch failure never breaks a response that has other real
+    data in it (candidate status, review result, etc.)."""
+    try:
+        entries = repositories.list_audit_log(candidate_id)
+    except Exception:
+        return []
+    return [
+        {"stage": e.get("stage"), "updated_by": e.get("updated_by"), "notes": e.get("notes"), "logged_at": e.get("logged_at")}
+        for e in entries if e.get("action") == "stage_update"
+    ]
 
 
 @bp.route(route="applications", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -330,6 +352,113 @@ def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
         return "sent"
     except Exception as e:
         return f"failed: {e}"
+
+
+@bp.route(route="pipeline-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_pipeline_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The recruiter-configurable ordered list of hiring-process stage
+    names (Shortlisted, Aptitude Exam, ... Selected/Rejected). One global
+    list for now, not per-JD -- see repositories.get_pipeline_config()'s
+    docstring. Defaults to DEFAULT_PIPELINE_STAGES if nobody's configured
+    one yet, so this never 404s."""
+    try:
+        stages = repositories.get_pipeline_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"stages": stages})
+
+
+@bp.route(route="pipeline-config", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def update_pipeline_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Recruiter edits the stage list. Body: {"stages": ["Shortlisted", ...]}
+    -- a full ordered replace, not a diff (same semantics as upsert_candidate).
+    Existing candidates already past a stage that gets removed keep their
+    recorded history (audit_log is immutable) -- only future stage-advance
+    calls are validated against the new list."""
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    stages = body.get("stages")
+    if not isinstance(stages, list) or not stages:
+        return _error_response("'stages' must be a non-empty list of stage names.", status_code=400)
+    if not all(isinstance(s, str) and s.strip() for s in stages):
+        return _error_response("Every stage name must be a non-empty string.", status_code=400)
+
+    try:
+        repositories.set_pipeline_config(stages)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"stages": stages})
+
+
+@bp.route(route="candidates/{candidate_id}/timeline", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_candidate_timeline_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Recruiter/Admin view of one candidate's hiring-stage history --
+    every stage_update audit_log entry for them, oldest first. Current
+    stage is the last entry, if any (nobody advanced yet = no entries,
+    not an error)."""
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        entries = repositories.list_audit_log(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    timeline = [
+        {"stage": e.get("stage"), "updated_by": e.get("updated_by"), "notes": e.get("notes"), "logged_at": e.get("logged_at")}
+        for e in entries if e.get("action") == "stage_update"
+    ]
+    return _json_response({"candidate_id": candidate_id, "timeline": timeline})
+
+
+@bp.route(route="candidates/{candidate_id}/stage", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Recruiter/Admin sets a candidate's current hiring stage. Body:
+    {"stage": "Technical Exam", "updated_by": "...", "notes": "..." (optional)}.
+
+    'stage' must be one of the currently configured pipeline-config
+    stages -- not free text -- so the timeline can't drift from whatever
+    the recruiter actually configured (a typo'd stage name would
+    otherwise silently create an orphan stage nothing else recognizes).
+    Appends one immutable stage_update audit_log entry; does not
+    overwrite or remove any earlier entry, so the full history (which
+    stages this candidate actually passed through, and when) survives
+    even if they're moved backward or the config changes later."""
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    stage = body.get("stage")
+    updated_by = body.get("updated_by")
+    notes = body.get("notes", "")
+
+    if not stage:
+        return _error_response("'stage' is required.", status_code=400)
+    if not updated_by:
+        return _error_response("'updated_by' is required.", status_code=400)
+
+    try:
+        candidate = repositories.get_candidate(candidate_id)
+        if candidate is None:
+            return _error_response(f"Candidate '{candidate_id}' not found.", status_code=404)
+
+        configured_stages = repositories.get_pipeline_config()
+        if stage not in configured_stages:
+            return _error_response(
+                f"'{stage}' is not a configured pipeline stage. Configured stages: {configured_stages}.",
+                status_code=400,
+            )
+
+        repositories.append_audit_log({
+            "candidate_id": candidate_id, "action": "stage_update",
+            "stage": stage, "updated_by": updated_by, "notes": notes,
+        })
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    return _json_response({"candidate_id": candidate_id, "stage": stage, "status": "recorded"})
 
 
 @bp.route(route="candidates/{candidate_id}/verify-document", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)

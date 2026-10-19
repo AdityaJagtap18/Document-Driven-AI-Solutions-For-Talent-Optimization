@@ -11,6 +11,12 @@ COSMOS_CONTAINERS = {
     "interview_transcripts": "/candidate_id",
     "scoring_history": "/candidate_id",
     "audit_log": "/candidate_id",
+    # Single-document container: one recruiter-configurable ordered list of
+    # hiring-process stage names (Shortlisted, Aptitude Exam, Technical
+    # Exam, ... Selected/Rejected), shared across all candidates/JDs for
+    # now -- see repositories.get_pipeline_config(). Partition key is just
+    # /id since there's only ever the one "default" document.
+    "pipeline_config": "/id",
 }
 
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]
