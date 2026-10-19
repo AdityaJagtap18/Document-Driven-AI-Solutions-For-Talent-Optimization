@@ -99,6 +99,7 @@ function App() {
         <div className="app-mode-indicator">
           API: <strong>{window.CDPI_CONFIG.mode}</strong>
         </div>
+        <div className="app-version-indicator">v{window.CDPI_VERSION}</div>
       </header>
 
       <main className="app-main">

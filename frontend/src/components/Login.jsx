@@ -73,6 +73,7 @@ function Login(props) {
           Demo accounts (not real auth, see frontend/README.md): candidate/candidate123,
           recruiter/recruiter123, admin/admin123
         </p>
+        <p className="muted login-version">v{window.CDPI_VERSION}</p>
       </form>
     </div>
   );
