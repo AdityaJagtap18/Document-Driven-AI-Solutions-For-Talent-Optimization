@@ -16,7 +16,17 @@
  * inline rendering, see CandidatePortal.jsx) rather than this modal,
  * since a candidate's own timeline is shown inline on their one page,
  * not as a popout.
+ *
+ * NO SKIPPING: the form never shows a free choice of stage -- it computes
+ * the single valid next stage (first configured stage if nothing's
+ * recorded yet, otherwise whatever immediately follows the current one)
+ * and that's the only thing that can be recorded, matching exactly what
+ * advance_candidate_stage_endpoint enforces server-side. Notes are
+ * required (not just a nice-to-have): the point of recording a stage is
+ * capturing how the candidate did there, not just that they showed up.
  */
+var PERFORMANCE_RATINGS = ["Excellent", "Good", "Average", "Poor"];
+
 function StageTimelineModal(props) {
   var api = props.api;
   var candidateId = props.candidateId;
@@ -26,7 +36,7 @@ function StageTimelineModal(props) {
   var state = React.useState({ loading: true, error: null, timeline: [], stages: [] });
   var data = state[0];
   var setData = state[1];
-  var formState = React.useState({ stage: "", updatedBy: "", notes: "" });
+  var formState = React.useState({ updatedBy: "", notes: "", performance: "" });
   var form = formState[0];
   var setForm = formState[1];
   var submitState = React.useState({ submitting: false, error: null });
@@ -48,23 +58,42 @@ function StageTimelineModal(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidateId]);
 
+  var reachedStages = data.timeline.map(function (t) { return t.stage; });
+  var currentStage = data.timeline.length ? data.timeline[data.timeline.length - 1].stage : null;
+
+  // The ONE valid next stage, same computation advance_candidate_stage_endpoint
+  // does server-side -- the form never offers a free choice.
+  var nextStage = null;
+  var blockedReason = null;
+  if (data.stages.length > 0) {
+    if (currentStage === null) {
+      nextStage = data.stages[0];
+    } else {
+      var idx = data.stages.indexOf(currentStage);
+      if (idx === -1) {
+        blockedReason = "Current stage '" + currentStage + "' is no longer in the configured pipeline. Fix the stage list before advancing this candidate.";
+      } else if (idx === data.stages.length - 1) {
+        blockedReason = "'" + currentStage + "' is already the final configured stage — nothing left to advance to.";
+      } else {
+        nextStage = data.stages[idx + 1];
+      }
+    }
+  }
+
   function handleAdvance(e) {
     e.preventDefault();
-    if (!form.stage || !form.updatedBy.trim()) return;
+    if (!nextStage || !form.updatedBy.trim() || !form.notes.trim()) return;
     setSubmit({ submitting: true, error: null });
-    api.advanceCandidateStage(candidateId, form.stage, form.updatedBy.trim(), form.notes.trim())
+    api.advanceCandidateStage(candidateId, nextStage, form.updatedBy.trim(), form.notes.trim(), form.performance || undefined)
       .then(function () {
         setSubmit({ submitting: false, error: null });
-        setForm({ stage: "", updatedBy: form.updatedBy, notes: "" });
+        setForm({ updatedBy: form.updatedBy, notes: "", performance: "" });
         load();
       })
       .catch(function (err) {
         setSubmit({ submitting: false, error: err.message });
       });
   }
-
-  var reachedStages = data.timeline.map(function (t) { return t.stage; });
-  var currentStage = data.timeline.length ? data.timeline[data.timeline.length - 1].stage : null;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -88,7 +117,10 @@ function StageTimelineModal(props) {
                   <div className={"stepper-item" + (reached ? " stepper-item-reached" : "") + (isCurrent ? " stepper-item-current" : "")} key={stageName}>
                     <div className="stepper-dot"></div>
                     <div className="stepper-content">
-                      <div className="stepper-label">{stageName}</div>
+                      <div className="stepper-label">
+                        {stageName}
+                        {entry && entry.performance && <span className={"badge perf-badge perf-" + entry.performance.toLowerCase()}>{entry.performance}</span>}
+                      </div>
                       {entry && (
                         <div className="stepper-meta">
                           {entry.updated_by}{entry.logged_at ? " — " + new Date(entry.logged_at).toLocaleString() : ""}
@@ -102,20 +134,15 @@ function StageTimelineModal(props) {
               {data.stages.length === 0 && <p className="muted">No pipeline stages configured yet.</p>}
             </div>
 
-            {props.editable && data.stages.length > 0 && (
+            {props.editable && blockedReason && (
+              <p className="muted stage-advance-blocked">{blockedReason}</p>
+            )}
+
+            {props.editable && nextStage && (
               <form className="stage-advance-form" onSubmit={handleAdvance}>
-                <h4>Record a stage</h4>
+                <h4>Record next stage: {nextStage}</h4>
+                <p className="muted">No skipping ahead — this is the only stage that can be recorded next.</p>
                 <div className="application-form-grid">
-                  <label className="login-field">
-                    Stage
-                    <select
-                      value={form.stage}
-                      onChange={function (e) { var v = e.target.value; setForm(function (f) { return Object.assign({}, f, { stage: v }); }); }}
-                    >
-                      <option value="">Select a stage…</option>
-                      {data.stages.map(function (s) { return <option key={s} value={s}>{s}</option>; })}
-                    </select>
-                  </label>
                   <label className="login-field">
                     Updated by
                     <input
@@ -124,17 +151,28 @@ function StageTimelineModal(props) {
                       onChange={function (e) { var v = e.target.value; setForm(function (f) { return Object.assign({}, f, { updatedBy: v }); }); }}
                     />
                   </label>
+                  <label className="login-field">
+                    Performance (optional)
+                    <select
+                      value={form.performance}
+                      onChange={function (e) { var v = e.target.value; setForm(function (f) { return Object.assign({}, f, { performance: v }); }); }}
+                    >
+                      <option value="">Not rated</option>
+                      {PERFORMANCE_RATINGS.map(function (p) { return <option key={p} value={p}>{p}</option>; })}
+                    </select>
+                  </label>
                 </div>
                 <label className="login-field">
-                  Notes (optional)
-                  <input
-                    type="text"
+                  Notes * — how did they do at this stage?
+                  <textarea
+                    rows={3}
+                    required
                     value={form.notes}
                     onChange={function (e) { var v = e.target.value; setForm(function (f) { return Object.assign({}, f, { notes: v }); }); }}
                   />
                 </label>
                 {submit.error && <div className="banner-error-inline">{submit.error}</div>}
-                <button className="btn btn-primary" type="submit" disabled={submit.submitting || !form.stage || !form.updatedBy.trim()}>
+                <button className="btn btn-primary" type="submit" disabled={submit.submitting || !form.updatedBy.trim() || !form.notes.trim()}>
                   {submit.submitting ? "Recording…" : "Record stage"}
                 </button>
               </form>

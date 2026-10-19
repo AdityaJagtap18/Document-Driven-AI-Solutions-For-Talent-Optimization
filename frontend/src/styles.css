@@ -420,14 +420,26 @@ body {
 }
 .stepper-item-reached .stepper-dot { background: var(--good); }
 .stepper-item-current .stepper-dot { box-shadow: 0 0 0 3px var(--primary-soft); background: var(--primary); }
-.stepper-label { font-size: 0.9rem; font-weight: 600; }
+.stepper-label { font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .stepper-item-reached .stepper-label { color: var(--fg); }
 .stepper-item:not(.stepper-item-reached) .stepper-label { color: var(--fg-muted); font-weight: 500; }
 .stepper-meta { font-size: 0.78rem; color: var(--fg-muted); margin-top: 2px; }
 .stepper-notes { margin-top: 2px; font-style: italic; }
 
+.perf-badge { font-size: 0.68rem; padding: 2px 8px; }
+.perf-excellent { background: #e7f7f0; color: var(--good); }
+.perf-good { background: #eaf1fd; color: var(--accent-blue); }
+.perf-average { background: #fdf1e5; color: var(--neutral); }
+.perf-poor { background: #fdeceb; color: var(--bad); }
+
 .stage-advance-form { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
-.stage-advance-form h4 { margin: 0; font-size: 0.85rem; color: var(--fg-muted); }
+.stage-advance-form h4 { margin: 0; font-size: 0.9rem; }
+.stage-advance-form p.muted { margin: 0; font-size: 0.8rem; }
+.stage-advance-form textarea {
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-family: inherit; resize: vertical; width: 100%; box-sizing: border-box;
+}
+.stage-advance-blocked { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 
 .stage-config-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .stage-config-row { display: flex; gap: 6px; align-items: center; }
