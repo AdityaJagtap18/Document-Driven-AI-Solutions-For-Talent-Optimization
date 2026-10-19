@@ -19,12 +19,12 @@
  * dimensions are treated as 0 in the average rather than crashing.
  */
 var CHART_COLORS = {
-  accent: "#1f6f5c", good: "#1f6f5c", bad: "#a4402f", neutral: "#8a6d3b",
-  blue: "#3b6ea5", purple: "#7b5ea7", teal: "#2a9d8f", amber: "#c98a2b",
-  gray: "#6b6758",
+  accent: "#6c63f0", good: "#27ad76", bad: "#e2583f", neutral: "#f0974f",
+  blue: "#4f8af7", purple: "#8b7af0", teal: "#2ab6a6", amber: "#f0974f",
+  gray: "#8c89a6",
 };
 var PALETTE = [CHART_COLORS.accent, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.purple,
-  CHART_COLORS.teal, CHART_COLORS.bad, CHART_COLORS.gray, CHART_COLORS.neutral];
+  CHART_COLORS.teal, CHART_COLORS.bad, CHART_COLORS.gray, CHART_COLORS.good];
 
 function ChartCanvas(props) {
   var canvasRef = React.useRef(null);
@@ -41,9 +41,64 @@ function ChartCanvas(props) {
 
 function ChartCard(props) {
   return (
-    <div className="chart-card">
+    <div className={"chart-card" + (props.wide ? " chart-card-wide" : "")}>
       <h4>{props.title}</h4>
       <div className="chart-card-canvas">{props.children}</div>
+    </div>
+  );
+}
+
+/** Half-donut "gauge" with a center total and a legend below — same
+ * pattern as the reference dashboard's "Source" card. Chart.js doughnut
+ * with circumference/rotation cut down to a semicircle; the center
+ * number is a plain positioned <div>, not a canvas plugin, since that's
+ * simpler than writing a custom Chart.js plugin for one static label. */
+function GaugeCard(props) {
+  var config = {
+    type: "doughnut",
+    data: {
+      labels: props.segments.map(function (s) { return s.label; }),
+      datasets: [{
+        data: props.segments.map(function (s) { return s.value; }),
+        backgroundColor: props.segments.map(function (s) { return s.color; }),
+        borderWidth: 0,
+        borderRadius: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      circumference: 180,
+      rotation: 270,
+      cutout: "72%",
+      layout: { padding: { bottom: 10 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  };
+
+  return (
+    <div className="chart-card gauge-card">
+      <h4>{props.title}</h4>
+      <div className="gauge-wrap">
+        <ChartCanvas config={config} />
+        <div className="gauge-center">
+          <div className="gauge-center-label">Total</div>
+          <div className="gauge-center-value">{props.total}</div>
+        </div>
+      </div>
+      <div className="gauge-legend">
+        {props.segments.map(function (s) {
+          var pct = props.total ? Math.round((s.value / props.total) * 100) : 0;
+          return (
+            <div className="gauge-legend-row" key={s.label}>
+              <span className="gauge-legend-dot" style={{ background: s.color }}></span>
+              <span className="gauge-legend-label">{s.label}</span>
+              <span className="gauge-legend-count">{s.value}</span>
+              <span className="gauge-legend-pct">{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -84,15 +139,13 @@ function AdminReports(props) {
 
   var candidates = data.candidates;
 
-  // 1. Tier distribution (Pie)
+  // 1. Tier distribution (half-donut gauge + legend)
   var tierCounts = countBy(candidates, function (c) { return c.ranking_tier; });
-  var tierConfig = {
-    type: "pie",
-    data: {
-      labels: Object.keys(tierCounts),
-      datasets: [{ data: Object.values(tierCounts), backgroundColor: [CHART_COLORS.good, CHART_COLORS.neutral, CHART_COLORS.bad] }],
-    },
-  };
+  var tierSegments = [
+    { label: "Recommended for Fast-Track", value: tierCounts["Recommended for Fast-Track"] || 0, color: CHART_COLORS.good },
+    { label: "To be Considered", value: tierCounts["To be Considered"] || 0, color: CHART_COLORS.neutral },
+    { label: "Rejected", value: tierCounts["Rejected"] || 0, color: CHART_COLORS.bad },
+  ];
 
   // 2. Candidate Type distribution (Doughnut)
   var typeCounts = countBy(candidates, function (c) { return c["Candidate Type"]; });
@@ -126,10 +179,14 @@ function AdminReports(props) {
       labels: sorted.map(function (c, i) { return i + 1; }),
       datasets: [{
         label: "Normalized Weighted Score", data: sorted.map(function (c) { return c.normalized_weighted_score; }),
-        borderColor: CHART_COLORS.accent, backgroundColor: "transparent", tension: 0.15,
+        borderColor: CHART_COLORS.accent, backgroundColor: "rgba(108,99,240,0.12)", fill: true,
+        tension: 0.35, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2.5,
       }],
     },
-    options: { plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: "Rank" } } } },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { title: { display: true, text: "Rank" }, grid: { display: false } }, y: { grid: { color: "#f0eefa" } } },
+    },
   };
 
   // 5. Top industries (horizontal Bar)
@@ -199,10 +256,10 @@ function AdminReports(props) {
         separately maintained or hand-curated.
       </p>
       <div className="chart-grid">
-        <ChartCard title="Tier Distribution"><ChartCanvas config={tierConfig} /></ChartCard>
+        <ChartCard title="Normalized Weighted Score by Rank" wide><ChartCanvas config={rankLineConfig} /></ChartCard>
+        <GaugeCard title="Tier Distribution" total={candidates.length} segments={tierSegments} />
         <ChartCard title="Candidate Type Distribution"><ChartCanvas config={typeConfig} /></ChartCard>
         <ChartCard title="Resume Strength Score Distribution"><ChartCanvas config={scoreHistConfig} /></ChartCard>
-        <ChartCard title="Normalized Weighted Score by Rank"><ChartCanvas config={rankLineConfig} /></ChartCard>
         <ChartCard title="Top Industries"><ChartCanvas config={industryConfig} /></ChartCard>
         <ChartCard title="Top Matching Skills"><ChartCanvas config={skillsConfig} /></ChartCard>
         <ChartCard title="Avg Score by Dimension — Fast-Track vs Rejected"><ChartCanvas config={radarConfig} /></ChartCard>

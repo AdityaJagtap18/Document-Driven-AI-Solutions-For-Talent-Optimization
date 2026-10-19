@@ -1,17 +1,16 @@
 /**
- * Top-level app: role-gated single view, no nav bar to switch personas.
- * Each role renders exactly one view and nothing else -- a candidate
- * cannot click into the recruiter dashboard, a recruiter cannot click
- * into another recruiter's queue vs. the admin dashboard, etc.
+ * Top-level app: role-gated single view inside a sidebar + topbar shell
+ * (redesigned per a SaaS-dashboard reference the user shared -- see
+ * styles.css's top comment for what was and wasn't carried over). A
+ * candidate still cannot click into the recruiter dashboard, a recruiter
+ * still cannot click into the admin dashboard, etc. -- the sidebar only
+ * ever lists the nav items valid for the signed-in role.
  *
  * This is a lightweight DEMO login, not real authentication: picking a
  * role is the entire "login", nothing is checked against a real identity
  * store. Real auth (Entra ID / MSAL, roles from Azure AD group
  * membership) is follow-up work that needs an Azure AD App Registration
- * the user sets up themselves -- see frontend/README.md. The point of
- * this pass is fixing the actual usability bug (anyone could browse
- * every persona's view before), not pretending this is production
- * security.
+ * the user sets up themselves -- see frontend/README.md.
  *
  * No router library (not worth the dependency for this many views with
  * no bundler) -- URL doesn't change, refresh loses your place within the
@@ -45,20 +44,37 @@ function storeUser(user) {
   }
 }
 
+function initials(name) {
+  var parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+}
+
+// Every role's nav items, and which tab key each maps to. Admin is the
+// only role with more than one -- every other role's sidebar has exactly
+// one entry, which is the whole point of the role gate.
+var NAV_BY_VIEW = {
+  dashboard: [
+    { tab: "dashboard", label: "Dashboard", Icon: IconDashboard },
+    { tab: "reports", label: "Reports", Icon: IconReports },
+  ],
+  review: [{ tab: "review", label: "Review Queue", Icon: IconQueue }],
+  portal: [{ tab: "portal", label: "Candidate Portal", Icon: IconPortal }],
+};
+
 function App() {
   var api = window.CDPI_CONFIG.mode === "real" ? window.CDPI_REAL_API : window.CDPI_MOCK_API;
   var userState = React.useState(loadStoredUser);
   var user = userState[0];
   var setUser = userState[1];
-  // Admin-only sub-tab (Dashboard vs Reports) -- every other role still
-  // has exactly one view, nothing to tab between.
-  var adminTabState = React.useState("dashboard");
-  var adminTab = adminTabState[0];
-  var setAdminTab = adminTabState[1];
+  var tabState = React.useState("dashboard");
+  var tab = tabState[0];
+  var setTab = tabState[1];
 
   function handleLogin(loggedInUser) {
     storeUser(loggedInUser);
     setUser(loggedInUser);
+    setTab(loggedInUser.view);
   }
 
   function handleSignOut() {
@@ -70,44 +86,66 @@ function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  var isAdmin = user.view === "dashboard";
+  var navItems = NAV_BY_VIEW[user.view] || [];
+  var activeItem = navItems.filter(function (item) { return item.tab === tab; })[0] || navItems[0];
+  var activeTab = activeItem ? activeItem.tab : tab;
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-title">CDPI</div>
-        {isAdmin && (
-          <nav className="nav-tabs">
-            <button
-              className={"nav-btn" + (adminTab === "dashboard" ? " nav-btn-active" : "")}
-              onClick={function () { setAdminTab("dashboard"); }}
-            >
-              Dashboard
-            </button>
-            <button
-              className={"nav-btn" + (adminTab === "reports" ? " nav-btn-active" : "")}
-              onClick={function () { setAdminTab("reports"); }}
-            >
-              Reports
-            </button>
-          </nav>
-        )}
-        <div className="app-user-indicator">
-          {user.name} &middot; <strong>{user.roleLabel}</strong>
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-mark">C</div>
+          <div className="sidebar-brand-name">CDPI</div>
         </div>
-        <button className="btn" onClick={handleSignOut}>Sign out</button>
-        <div className="app-mode-indicator">
-          API: <strong>{window.CDPI_CONFIG.mode}</strong>
-        </div>
-        <div className="app-version-indicator">v{window.CDPI_VERSION}</div>
-      </header>
 
-      <main className="app-main">
-        {user.view === "dashboard" && adminTab === "dashboard" && <Dashboard api={api} />}
-        {user.view === "dashboard" && adminTab === "reports" && <AdminReports api={api} />}
-        {user.view === "review" && <ReviewQueue api={api} />}
-        {user.view === "portal" && <CandidatePortal api={api} />}
-      </main>
+        <div>
+          <div className="sidebar-section-label">Main menu</div>
+          <nav className="sidebar-nav">
+            {navItems.map(function (item) {
+              var Icon = item.Icon;
+              return (
+                <button
+                  key={item.tab}
+                  className={"sidebar-link" + (item.tab === activeTab ? " sidebar-link-active" : "")}
+                  onClick={function () { setTab(item.tab); }}
+                >
+                  <Icon /> {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-avatar">{initials(user.name)}</div>
+            <div className="sidebar-user-meta">
+              <div className="sidebar-user-name">{user.name}</div>
+              <div className="sidebar-user-role">{user.roleLabel}</div>
+            </div>
+          </div>
+          <button className="sidebar-signout" onClick={handleSignOut}>
+            <IconLogout /> Sign out
+          </button>
+        </div>
+      </aside>
+
+      <div className="app-body">
+        <header className="topbar">
+          <div className="topbar-title">{activeItem ? activeItem.label : "CDPI"}</div>
+          <div className="topbar-right">
+            <div className="topbar-mode">API: <strong>{window.CDPI_CONFIG.mode}</strong></div>
+            <div className="topbar-version">v{window.CDPI_VERSION}</div>
+          </div>
+        </header>
+
+        <main className="app-main">
+          {activeTab === "dashboard" && <Dashboard api={api} />}
+          {activeTab === "reports" && <AdminReports api={api} />}
+          {activeTab === "review" && <ReviewQueue api={api} />}
+          {activeTab === "portal" && <CandidatePortal api={api} />}
+        </main>
+      </div>
     </div>
   );
 }

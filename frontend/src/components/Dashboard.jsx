@@ -13,6 +13,26 @@
  * only renders a field when it's actually present rather than showing
  * empty sections for every mock candidate.
  */
+function initialsFor(name) {
+  var parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+}
+
+var SORTABLE_COLUMNS = [
+  { key: "Name", label: "Name" },
+  { key: "JD Match", label: "JD Match" },
+  { key: "Candidate Type", label: "Type" },
+  { key: "Resume Strength Score", label: "Score" },
+  { key: "ranking_tier", label: "Tier" },
+];
+
+function sortValue(candidate, key) {
+  var v = candidate[key];
+  if (key === "JD Match" && typeof v === "string") return parseFloat(v) || 0;
+  return v;
+}
+
 function Dashboard(props) {
   var api = props.api;
   var state = React.useState({ loading: true, error: null, candidates: [], observability: null, filter: "" });
@@ -21,6 +41,12 @@ function Dashboard(props) {
   var expandedState = React.useState(null);
   var expandedId = expandedState[0];
   var setExpandedId = expandedState[1];
+  var searchState = React.useState("");
+  var search = searchState[0];
+  var setSearch = searchState[1];
+  var sortState = React.useState({ key: null, dir: 1 });
+  var sort = sortState[0];
+  var setSort = sortState[1];
 
   React.useEffect(function () {
     var cancelled = false;
@@ -51,6 +77,27 @@ function Dashboard(props) {
     if (tierCounts[c.ranking_tier] !== undefined) tierCounts[c.ranking_tier] += 1;
   });
 
+  var visibleCandidates = data.candidates.filter(function (c) {
+    return !search.trim() || (c.Name || "").toLowerCase().indexOf(search.trim().toLowerCase()) !== -1;
+  });
+  if (sort.key) {
+    visibleCandidates = visibleCandidates.slice().sort(function (a, b) {
+      var av = sortValue(a, sort.key), bv = sortValue(b, sort.key);
+      if (av == null) av = "";
+      if (bv == null) bv = "";
+      if (av < bv) return -1 * sort.dir;
+      if (av > bv) return 1 * sort.dir;
+      return 0;
+    });
+  }
+
+  function toggleSort(key) {
+    setSort(function (s) {
+      if (s.key === key) return { key: key, dir: s.dir * -1 };
+      return { key: key, dir: 1 };
+    });
+  }
+
   return (
     <div className="view">
       <h2>Recruiter Dashboard</h2>
@@ -79,42 +126,64 @@ function Dashboard(props) {
           <option value="To be Considered">To be Considered</option>
           <option value="Rejected">Rejected</option>
         </select>
+        <input
+          type="search"
+          placeholder="Search by name…"
+          value={search}
+          onChange={function (e) { setSearch(e.target.value); }}
+        />
       </div>
 
       {data.loading ? (
         <p className="muted">Loading candidates…</p>
       ) : (
-        <table className="candidate-table">
-          <thead>
-            <tr>
-              <th>Name</th><th>JD Match</th><th>Type</th><th>Score</th><th>Tier</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.candidates.map(function (c) {
-              var isExpanded = expandedId === c.candidate_id;
-              return (
-                <React.Fragment key={c.candidate_id}>
-                  <tr
-                    className="candidate-row-clickable"
-                    onClick={function () { setExpandedId(isExpanded ? null : c.candidate_id); }}
-                  >
-                    <td>{c.Name}</td>
-                    <td>{c["JD Match"]}</td>
-                    <td>{c["Candidate Type"]}</td>
-                    <td>{c["Resume Strength Score"]}</td>
-                    <td><TierBadge tier={c.ranking_tier} /></td>
-                  </tr>
-                  {isExpanded && (
-                    <tr>
-                      <td colSpan={5}><CandidateDetail candidate={c} /></td>
+        <div className="table-card">
+          <table className="candidate-table">
+            <thead>
+              <tr>
+                {SORTABLE_COLUMNS.map(function (col) {
+                  var active = sort.key === col.key;
+                  return (
+                    <th key={col.key}>
+                      <button onClick={function () { toggleSort(col.key); }}>
+                        {col.label}{active ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleCandidates.map(function (c) {
+                var isExpanded = expandedId === c.candidate_id;
+                return (
+                  <React.Fragment key={c.candidate_id}>
+                    <tr
+                      className="candidate-row-clickable"
+                      onClick={function () { setExpandedId(isExpanded ? null : c.candidate_id); }}
+                    >
+                      <td>
+                        <div className="name-cell">
+                          <div className="avatar-circle">{initialsFor(c.Name)}</div>
+                          {c.Name}
+                        </div>
+                      </td>
+                      <td>{c["JD Match"]}</td>
+                      <td>{c["Candidate Type"]}</td>
+                      <td>{c["Resume Strength Score"]}</td>
+                      <td><TierBadge tier={c.ranking_tier} /></td>
                     </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={5}><CandidateDetail candidate={c} /></td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
