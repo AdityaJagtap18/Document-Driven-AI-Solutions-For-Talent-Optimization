@@ -12,6 +12,12 @@ function ReviewQueue(props) {
   var actionState = React.useState({}); // candidate_id -> "pending" | "done" | error message
   var actions = actionState[0];
   var setActions = actionState[1];
+  var modalState = React.useState(null); // { candidateId, candidateName } | null
+  var modalCandidate = modalState[0];
+  var setModalCandidate = modalState[1];
+  var configOpenState = React.useState(false);
+  var configOpen = configOpenState[0];
+  var setConfigOpen = configOpenState[1];
 
   function load() {
     setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
@@ -77,6 +83,7 @@ function ReviewQueue(props) {
             setData(function (d) { return Object.assign({}, d, { reviewerName: value }); });
           }}
         />
+        <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
 
       {data.error && <div className="banner banner-error">Couldn't load queue: {data.error}</div>}
@@ -96,6 +103,12 @@ function ReviewQueue(props) {
                 <p className="review-summary">{c["Profile Summary"]}</p>
               </div>
               <div className="review-card-actions">
+                <button
+                  className="btn"
+                  onClick={function () { setModalCandidate({ candidateId: c.candidate_id, candidateName: c.Name }); }}
+                >
+                  View Timeline
+                </button>
                 {action === "pending" && <span className="muted">Saving…</span>}
                 {action === "done" && <span className="badge badge-good">Recorded</span>}
                 {action && action !== "pending" && action !== "done" && <span className="banner-error-inline">{action}</span>}
@@ -114,6 +127,20 @@ function ReviewQueue(props) {
           );
         })}
       </div>
+
+      {modalCandidate && (
+        <StageTimelineModal
+          api={api}
+          candidateId={modalCandidate.candidateId}
+          candidateName={modalCandidate.candidateName}
+          editable={true}
+          onClose={function () { setModalCandidate(null); }}
+        />
+      )}
+
+      {configOpen && (
+        <PipelineConfigModal api={api} onClose={function () { setConfigOpen(false); }} />
+      )}
     </div>
   );
 }

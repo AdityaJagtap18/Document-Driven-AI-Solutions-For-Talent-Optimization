@@ -162,12 +162,13 @@ class TestCandidateByEmail:
             },
         )
         monkeypatch.setattr(repositories, "list_audit_log", lambda candidate_id: [])
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Selected"])
         resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "jane@example.com"}))
         body = json.loads(resp.get_body())
         assert body == {
             "Name": "Jane Doe", "resume_name": "jane.pdf",
             "ranking_tier": "To be Considered", "ingested_at": "2026-01-01",
-            "stage_timeline": [],
+            "stage_timeline": [], "pipeline_stages": ["Shortlisted", "Selected"],
         }
         assert "HR Notes" not in body
         assert "Red Flags & Risk Analysis" not in body
@@ -185,9 +186,27 @@ class TestCandidateByEmail:
                 {"action": "stage_update", "stage": "Aptitude Exam", "updated_by": "Priyanka", "notes": "", "logged_at": "2026-01-03"},
             ],
         )
+        monkeypatch.setattr(repositories, "get_pipeline_config", lambda: ["Shortlisted", "Aptitude Exam", "Selected"])
         resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "jane@example.com"}))
         body = json.loads(resp.get_body())
         assert [t["stage"] for t in body["stage_timeline"]] == ["Shortlisted", "Aptitude Exam"]
+        assert body["pipeline_stages"] == ["Shortlisted", "Aptitude Exam", "Selected"]
+
+    def test_edge_pipeline_config_unavailable_falls_back_to_empty_list(self, monkeypatch):
+        monkeypatch.setattr(
+            repositories, "find_candidate_by_email",
+            lambda email: {"candidate_id": "c1", "Name": "Jane Doe", "resume_name": "jane.pdf", "ranking_tier": "To be Considered", "ingested_at": "2026-01-01"},
+        )
+        monkeypatch.setattr(repositories, "list_audit_log", lambda candidate_id: [])
+
+        def broken():
+            raise RuntimeError("Missing required secret(s): COSMOS_ENDPOINT")
+
+        monkeypatch.setattr(repositories, "get_pipeline_config", broken)
+        resp = api.get_candidate_by_email_endpoint(_req(route_params={"email": "jane@example.com"}))
+        # a pipeline-config hiccup must not break the rest of a real status response
+        assert resp.status_code == 200
+        assert json.loads(resp.get_body())["pipeline_stages"] == []
 
     def test_edge_not_found(self, monkeypatch):
         monkeypatch.setattr(repositories, "find_candidate_by_email", lambda email: None)

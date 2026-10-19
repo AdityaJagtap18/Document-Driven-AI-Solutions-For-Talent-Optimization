@@ -279,6 +279,8 @@ body {
 
 .status-form { display: flex; gap: 8px; }
 .status-result { margin-top: 14px; }
+.status-stage-timeline { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.status-stage-timeline h4 { margin: 0 0 4px; font-size: 0.85rem; color: var(--fg-muted); }
 
 .application-form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; max-width: 640px; }
 .application-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -362,6 +364,8 @@ body {
 }
 .pipeline-card-name { font-size: 0.85rem; font-weight: 600; }
 .pipeline-card-detail { font-size: 0.75rem; color: var(--fg-muted); margin-top: 1px; }
+.pipeline-card-clickable { cursor: pointer; }
+.pipeline-card-clickable:hover { border-color: var(--accent); }
 
 @media (max-width: 900px) {
   .sidebar { display: none; }
@@ -376,3 +380,57 @@ body {
   .application-form-grid { grid-template-columns: 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------------
+   Modals (StageTimelineModal, PipelineConfigModal)
+--------------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(33, 31, 54, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; z-index: 100;
+}
+.modal-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 22px 24px;
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.modal-header h3 { margin: 0; }
+.modal-close-btn {
+  border: none; background: transparent; font-size: 1.4rem; line-height: 1; cursor: pointer;
+  color: var(--fg-muted); padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.modal-close-btn:hover { background: var(--surface-soft); color: var(--fg); }
+
+.stepper { display: flex; flex-direction: column; margin-top: 16px; }
+.stepper-item { display: flex; gap: 12px; position: relative; padding-bottom: 20px; }
+.stepper-item:last-child { padding-bottom: 0; }
+.stepper-item:not(:last-child)::before {
+  content: ""; position: absolute; left: 5px; top: 16px; bottom: 0; width: 2px; background: var(--border);
+}
+.stepper-item-reached:not(:last-child)::before { background: var(--good); }
+.stepper-dot {
+  width: 12px; height: 12px; border-radius: 50%; background: var(--border);
+  margin-top: 3px; flex-shrink: 0; z-index: 1;
+}
+.stepper-item-reached .stepper-dot { background: var(--good); }
+.stepper-item-current .stepper-dot { box-shadow: 0 0 0 3px var(--primary-soft); background: var(--primary); }
+.stepper-label { font-size: 0.9rem; font-weight: 600; }
+.stepper-item-reached .stepper-label { color: var(--fg); }
+.stepper-item:not(.stepper-item-reached) .stepper-label { color: var(--fg-muted); font-weight: 500; }
+.stepper-meta { font-size: 0.78rem; color: var(--fg-muted); margin-top: 2px; }
+.stepper-notes { margin-top: 2px; font-style: italic; }
+
+.stage-advance-form { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+.stage-advance-form h4 { margin: 0; font-size: 0.85rem; color: var(--fg-muted); }
+
+.stage-config-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.stage-config-row { display: flex; gap: 6px; align-items: center; }
+.stage-config-row input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.88rem; }
+.stage-config-btn { padding: 6px 9px; font-size: 0.78rem; }
+.stage-config-actions { margin-top: 16px; }

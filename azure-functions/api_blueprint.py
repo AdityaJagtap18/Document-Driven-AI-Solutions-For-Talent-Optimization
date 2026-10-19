@@ -156,16 +156,27 @@ def get_candidate_by_email_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         return _error_response(f"No application found for '{email}'.", status_code=404)
     # Only status-relevant fields — never the full internal record (HR
     # Notes, Red Flags & Risk Analysis, etc.) to a candidate-facing endpoint.
-    # stage_timeline included here (not a separate endpoint) because this
-    # is the only candidate-facing read today, and it's already scoped to
-    # "whoever knows this email" — the same access boundary as everything
-    # else returned here, see the docstring's REAL GAP note above.
+    # stage_timeline/pipeline_stages included here (not separate endpoints)
+    # because this is the only candidate-facing read today, and it's
+    # already scoped to "whoever knows this email" — the same access
+    # boundary as everything else returned here, see the docstring's REAL
+    # GAP note above. pipeline_stages specifically has to be duplicated
+    # here rather than making the candidate call GET /pipeline-config
+    # themselves: that endpoint is FUNCTION-auth (recruiter/admin only),
+    # and candidates have no function key, same reasoning as every other
+    # ANONYMOUS endpoint in this file.
+    try:
+        pipeline_stages = repositories.get_pipeline_config()
+    except Exception:
+        pipeline_stages = []
+
     safe_fields = {
         "Name": candidate.get("Name"),
         "resume_name": candidate.get("resume_name"),
         "ranking_tier": candidate.get("ranking_tier"),
         "ingested_at": candidate.get("ingested_at"),
         "stage_timeline": _stage_timeline_for(candidate.get("candidate_id")),
+        "pipeline_stages": pipeline_stages,
     }
     return _json_response(safe_fields)
 

@@ -80,4 +80,19 @@ window.CDPI_REAL_API = {
   listAuditLog: function (action) {
     return cdpiRequest("/api/audit-log" + (action ? "?action=" + encodeURIComponent(action) : ""));
   },
+  getPipelineConfig: function () {
+    return cdpiRequest("/api/pipeline-config");
+  },
+  updatePipelineConfig: function (stages) {
+    return cdpiRequest("/api/pipeline-config", { method: "PUT", body: JSON.stringify({ stages: stages }) });
+  },
+  getCandidateTimeline: function (candidateId) {
+    return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/timeline");
+  },
+  advanceCandidateStage: function (candidateId, stage, updatedBy, notes) {
+    return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/stage", {
+      method: "POST",
+      body: JSON.stringify({ stage: stage, updated_by: updatedBy, notes: notes }),
+    });
+  },
 };

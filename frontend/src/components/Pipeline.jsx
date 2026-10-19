@@ -60,6 +60,12 @@ function Pipeline(props) {
   var searchState = React.useState("");
   var search = searchState[0];
   var setSearch = searchState[1];
+  var modalState = React.useState(null); // { candidateId, candidateName } | null
+  var modalCandidate = modalState[0];
+  var setModalCandidate = modalState[1];
+  var configOpenState = React.useState(false);
+  var configOpen = configOpenState[0];
+  var setConfigOpen = configOpenState[1];
 
   function load() {
     return Promise.all([api.listCandidates(), api.listAuditLog()])
@@ -132,6 +138,7 @@ function Pipeline(props) {
           onChange={function (e) { setSearch(e.target.value); }}
         />
         <button className="btn" onClick={load}>Refresh now</button>
+        <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
 
       <div className="pipeline-board">
@@ -146,7 +153,11 @@ function Pipeline(props) {
                 {col.items.length === 0 && <p className="muted pipeline-empty">None</p>}
                 {col.items.map(function (item) {
                   return (
-                    <div className="pipeline-card" key={item.id}>
+                    <div
+                      className="pipeline-card pipeline-card-clickable"
+                      key={item.id}
+                      onClick={function () { setModalCandidate({ candidateId: item.id, candidateName: item.name }); }}
+                    >
                       <div className="avatar-circle">{initialsForPipeline(item.name)}</div>
                       <div>
                         <div className="pipeline-card-name">{item.name}</div>
@@ -160,6 +171,20 @@ function Pipeline(props) {
           );
         })}
       </div>
+
+      {modalCandidate && (
+        <StageTimelineModal
+          api={api}
+          candidateId={modalCandidate.candidateId}
+          candidateName={modalCandidate.candidateName}
+          editable={true}
+          onClose={function () { setModalCandidate(null); }}
+        />
+      )}
+
+      {configOpen && (
+        <PipelineConfigModal api={api} onClose={function () { setConfigOpen(false); }} />
+      )}
     </div>
   );
 }

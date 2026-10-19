@@ -67,6 +67,19 @@ var MOCK_INTERVIEWS = {
 
 var MOCK_AUDIT_LOG = [];
 
+var DEFAULT_PIPELINE_STAGES = [
+  "Shortlisted", "Aptitude Exam", "Technical Exam",
+  "Online Interview", "Offline Interview", "HR Round",
+  "Selected", "Rejected",
+];
+var MOCK_PIPELINE_STAGES = DEFAULT_PIPELINE_STAGES.slice();
+
+function stageTimelineFor(candidateId) {
+  return MOCK_AUDIT_LOG
+    .filter(function (e) { return e.candidate_id === candidateId && e.action === "stage_update"; })
+    .map(function (e) { return { stage: e.stage, updated_by: e.updated_by, notes: e.notes, logged_at: e.logged_at }; });
+}
+
 function mockDelay(value) {
   return new Promise(function (resolve) {
     setTimeout(function () { resolve(value); }, 150 + Math.random() * 200);
@@ -139,8 +152,46 @@ window.CDPI_MOCK_API = {
       return mockDelay({
         Name: found.Name, resume_name: found.resume_name,
         ranking_tier: found.ranking_tier, ingested_at: found.ingested_at,
+        stage_timeline: stageTimelineFor(found.candidate_id),
+        pipeline_stages: MOCK_PIPELINE_STAGES.slice(),
       });
     });
+  },
+
+  getPipelineConfig: function () {
+    return mockDelay({ stages: MOCK_PIPELINE_STAGES.slice() });
+  },
+
+  updatePipelineConfig: function (stages) {
+    if (!Array.isArray(stages) || !stages.length) {
+      var err = new Error("'stages' must be a non-empty list of stage names."); err.status = 400;
+      return Promise.reject(err);
+    }
+    MOCK_PIPELINE_STAGES = stages.slice();
+    return mockDelay({ stages: MOCK_PIPELINE_STAGES.slice() });
+  },
+
+  getCandidateTimeline: function (candidateId) {
+    return mockDelay({ candidate_id: candidateId, timeline: stageTimelineFor(candidateId) });
+  },
+
+  advanceCandidateStage: function (candidateId, stage, updatedBy, notes) {
+    if (!stage) {
+      var err1 = new Error("'stage' is required."); err1.status = 400; return Promise.reject(err1);
+    }
+    if (!updatedBy) {
+      var err2 = new Error("'updated_by' is required."); err2.status = 400; return Promise.reject(err2);
+    }
+    if (MOCK_PIPELINE_STAGES.indexOf(stage) === -1) {
+      var err3 = new Error("'" + stage + "' is not a configured pipeline stage. Configured stages: " + MOCK_PIPELINE_STAGES.join(", ") + ".");
+      err3.status = 400;
+      return Promise.reject(err3);
+    }
+    MOCK_AUDIT_LOG.push({
+      candidate_id: candidateId, action: "stage_update", stage: stage, updated_by: updatedBy,
+      notes: notes || "", logged_at: new Date().toISOString(),
+    });
+    return mockDelay({ candidate_id: candidateId, stage: stage, status: "recorded" });
   },
 
   reviewCandidate: function (candidateId, decision, reviewer, notes) {

@@ -63,6 +63,9 @@ function CandidatePortal(props) {
             {data.result.ingested_at && (
               <p className="muted">Submitted {new Date(data.result.ingested_at).toLocaleDateString()}</p>
             )}
+            {data.result.pipeline_stages && data.result.pipeline_stages.length > 0 && (
+              <OwnStageTimeline stages={data.result.pipeline_stages} timeline={data.result.stage_timeline || []} />
+            )}
           </div>
         )}
         {data.checked && data.error && (
@@ -225,5 +228,39 @@ function ApplicationForm(props) {
         <div className="banner banner-error">{submit.error}</div>
       )}
     </section>
+  );
+}
+
+/** Read-only hiring-stage stepper for the candidate's OWN status check —
+ * same stage list/markup StageTimelineModal uses for recruiters, no
+ * "record a stage" form here (candidates can't advance their own stage).
+ * Rendered inline on this one page, not as a popout, since there's only
+ * ever one candidate's timeline to show here. */
+function OwnStageTimeline(props) {
+  var reachedStages = props.timeline.map(function (t) { return t.stage; });
+  var currentStage = props.timeline.length ? props.timeline[props.timeline.length - 1].stage : null;
+
+  return (
+    <div className="status-stage-timeline">
+      <h4>Hiring process</h4>
+      <div className="stepper">
+        {props.stages.map(function (stageName) {
+          var entry = props.timeline.filter(function (t) { return t.stage === stageName; })[0];
+          var reached = reachedStages.indexOf(stageName) !== -1;
+          var isCurrent = stageName === currentStage;
+          return (
+            <div className={"stepper-item" + (reached ? " stepper-item-reached" : "") + (isCurrent ? " stepper-item-current" : "")} key={stageName}>
+              <div className="stepper-dot"></div>
+              <div className="stepper-content">
+                <div className="stepper-label">{stageName}</div>
+                {entry && entry.logged_at && (
+                  <div className="stepper-meta">{new Date(entry.logged_at).toLocaleDateString()}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
