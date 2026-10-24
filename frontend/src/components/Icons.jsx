@@ -97,3 +97,38 @@ function IconShield(props) {
     </svg>
   );
 }
+
+function IconPulse(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7 12h2.5l1.5-4 3 8 1.5-4H17" />
+    </svg>
+  );
+}
+
+function IconCloud(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M7 18h10a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.7-1.7A4 4 0 0 0 7 18z" />
+    </svg>
+  );
+}
+
+function IconMail(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+
+function IconKey(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <circle cx="8" cy="8" r="4" />
+      <path d="M11 11l8 8M16 16l2-2M18 18l2-2" />
+    </svg>
+  );
+}

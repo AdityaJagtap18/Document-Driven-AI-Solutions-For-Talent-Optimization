@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8732", "--directory", "frontend"],
       "port": 8732
+    },
+    {
+      "name": "functions",
+      "runtimeExecutable": "func",
+      "runtimeArgs": ["start", "--port", "7071"],
+      "port": 7071
     }
   ]
 }

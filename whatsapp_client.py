@@ -39,6 +39,39 @@ def _require_config():
     return phone_number_id, access_token
 
 
+def check_connection() -> dict:
+    """A real, safe connectivity check -- a GET on the configured phone
+    number's own metadata, never a message send. Returns {outcome,
+    error_category, detail, duration_ms} using the same vocabulary as
+    azure_integrations.check_connection(), for a consistent status
+    language across every config console in this app."""
+    import time as _time
+
+    start = _time.monotonic()
+    try:
+        phone_number_id, access_token = _require_config()
+    except RuntimeError as e:
+        return {"outcome": "unknown", "error_category": "configuration_invalid", "detail": str(e), "duration_ms": 0.0}
+
+    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{phone_number_id}"
+    try:
+        response = requests.get(url, headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+        duration_ms = round((_time.monotonic() - start) * 1000, 1)
+        if response.status_code == 200:
+            return {"outcome": "healthy", "error_category": None, "detail": "Graph API accepted the request and returned phone number metadata.", "duration_ms": duration_ms}
+        if response.status_code in (401, 403):
+            return {"outcome": "unhealthy", "error_category": "authentication_failed", "detail": f"Graph API returned {response.status_code}.", "duration_ms": duration_ms}
+        if response.status_code == 404:
+            return {"outcome": "unhealthy", "error_category": "endpoint_unreachable", "detail": "Graph API reports this phone_number_id does not exist.", "duration_ms": duration_ms}
+        return {"outcome": "unhealthy", "error_category": "unknown_error", "detail": f"Graph API returned {response.status_code}.", "duration_ms": duration_ms}
+    except requests.exceptions.Timeout:
+        return {"outcome": "unhealthy", "error_category": "timeout", "detail": "Graph API request timed out.", "duration_ms": round((_time.monotonic() - start) * 1000, 1)}
+    except requests.exceptions.ConnectionError as e:
+        return {"outcome": "unhealthy", "error_category": "endpoint_unreachable", "detail": str(e)[:300], "duration_ms": round((_time.monotonic() - start) * 1000, 1)}
+    except Exception as e:
+        return {"outcome": "unhealthy", "error_category": "unknown_error", "detail": str(e)[:300], "duration_ms": round((_time.monotonic() - start) * 1000, 1)}
+
+
 def send_whatsapp_text(to_phone_number: str, message: str) -> dict:
     """Sends a free-text WhatsApp message. NOTE: Meta only allows free-text
     messages within a 24-hour window of the recipient messaging you first;

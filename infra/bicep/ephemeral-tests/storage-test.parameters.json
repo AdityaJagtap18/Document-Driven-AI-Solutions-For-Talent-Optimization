@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccountName": {
+      "value": "REPLACED_AT_DEPLOY_TIME"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "tags": {
+      "value": {
+        "project": "CDPI",
+        "purpose": "ephemeral-integration-test",
+        "testRunId": "REPLACED_AT_DEPLOY_TIME",
+        "managedBy": "CDPI-test-runner",
+        "createdAt": "REPLACED_AT_DEPLOY_TIME"
+      }
+    }
+  }
+}

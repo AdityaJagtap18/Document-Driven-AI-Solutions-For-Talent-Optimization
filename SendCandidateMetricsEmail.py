@@ -16,11 +16,18 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, "config", "email_templates")
 today_str = datetime.now().strftime("%B %d, %Y")
 
 # === Load Email Credentials ===
+# Resolves via email_adapter.py (secrets_loader.py first, falling back
+# to this file's own sender_email/app_password fields) -- same fix
+# applied to InviteSender/send_interview_invites.py, see
+# email_adapter.py's docstring.
 try:
-    with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
-        creds = json.load(f)
-        EMAIL_ADDRESS = creds["sender_email"]
-        EMAIL_PASSWORD = creds["app_password"]
+    from email_adapter import resolve_smtp_config
+
+    _smtp = resolve_smtp_config()
+    if _smtp["missing"]:
+        raise RuntimeError(f"Missing SMTP configuration: {', '.join(_smtp['missing'])}.")
+    EMAIL_ADDRESS = _smtp["email"]
+    EMAIL_PASSWORD = _smtp["password"]
 except Exception as e:
     print(f"[ERROR] Failed to load credentials: {e}")
     exit(1)

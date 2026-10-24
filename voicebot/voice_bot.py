@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from azure_speech_utils import speak, listen
 import openai
-from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 import os
 import json as jsonlib
@@ -13,15 +12,16 @@ import uuid
 import wave
 import re
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from llm_utils import call_with_retry  # noqa: E402
+from llm_utils import call_with_retry, get_chat_llm, using_azure_openai  # noqa: E402
 from secrets_loader import get_secret  # noqa: E402
 
-_openai_key = get_secret("OPENAI_API_KEY")
-if not _openai_key:
-    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
-os.environ["OPENAI_API_KEY"] = _openai_key
+if not using_azure_openai():
+    _openai_key = get_secret("OPENAI_API_KEY")
+    if not _openai_key:
+        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example), configure AZURE_KEY_VAULT_URL, or set AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT to use Azure OpenAI instead.")
+    os.environ["OPENAI_API_KEY"] = _openai_key
 
-llm = ChatOpenAI(
+llm = get_chat_llm(
     temperature=0.7,
     max_tokens=1000,
     model="gpt-3.5-turbo",

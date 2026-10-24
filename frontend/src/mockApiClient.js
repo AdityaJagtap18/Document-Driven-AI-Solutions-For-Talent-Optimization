@@ -101,6 +101,30 @@ var MOCK_PERMISSIONS = {
   "screening.propose": { label: "Propose bulk decisions", description: "Propose a bulk accept/reject on screening-phase candidates.", module: "Candidate Management" },
   "screening.approve": { label: "Approve bulk decisions", description: "Approve or reject a recruiter's bulk-decision proposal.", module: "Candidate Management" },
   "pages.manage": { label: "Manage page access", description: "View the page registry and configure which roles may navigate to which pages.", module: "Page Access Management" },
+  "observability.read": { label: "View AI observability", description: "View aggregate AI Observability Center metrics (totals, rates, latency percentiles, cost breakdown).", module: "AI Observability" },
+  "observability.traces.read": { label: "View detailed AI traces", description: "View individual trace/span detail, including stage-level metadata.", module: "AI Observability" },
+  "azure.read": { label: "View Azure integrations", description: "View the Azure service integration inventory and current cached status.", module: "Azure Service Hub" },
+  "azure.config.read": { label: "View Azure integration configuration", description: "View a registered integration's non-secret configuration and diagnostics history.", module: "Azure Service Hub" },
+  "azure.manage": { label: "Run Azure connection checks", description: "Trigger a live connection health check against an Azure integration.", module: "Azure Service Hub" },
+  "azure.register": { label: "Register Azure integrations", description: "Register a new integration instance, or remove an existing registration (never deletes the underlying Azure resource).", module: "Azure Service Hub" },
+  "azure.config.write": { label: "Edit Azure integration configuration", description: "Update a registered integration's non-secret configuration fields.", module: "Azure Service Hub" },
+  "azure.enable": { label: "Enable/disable Azure integrations", description: "Turn CDPI's use of a registered integration on or off.", module: "Azure Service Hub" },
+  "azure.resources.discover": { label: "Discover Azure resources", description: "Run real Azure Resource Manager discovery for a registered integration.", module: "Azure Service Hub" },
+  "azure.resources.write": { label: "Provision/update Azure resources", description: "Reserved for future resource lifecycle operations -- no adapter in this release implements a verified write operation.", module: "Azure Service Hub" },
+  "azure.resources.delete": { label: "Delete Azure resources", description: "Reserved for future resource lifecycle operations -- no adapter in this release implements a verified delete operation.", module: "Azure Service Hub" },
+  "secrets.read": { label: "View secrets inventory", description: "View which secrets this app reads, whether each currently resolves, and from Key Vault or .env -- never the secret values themselves.", module: "Secrets Management" },
+  "secrets.write": { label: "Set secret values", description: "Write a secret's value to the local .env file. The value is never stored anywhere else, never returned by any API, and never shown again after submission.", module: "Secrets Management" },
+  "rag.config.read": { label: "View RAG configuration", description: "View the active and draft RAG pipeline configuration and its change history.", module: "RAG Configuration" },
+  "rag.config.write": { label: "Edit RAG configuration", description: "Create or update a draft RAG configuration.", module: "RAG Configuration" },
+  "rag.config.activate": { label: "Activate RAG configuration", description: "Promote a validated draft RAG configuration to active, or roll back to a prior version.", module: "RAG Configuration" },
+  "rag.preview.run": { label: "Run RAG retrieval preview", description: "Run a real retrieval (and optionally generation) preview against a test query.", module: "RAG Configuration" },
+  "rag.prompts.manage": { label: "Manage RAG prompt templates", description: "Create draft prompt template versions and activate/roll back which version is live.", module: "RAG Configuration" },
+  "comms.config.read": { label: "View communications configuration", description: "View the active and draft email/WhatsApp/delivery-policy and interview bot configuration and their change history.", module: "Communications Configuration" },
+  "comms.config.write": { label: "Edit communications configuration", description: "Create or update a draft communications or interview bot configuration.", module: "Communications Configuration" },
+  "comms.config.activate": { label: "Activate communications configuration", description: "Promote a validated draft to active, or roll back to a prior version.", module: "Communications Configuration" },
+  "comms.test.send": { label: "Send test communications", description: "Run a connection test or send a labeled test message to an explicitly chosen recipient.", module: "Communications Configuration" },
+  "comms.templates.manage": { label: "Manage message templates", description: "Create draft template versions and activate/roll back which version is live.", module: "Communications Configuration" },
+  "comms.delivery.read": { label: "View delivery log", description: "View real delivery/submission records for sent communications.", module: "Communications Configuration" },
 };
 var MOCK_PERMISSION_IDS = Object.keys(MOCK_PERMISSIONS);
 
@@ -222,6 +246,27 @@ var MOCK_PAGES_CATALOG = [
   { page_id: "page_access_management", name: "Page Access", route: "page-access", module: "Page Access Management",
     route_type: "page", is_protected: true, required_permission: "pages.manage",
     description: "Admin Panel: this page -- the page registry and the per-role page-access policy editor." },
+  { page_id: "ai_observability", name: "AI Observability", route: "ai-observability", module: "AI Observability",
+    route_type: "page", is_protected: true, required_permission: "observability.read",
+    description: "Admin Panel: LLM call metrics and AI pipeline-stage traces." },
+  { page_id: "azure_services", name: "Azure Service Hub", route: "azure-services", module: "Azure Service Hub",
+    route_type: "page", is_protected: true, required_permission: "azure.read",
+    description: "Admin Panel: the registry of Azure integrations this repo has code for, their configuration status, and live connection checks." },
+  { page_id: "secrets_management", name: "Secrets", route: "secrets", module: "Secrets Management",
+    route_type: "page", is_protected: true, required_permission: "secrets.read",
+    description: "Admin Panel: every secret this app actually reads, whether each currently resolves, and from Key Vault or .env -- never the values themselves." },
+  { page_id: "rag_config", name: "RAG Configuration", route: "rag-config", module: "RAG Configuration",
+    route_type: "page", is_protected: true, required_permission: "rag.config.read",
+    description: "Admin Panel: configure and version the resume-matching RAG pipeline's chunking, retrieval, generation, and prompt templates." },
+  { page_id: "communications_config", name: "Communications Configuration", route: "communications-config", module: "Communications Configuration",
+    route_type: "page", is_protected: true, required_permission: "comms.config.read",
+    description: "Admin Panel: configure email/WhatsApp/SMS delivery, the interview bot, message templates, and delivery policies." },
+  { page_id: "azure_readiness", name: "Azure Readiness", route: "azure-readiness", module: "Azure Service Hub",
+    route_type: "page", is_protected: true, required_permission: "azure.config.read",
+    description: "Admin Panel: centralized Azure integration readiness, Azure CLI login status, and the ephemeral provision-test-destroy workflow." },
+  { page_id: "persona_catalogue", name: "Persona Catalogue", route: "persona-catalogue", module: "Role & Permission Management",
+    route_type: "page", is_protected: true, required_permission: "roles.read",
+    description: "Admin Panel: the 12 representative persona configurations, their role mapping, allowed pages, and report authorization/status." },
   { page_id: "candidate_portal", name: "Candidate Portal", route: "portal", module: "Resume Upload and Parsing",
     route_type: "page", is_protected: true, required_permission: null,
     description: "Candidate self-service: submit an application, check status. Gated by the 'candidate' role directly." },
@@ -367,6 +412,200 @@ function loadCandidates() {
   }
   return _candidatesPromise;
 }
+
+// ---------------------------------------------------------------------------
+// RAG Configuration Console mock substrate -- mirrors rag_config.py's
+// DEFAULT_CONFIG/VALID_RANGES/PROMPT_DEFAULTS exactly.
+// ---------------------------------------------------------------------------
+var MOCK_RAG_DEFAULT_CONFIG = {
+  chunking: { max_chars: 1500 },
+  retrieval: { top_k: 5, similarity_threshold: 0.0 },
+  generation: {
+    chunk_summarization: { model: "gpt-3.5-turbo", temperature: 0.7, max_tokens: 1000 },
+    merge_extraction: { model: "gpt-3.5-turbo", temperature: 0.3, max_tokens: 1500 },
+  },
+};
+var MOCK_RAG_VALID_RANGES = {
+  "chunking.max_chars": [200, 5000],
+  "retrieval.top_k": [1, 50],
+  "retrieval.similarity_threshold": [0.0, 1.0],
+  "generation.chunk_summarization.temperature": [0.0, 2.0],
+  "generation.chunk_summarization.max_tokens": [50, 4000],
+  "generation.merge_extraction.temperature": [0.0, 2.0],
+  "generation.merge_extraction.max_tokens": [50, 4000],
+};
+var MOCK_RAG_PROMPT_DEFAULTS = {
+  resume_chunk_summarization: { input_variables: ["text", "jd"] },
+  resume_merge_structured_extraction: { input_variables: ["summaries", "jd"] },
+};
+
+function _mockGetDotted(obj, dottedKey) {
+  var parts = dottedKey.split(".");
+  var node = obj;
+  for (var i = 0; i < parts.length; i++) {
+    if (!node || typeof node !== "object" || !(parts[i] in node)) return undefined;
+    node = node[parts[i]];
+  }
+  return node;
+}
+
+function _mockValidateRagConfig(config) {
+  var errors = [];
+  Object.keys(MOCK_RAG_VALID_RANGES).forEach(function (dottedKey) {
+    var range = MOCK_RAG_VALID_RANGES[dottedKey];
+    var value = _mockGetDotted(config, dottedKey);
+    if (value === undefined || value === null) return;
+    if (typeof value !== "number" || isNaN(value)) {
+      errors.push("'" + dottedKey + "' must be a number.");
+    } else if (value < range[0] || value > range[1]) {
+      errors.push("'" + dottedKey + "' must be between " + range[0] + " and " + range[1] + " (got " + value + ").");
+    }
+  });
+  return errors;
+}
+
+var MOCK_RAG_ACTIVE_CONFIG = null;
+var MOCK_RAG_DRAFT_CONFIG = null;
+var MOCK_RAG_CONFIG_HISTORY = [];
+
+function _mockRecordRagConfigChange(operation, actor, safeSummary) {
+  MOCK_RAG_CONFIG_HISTORY.push({
+    id: "rch-" + Math.random().toString(36).slice(2, 10), operation: operation, actor: actor,
+    safe_summary: safeSummary || {}, recorded_at: new Date().toISOString(),
+  });
+}
+
+// Seeded version 1, already active, for both real RAG prompts -- mirrors
+// repositories.ensure_default_rag_prompts() seeding from the exact
+// template text ResumeParser.py has always hardcoded (not shown here in
+// full; the mock doesn't need byte-identical text, just the same shape).
+var MOCK_RAG_PROMPT_VERSIONS = {
+  resume_chunk_summarization: [
+    { id: "resume_chunk_summarization:v1", prompt_id: "resume_chunk_summarization", version: 1, status: "active",
+      template: "You are an AI assistant. Summarize the relevant resume details below in relation to the following job description.\n\nResume Chunk:\n\"\"\"{text}\"\"\"\n\nJob Description:\n\"\"\"{jd}\"\"\"\n\nExtract the key points in concise bullet form, JSON-style if possible. Do NOT return full JSON yet.",
+      created_by: "system:initial_seed", created_at: "2026-01-01T00:00:00Z" },
+  ],
+  resume_merge_structured_extraction: [
+    { id: "resume_merge_structured_extraction:v1", prompt_id: "resume_merge_structured_extraction", version: 1, status: "active",
+      template: "You are an expert resume evaluator.\n\nBelow are summaries of different chunks of a resume, all based on the same candidate:\n\n\"\"\"{summaries}\"\"\"\n\nJob Description:\n\"\"\"{jd}\"\"\"\n\nNow based on the summaries and the JD, extract the following structured JSON. Return clean JSON output. Return only the JSON.",
+      created_by: "system:initial_seed", created_at: "2026-01-01T00:00:00Z" },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Communications Configuration Console mock substrate -- mirrors
+// comms_config.py's CHANNELS/DEFAULT_COMMS_CONFIG/DEFAULT_INTERVIEW_BOT_CONFIG/
+// DEFAULT_TEMPLATES exactly. Mock mode has no real SMTP/WhatsApp Graph
+// API to check against -- every connectivity test honestly reports
+// "unknown"/"not configured", and no test email is actually sent.
+// ---------------------------------------------------------------------------
+var MOCK_COMMS_CHANNELS = [
+  { channel: "email", status: "supported", category: "Email",
+    description: "Raw SMTP via smtplib, credentials resolved through email_adapter.py.",
+    source_modules: ["email_adapter.py", "InviteSender/send_interview_invites.py", "SendCandidateMetricsEmail.py"],
+    capabilities: { connectivity_check: true, test_message: true } },
+  { channel: "whatsapp", status: "supported", category: "WhatsApp",
+    description: "Meta WhatsApp Business Cloud API -- genuinely wired into the candidate-decision notification workflow.",
+    source_modules: ["whatsapp_client.py"],
+    capabilities: { connectivity_check: true, test_message: false } },
+  { channel: "sms", status: "absent", category: "SMS",
+    description: "No SMS provider integration exists anywhere in this repository.",
+    source_modules: [], capabilities: { connectivity_check: false, test_message: false }, requires_development_work: true },
+];
+var MOCK_COMMS_DEFAULT_CONFIG = {
+  email: { enabled: true, sender_display_name: "CDPI Recruitment", reply_to: "" },
+  whatsapp: { enabled: true },
+  delivery_policies: { default_channel: { candidate_decision_notification: "whatsapp" }, duplicate_send_window_minutes: 60 },
+};
+var MOCK_COMMS_VALID_RANGES = { "delivery_policies.duplicate_send_window_minutes": [1, 1440] };
+var MOCK_INTERVIEW_BOT_DEFAULT_CONFIG = { model: "gpt-3.5-turbo", temperature: 0.7, max_tokens: 1000, warmup_question_count: 3, language: "en" };
+var MOCK_INTERVIEW_BOT_VALID_RANGES = { temperature: [0.0, 2.0], max_tokens: [50, 4000], warmup_question_count: [1, 10] };
+var MOCK_TEMPLATE_DEFAULTS = {
+  candidate_interview_invite: {
+    channel: "email",
+    subject: "Interview Scheduled with CDIP Recruitment – {candidate_name}",
+    body: "Dear {candidate_name},\n\nInterview: {interview_date} ({interview_day}), {interview_start}-{interview_end}, slot {interview_slot}.\nLink: {interview_link}\n\nBest wishes.",
+    input_variables: ["candidate_name", "interview_date", "interview_day", "interview_start", "interview_end", "interview_slot", "interview_link"],
+  },
+};
+var MOCK_TEMPLATE_PREVIEW_EXAMPLE_DATA = {
+  candidate_name: "Jordan Example", interview_date: "15-11-2026", interview_day: "Sunday",
+  interview_start: "10:00 AM", interview_end: "10:45 AM", interview_slot: "Slot 3",
+  interview_link: "https://meet.jit.si/Interview_Jordan_Example",
+};
+
+function _mockValidateCommsConfig(config) {
+  var errors = [];
+  Object.keys(MOCK_COMMS_VALID_RANGES).forEach(function (dottedKey) {
+    var range = MOCK_COMMS_VALID_RANGES[dottedKey];
+    var value = _mockGetDotted(config, dottedKey);
+    if (value === undefined || value === null) return;
+    if (typeof value !== "number" || isNaN(value)) { errors.push("'" + dottedKey + "' must be a number."); }
+    else if (value < range[0] || value > range[1]) { errors.push("'" + dottedKey + "' must be between " + range[0] + " and " + range[1] + " (got " + value + ")."); }
+  });
+  var defaultChannel = (config.delivery_policies && config.delivery_policies.default_channel) || {};
+  Object.keys(defaultChannel).forEach(function (workflow) {
+    var channel = defaultChannel[workflow];
+    var adapter = MOCK_COMMS_CHANNELS.filter(function (c) { return c.channel === channel; })[0];
+    if (!adapter) errors.push("Unknown channel '" + channel + "' for workflow '" + workflow + "'.");
+    else if (adapter.status !== "supported") errors.push("Channel '" + channel + "' for workflow '" + workflow + "' is '" + adapter.status + "', not supported.");
+  });
+  return errors;
+}
+
+function _mockValidateInterviewBotConfig(config) {
+  var errors = [];
+  Object.keys(MOCK_INTERVIEW_BOT_VALID_RANGES).forEach(function (key) {
+    var range = MOCK_INTERVIEW_BOT_VALID_RANGES[key];
+    var value = config[key];
+    if (value === undefined || value === null) return;
+    if (typeof value !== "number" || isNaN(value)) { errors.push("'" + key + "' must be a number."); }
+    else if (value < range[0] || value > range[1]) { errors.push("'" + key + "' must be between " + range[0] + " and " + range[1] + " (got " + value + ")."); }
+  });
+  return errors;
+}
+
+var MOCK_COMMS_ACTIVE_CONFIG = null;
+var MOCK_COMMS_DRAFT_CONFIG = null;
+var MOCK_COMMS_CONFIG_HISTORY = [];
+var MOCK_INTERVIEW_BOT_ACTIVE_CONFIG = null;
+var MOCK_INTERVIEW_BOT_DRAFT_CONFIG = null;
+var MOCK_COMMS_TEMPLATE_VERSIONS = {
+  candidate_interview_invite: [
+    Object.assign({ id: "candidate_interview_invite:v1", template_id: "candidate_interview_invite", version: 1, status: "active", created_by: "system:initial_seed", created_at: "2026-01-01T00:00:00Z" }, MOCK_TEMPLATE_DEFAULTS.candidate_interview_invite),
+  ],
+};
+var MOCK_COMMS_DELIVERY_LOG = [];
+
+function _mockRecordCommsConfigChange(operation, actor, safeSummary) {
+  MOCK_COMMS_CONFIG_HISTORY.push({ id: "cmh-" + Math.random().toString(36).slice(2, 10), operation: operation, actor: actor, safe_summary: safeSummary || {}, recorded_at: new Date().toISOString() });
+}
+
+// ---------------------------------------------------------------------------
+// Secrets Management mock substrate -- mirrors secrets_registry.
+// SECRET_DEFINITIONS exactly (built from the same real get_secret()/
+// _require_secrets() call-site grep as the backend module). Mock mode has
+// no real .env/Key Vault to check, so every secret honestly reports
+// "not present" here -- never a fabricated "configured" status.
+// ---------------------------------------------------------------------------
+var MOCK_SECRET_DEFINITIONS = [
+  { key: "JWT_SECRET", label: "Session signing secret", secret: true, used_by: ["auth.py"], description: "Signs/verifies every login session token. Required." },
+  { key: "OPENAI_API_KEY", label: "OpenAI API key", secret: true, used_by: ["ResumeParser.py", "interview_bot.py", "generate_questions.py", "voicebot/voice_bot.py", "semantic-library/embeddings.py"], description: "Chat completions and embeddings -- every LLM call in this repo." },
+  { key: "COSMOS_ENDPOINT", label: "Cosmos DB endpoint", secret: false, used_by: ["context-lake/client.py"], description: "Primary data store connection." },
+  { key: "COSMOS_KEY", label: "Cosmos DB primary key", secret: true, used_by: ["context-lake/client.py"], description: "Primary data store authentication." },
+  { key: "COSMOS_DATABASE", label: "Cosmos DB database name", secret: false, used_by: ["context-lake/client.py"], description: "Which database within the Cosmos account this app uses." },
+  { key: "BLOB_CONNECTION_STRING", label: "Blob Storage connection string", secret: true, used_by: ["context-lake/client.py"], description: "Raw/parsed resume file storage." },
+  { key: "DOCUMENT_INTELLIGENCE_ENDPOINT", label: "Document Intelligence endpoint", secret: false, used_by: ["document_intelligence_client.py"], description: "Certificate/marksheet OCR endpoint." },
+  { key: "DOCUMENT_INTELLIGENCE_KEY", label: "Document Intelligence API key", secret: true, used_by: ["document_intelligence_client.py"], description: "Certificate/marksheet OCR authentication." },
+  { key: "AZURE_SPEECH_KEY", label: "Azure Speech API key", secret: true, used_by: ["voicebot/azure_speech_utils.py"], description: "Voicebot text-to-speech/speech-to-text authentication." },
+  { key: "AZURE_SPEECH_REGION", label: "Azure Speech region", secret: false, used_by: ["voicebot/azure_speech_utils.py"], description: "Azure region the Speech resource is deployed in." },
+  { key: "APPLICATIONINSIGHTS_CONNECTION_STRING", label: "Application Insights connection string", secret: true, used_by: ["observability.py"], description: "Optional telemetry sink for LLM call and AI trace records." },
+  { key: "GMAIL_WATCHER_USER", label: "Gmail watcher account", secret: true, used_by: ["file_watcher.py"], description: "Mailbox the resume-intake watcher polls." },
+  { key: "GMAIL_WATCHER_APP_PASSWORD", label: "Gmail watcher app password", secret: true, used_by: ["file_watcher.py"], description: "App-specific password for the Gmail watcher account." },
+  { key: "WHATSAPP_PHONE_NUMBER_ID", label: "WhatsApp Business phone number ID", secret: true, used_by: ["whatsapp_client.py"], description: "Meta WhatsApp Business Cloud API sender identity." },
+  { key: "WHATSAPP_ACCESS_TOKEN", label: "WhatsApp Business access token", secret: true, used_by: ["whatsapp_client.py"], description: "Meta WhatsApp Business Cloud API authentication." },
+];
+var MOCK_SECRET_VALUES_SET = {}; // key -> true once setSecret() has been called for it this session
 
 window.CDPI_MOCK_API = {
   setAuthToken: function (token) { _mockAuthToken = token; },
@@ -902,14 +1141,1316 @@ window.CDPI_MOCK_API = {
 
   observabilitySummary: function () {
     try { _mockRequirePermission("analytics.read"); } catch (e) { return Promise.reject(e); }
+    return mockDelay(_mockLlmObservabilitySummary());
+  },
+
+  // ---------------------------------------------------------------------
+  // AI Observability Center. LLM metrics reuse the same illustrative mock
+  // data observabilitySummary() above already used (AdminReports.jsx) --
+  // not a second, differently-shaped fake dataset. The trace/span data
+  // (MOCK_AI_TRACES) is NEW, clearly-labeled mock-only demo data (see
+  // this file's own module doc comment -- mock mode is this app's
+  // explicit, already-labeled dev-only mode, topbar shows "API: mock"),
+  // shaped exactly like the real backend's grouped-trace response (see
+  // api_blueprint.py's _group_spans_into_traces()/_percentile()/
+  // _cost_breakdown() -- the functions below mirror that logic, not a
+  // second invented shape).
+  // ---------------------------------------------------------------------
+  aiObservabilitySummary: function () {
+    try { _mockRequirePermission("observability.read"); } catch (e) { return Promise.reject(e); }
+    var spans = MOCK_AI_TRACES;
+    var traces = _mockGroupSpansIntoTraces(spans);
+    var spanDurations = spans.map(function (s) { return s.duration_ms; });
+    var traceDurations = traces.map(function (t) { return t.total_duration_ms; });
+    var observedStages = {};
+    spans.forEach(function (s) { if (s.stage) observedStages[s.stage] = true; });
+    var failedTraces = traces.filter(function (t) { return t.has_error; }).length;
+
     return mockDelay({
-      total_calls: 23, total_tokens: 15420, total_cost_usd: 0.028114,
-      by_label: {
-        resume_chunk_summarization: { calls: 12, tokens: 7230, cost_usd: 0.011568 },
-        resume_merge_structured_extraction: { calls: 4, tokens: 5890, cost_usd: 0.009547 },
-        interview_questions_generation: { calls: 4, tokens: 1680, cost_usd: 0.002688 },
-        voicebot_transcript_scoring: { calls: 3, tokens: 620, cost_usd: 0.004311 },
+      llm_calls: _mockLlmObservabilitySummary(),
+      ai_traces: _mockAiTraceSummary(spans),
+      requests: {
+        total: traces.length, failed: failedTraces, succeeded: traces.length - failedTraces,
+        failure_rate: traces.length ? Math.round((failedTraces / traces.length) * 10000) / 10000 : null,
       },
+      span_latency: _mockLatencyStats(spanDurations),
+      trace_latency: _mockLatencyStats(traceDurations),
+      cost: _mockCostBreakdown(spans),
+      instrumentation_coverage: _mockInstrumentationCoverage(Object.keys(observedStages)),
+      recent_traces: traces.slice().sort(function (a, b) { return (b.started_at || "") < (a.started_at || "") ? -1 : 1; }).slice(0, 50),
     });
   },
+
+  listAiTraces: function (filters) {
+    try { _mockRequirePermission("observability.read"); } catch (e) { return Promise.reject(e); }
+    filters = filters || {};
+    var traces = _mockGroupSpansIntoTraces(MOCK_AI_TRACES);
+    if (filters.workflow) traces = traces.filter(function (t) { return t.workflow === filters.workflow; });
+    if (filters.status) traces = traces.filter(function (t) { return t.status === filters.status; });
+    if (filters.correlation_id) {
+      traces = traces.filter(function (t) { return t.correlation_id && t.correlation_id.indexOf(filters.correlation_id) !== -1; });
+    }
+    if (filters.trace_id) traces = traces.filter(function (t) { return t.trace_id === filters.trace_id; });
+
+    var sortBy = filters.sort_by === "total_duration_ms" ? "total_duration_ms" : "started_at";
+    var order = filters.order === "asc" ? 1 : -1;
+    traces.sort(function (a, b) {
+      var av = a[sortBy] || "", bv = b[sortBy] || "";
+      return av < bv ? order : (av > bv ? -order : 0);
+    });
+
+    var limit = Math.min(parseInt(filters.limit, 10) || 50, 200);
+    var offset = Math.max(parseInt(filters.offset, 10) || 0, 0);
+    var page = traces.slice(offset, offset + limit);
+    return mockDelay({ count: traces.length, limit: limit, offset: offset, traces: page });
+  },
+
+  getAiTrace: function (traceId) {
+    try { _mockRequirePermission("observability.traces.read"); } catch (e) { return Promise.reject(e); }
+    var spans = MOCK_AI_TRACES.filter(function (s) { return s.trace_id === traceId; })
+      .slice().sort(function (a, b) { return (a.logged_at || "") < (b.logged_at || "") ? -1 : 1; });
+    if (!spans.length) { var err = new Error("No spans found for trace '" + traceId + "'."); err.status = 404; return Promise.reject(err); }
+    var trace = _mockGroupSpansIntoTraces(spans)[0];
+    return mockDelay({ trace: trace, spans: spans });
+  },
+
+  // ---------------------------------------------------------------------
+  // Azure Service Hub. Mock mode has no real secrets/environment/ARM
+  // access to check against -- every outcome here honestly reports
+  // "unknown"/"not supported" rather than a fabricated "healthy"/
+  // resource list (see azure_integrations.py's docstring for the real
+  // rules this mirrors). Switch config.js to mode:"real" against a
+  // deployed backend to see actual status for whatever's configured
+  // there.
+  // ---------------------------------------------------------------------
+  listAzureAdapters: function () {
+    try { _mockRequirePermission("azure.read"); } catch (e) { return Promise.reject(e); }
+    var adapters = MOCK_ADAPTER_TYPE_IDS.map(function (id) { return MOCK_ADAPTER_TYPES[id]; });
+    return mockDelay({ count: adapters.length, adapters: adapters });
+  },
+
+  listAzureIntegrations: function () {
+    try { _mockRequirePermission("azure.read"); } catch (e) { return Promise.reject(e); }
+    var result = MOCK_INTEGRATION_INSTANCES.map(function (instance) {
+      var adapter = MOCK_ADAPTER_TYPES[instance.adapter_type] || {};
+      var presence = _mockSecretPresence(instance.adapter_type);
+      var presentCount = Object.keys(presence).filter(function (k) { return presence[k]; }).length;
+      return {
+        integration_id: instance.id, adapter_type: instance.adapter_type,
+        display_name: instance.display_name, environment: instance.environment,
+        category: adapter.category, enabled: instance.enabled,
+        configured: Object.keys(presence).length > 0 && presentCount === Object.keys(presence).length,
+        last_connection_outcome: instance.last_connection_outcome,
+        last_health_checked_at: instance.last_health_checked_at,
+        resource_discovery_supported: (adapter.capabilities || {}).resource_discovery || false,
+      };
+    });
+    return mockDelay({ count: result.length, integrations: result });
+  },
+
+  getAzureIntegration: function (integrationId) {
+    try {
+      _mockRequirePermission("azure.config.read");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      var adapter = MOCK_ADAPTER_TYPES[instance.adapter_type] || {};
+      var history = MOCK_INTEGRATION_HEALTH_CHECKS.filter(function (h) { return h.integration_id === integrationId; })
+        .slice().sort(function (a, b) { return (a.checked_at || "") < (b.checked_at || "") ? 1 : -1; }).slice(0, 10);
+      return mockDelay({ instance: instance, adapter: adapter, secrets_configured: _mockSecretPresence(instance.adapter_type), recent_health_checks: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  validateAzureIntegrationConfig: function (adapterType) {
+    try {
+      _mockRequirePermission("azure.register");
+      if (!MOCK_ADAPTER_TYPES[adapterType]) { var err = new Error("Unknown adapter type '" + adapterType + "'."); err.status = 400; throw err; }
+      var errors = _mockValidateAdapterConfig(adapterType);
+      return mockDelay({ adapter_type: adapterType, valid: errors.length === 0, errors: errors });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  registerAzureIntegration: function (integrationId, adapterType, displayName, environment, config) {
+    try {
+      var actor = _mockRequirePermission("azure.register");
+      if (!integrationId || !displayName || !environment) { var err1 = new Error("'integration_id', 'display_name', and 'environment' are required."); err1.status = 400; throw err1; }
+      var adapter = MOCK_ADAPTER_TYPES[adapterType];
+      if (!adapter) { var err2 = new Error("Unknown adapter type '" + adapterType + "'."); err2.status = 400; throw err2; }
+      if (adapter.status === "planned") { var errPlanned = new Error("'" + adapter.name + "' is planned but not implemented in this repository -- there is no code path to register or configure it yet."); errPlanned.status = 400; throw errPlanned; }
+      config = config || {};
+      var secretKeysSupplied = adapter.config_schema.filter(function (f) { return f.secret && config[f.key] !== undefined; }).map(function (f) { return f.key; });
+      if (secretKeysSupplied.length) { var err3 = new Error("Secret field(s) " + secretKeysSupplied.join(", ") + " cannot be submitted through this API."); err3.status = 400; throw err3; }
+      if (_mockGetIntegrationInstance(integrationId)) { var err4 = new Error("Integration '" + integrationId + "' is already registered."); err4.status = 409; throw err4; }
+      var instance = {
+        id: integrationId, adapter_type: adapterType, display_name: displayName, environment: environment,
+        config: config, config_version: 1, enabled: false, lifecycle_status: "draft",
+        last_connection_outcome: null, last_health_checked_at: null, last_failure: null,
+        created_by: actor.username, updated_by: null, created_at: new Date().toISOString(),
+      };
+      MOCK_INTEGRATION_INSTANCES.push(instance);
+      _mockRecordConfigChange(integrationId, "registered", actor.username, { adapter_type: adapterType, environment: environment, config: config, config_version: 1 });
+      return mockDelay(instance);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  updateAzureIntegrationConfig: function (integrationId, config, expectedVersion) {
+    try {
+      var actor = _mockRequirePermission("azure.config.write");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err1 = new Error("Integration '" + integrationId + "' not found."); err1.status = 404; throw err1; }
+      if (instance.config_version !== expectedVersion) {
+        var err2 = new Error("Configuration has changed since you last read it (current version " + instance.config_version + ", expected " + expectedVersion + ") -- reload and reapply your change.");
+        err2.status = 409; throw err2;
+      }
+      var adapter = MOCK_ADAPTER_TYPES[instance.adapter_type];
+      var secretKeysSupplied = adapter.config_schema.filter(function (f) { return f.secret && config[f.key] !== undefined; }).map(function (f) { return f.key; });
+      if (secretKeysSupplied.length) { var err3 = new Error("Secret field(s) " + secretKeysSupplied.join(", ") + " cannot be submitted through this API."); err3.status = 400; throw err3; }
+      instance.config = config;
+      instance.config_version = expectedVersion + 1;
+      // A config change invalidates any prior "healthy" verdict -- revalidate before (re-)activation.
+      instance.last_connection_outcome = null;
+      instance.last_health_checked_at = null;
+      instance.last_failure = null;
+      if (instance.enabled) { instance.enabled = false; instance.lifecycle_status = "draft"; }
+      _mockRecordConfigChange(integrationId, "config_updated", actor.username, { config: config, config_version: instance.config_version });
+      return mockDelay(instance);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  setAzureIntegrationEnabled: function (integrationId, enabled) {
+    try {
+      var actor = _mockRequirePermission("azure.enable");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err1 = new Error("Integration '" + integrationId + "' not found."); err1.status = 404; throw err1; }
+      if (enabled && instance.last_connection_outcome !== "healthy") {
+        var err2 = new Error("Can't enable this integration -- it has no recorded successful ('healthy') connection check yet. Run a connection check first.");
+        err2.status = 409; throw err2;
+      }
+      instance.enabled = enabled;
+      instance.lifecycle_status = enabled ? "active" : "disabled";
+      _mockRecordConfigChange(integrationId, enabled ? "activated" : "deactivated", actor.username, { config_version: instance.config_version });
+      return mockDelay(instance);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  checkAzureIntegration: function (integrationId) {
+    try {
+      _mockRequirePermission("azure.manage");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err = new Error("Unknown integration '" + integrationId + "'."); err.status = 404; throw err; }
+      var result = _mockCheckConnection(instance.adapter_type);
+      result.integration_id = integrationId;
+      MOCK_INTEGRATION_HEALTH_CHECKS.push(result);
+      instance.last_connection_outcome = result.outcome;
+      instance.last_health_checked_at = result.checked_at;
+      instance.last_failure = result.outcome === "healthy" ? null : { outcome: result.outcome, error_category: result.error_category, detail: result.detail, checked_at: result.checked_at };
+      return mockDelay(result);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getAzureIntegrationConfigHistory: function (integrationId, limit) {
+    try {
+      _mockRequirePermission("azure.config.read");
+      if (!_mockGetIntegrationInstance(integrationId)) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      var history = MOCK_INTEGRATION_CONFIG_HISTORY.filter(function (h) { return h.integration_id === integrationId; })
+        .slice().sort(function (a, b) { return (a.recorded_at || "") < (b.recorded_at || "") ? 1 : -1; }).slice(0, limit || 50);
+      return mockDelay({ count: history.length, history: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  rollbackAzureIntegrationConfig: function (integrationId, historyId) {
+    try {
+      var actor = _mockRequirePermission("azure.config.write");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err1 = new Error("Integration '" + integrationId + "' not found."); err1.status = 404; throw err1; }
+      var entry = MOCK_INTEGRATION_CONFIG_HISTORY.filter(function (h) { return h.integration_id === integrationId && h.id === historyId; })[0];
+      if (!entry) { var err2 = new Error("Config history entry '" + historyId + "' not found for this integration."); err2.status = 404; throw err2; }
+      if ((entry.operation !== "registered" && entry.operation !== "config_updated") || !entry.safe_summary || entry.safe_summary.config === undefined) {
+        var err3 = new Error("This history entry has no configuration snapshot to roll back to."); err3.status = 400; throw err3;
+      }
+      instance.config = entry.safe_summary.config;
+      instance.config_version += 1;
+      instance.last_connection_outcome = null;
+      instance.last_health_checked_at = null;
+      instance.last_failure = null;
+      if (instance.enabled) { instance.enabled = false; instance.lifecycle_status = "draft"; }
+      _mockRecordConfigChange(integrationId, "rolled_back", actor.username, { rolled_back_to_history_id: historyId, config: instance.config, config_version: instance.config_version });
+      return mockDelay(instance);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getAzureIntegrationHealthHistory: function (integrationId, limit) {
+    try {
+      _mockRequirePermission("azure.config.read");
+      if (!_mockGetIntegrationInstance(integrationId)) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      var history = MOCK_INTEGRATION_HEALTH_CHECKS.filter(function (h) { return h.integration_id === integrationId; })
+        .slice().sort(function (a, b) { return (a.checked_at || "") < (b.checked_at || "") ? 1 : -1; }).slice(0, limit || 50);
+      return mockDelay({ count: history.length, checks: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  discoverAzureResources: function (integrationId) {
+    try {
+      _mockRequirePermission("azure.resources.discover");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      var adapter = MOCK_ADAPTER_TYPES[instance.adapter_type];
+      var cfg = instance.config || {};
+      if (!adapter.capabilities.resource_discovery) {
+        return mockDelay({ supported: false, resources: [], error: "Resource discovery is not supported for adapter type '" + instance.adapter_type + "'.", discovered_at: new Date().toISOString() });
+      }
+      if (!cfg.subscription_id || !cfg.resource_group) {
+        return mockDelay({ supported: false, resources: [], error: "subscription_id and resource_group are both required to discover resources.", discovered_at: new Date().toISOString() });
+      }
+      return mockDelay({ supported: false, resources: [], error: "Mock mode has no real Azure Resource Manager access to discover against. Switch config.js to mode:\"real\" against a deployed backend with real Azure credentials.", discovered_at: new Date().toISOString() });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  removeAzureIntegration: function (integrationId) {
+    try {
+      var actor = _mockRequirePermission("azure.register");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      MOCK_INTEGRATION_INSTANCES = MOCK_INTEGRATION_INSTANCES.filter(function (i) { return i.id !== integrationId; });
+      _mockRecordConfigChange(integrationId, "registration_removed", actor.username, { adapter_type: instance.adapter_type });
+      return mockDelay({ integration_id: integrationId, status: "registration_removed" });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listSecrets: function () {
+    try {
+      _mockRequirePermission("secrets.read");
+      var secrets = MOCK_SECRET_DEFINITIONS.map(function (def) {
+        var set = MOCK_SECRET_VALUES_SET[def.key];
+        return Object.assign({}, def, { present: !!set, source: set ? "environment" : null });
+      });
+      return mockDelay({ count: secrets.length, vault_configured: false, secrets: secrets });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  setSecret: function (key, value) {
+    try {
+      _mockRequirePermission("secrets.write");
+      var def = MOCK_SECRET_DEFINITIONS.filter(function (d) { return d.key === key; })[0];
+      if (!def) { var err1 = new Error("Unknown secret key '" + key + "'."); err1.status = 400; throw err1; }
+      if (!value) { var err2 = new Error("'value' is required and must be a non-empty string."); err2.status = 400; throw err2; }
+      // Mock mode has no real .env file to write to -- only tracks
+      // "has this key been set in THIS session" so the UI can reflect
+      // a successful write, same honesty rule as every other mock
+      // method in this file: never pretend a real file was touched.
+      MOCK_SECRET_VALUES_SET[key] = true;
+      return mockDelay(Object.assign({}, def, { present: true, source: "environment" }));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  // -------------------------------------------------------------------
+  // RAG Configuration Console. Mock mode has no real semantic index to
+  // retrieve against (resumes aren't actually embedded here) -- preview
+  // honestly reports "no real index in this demo" rather than
+  // fabricating retrieved chunks or a generated response.
+  // -------------------------------------------------------------------
+  getRagConfig: function () {
+    try {
+      _mockRequirePermission("rag.config.read");
+      return mockDelay({
+        active: MOCK_RAG_ACTIVE_CONFIG || Object.assign({}, MOCK_RAG_DEFAULT_CONFIG, { id: "active", config_version: 0, note: "Never activated -- ResumeParser.py is running on its built-in hardcoded defaults." }),
+        draft: MOCK_RAG_DRAFT_CONFIG,
+        source_status: { configured: true, connected: false, indexed: false, retrievable: false, chunk_count: 0, error: "Mock mode has no real semantic index -- this is a browser-only demo with no resumes actually processed." },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  validateRagConfig: function (config) {
+    try {
+      _mockRequirePermission("rag.config.write");
+      return mockDelay({ valid: _mockValidateRagConfig(config).length === 0, errors: _mockValidateRagConfig(config) });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  saveRagConfigDraft: function (config) {
+    try {
+      var actor = _mockRequirePermission("rag.config.write");
+      var errors = _mockValidateRagConfig(config);
+      if (errors.length) { var err = new Error("Invalid configuration: " + errors.join(" ")); err.status = 400; throw err; }
+      var configVersion = (MOCK_RAG_ACTIVE_CONFIG ? MOCK_RAG_ACTIVE_CONFIG.config_version : 0) + 1;
+      MOCK_RAG_DRAFT_CONFIG = Object.assign({ id: "draft", lifecycle_status: "draft", config_version: configVersion, created_by: actor.username, created_at: new Date().toISOString() }, config);
+      _mockRecordRagConfigChange("draft_saved", actor.username, { config_version: configVersion });
+      return mockDelay(MOCK_RAG_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateRagConfig: function (acknowledgeReindexImpact) {
+    try {
+      var actor = _mockRequirePermission("rag.config.activate");
+      if (!MOCK_RAG_DRAFT_CONFIG) { var err1 = new Error("No draft configuration exists to activate."); err1.status = 404; throw err1; }
+      var errors = _mockValidateRagConfig(MOCK_RAG_DRAFT_CONFIG);
+      if (errors.length) { var err2 = new Error("Cannot activate an invalid draft: " + errors.join(" ")); err2.status = 400; throw err2; }
+      var priorMaxChars = MOCK_RAG_ACTIVE_CONFIG ? MOCK_RAG_ACTIVE_CONFIG.chunking.max_chars : MOCK_RAG_DEFAULT_CONFIG.chunking.max_chars;
+      if (MOCK_RAG_DRAFT_CONFIG.chunking.max_chars !== priorMaxChars && !acknowledgeReindexImpact) {
+        var err3 = new Error(
+          "This draft changes chunking.max_chars, which does not retroactively apply to resumes already indexed -- "
+          + "their embeddings were built against the old chunk boundaries and will not reflect this change until "
+          + "those resumes are reprocessed. Resend with acknowledge_reindex_impact to activate anyway."
+        );
+        err3.status = 409; throw err3;
+      }
+      MOCK_RAG_ACTIVE_CONFIG = Object.assign({}, MOCK_RAG_DRAFT_CONFIG, { id: "active", lifecycle_status: "active", updated_by: actor.username, updated_at: new Date().toISOString() });
+      MOCK_RAG_DRAFT_CONFIG = null;
+      _mockRecordRagConfigChange("activated", actor.username, { config_version: MOCK_RAG_ACTIVE_CONFIG.config_version, chunking: MOCK_RAG_ACTIVE_CONFIG.chunking, retrieval: MOCK_RAG_ACTIVE_CONFIG.retrieval, generation: MOCK_RAG_ACTIVE_CONFIG.generation });
+      return mockDelay(MOCK_RAG_ACTIVE_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getRagConfigHistory: function (limit) {
+    try {
+      _mockRequirePermission("rag.config.read");
+      var history = MOCK_RAG_CONFIG_HISTORY.slice().sort(function (a, b) { return (a.recorded_at || "") < (b.recorded_at || "") ? 1 : -1; }).slice(0, limit || 50);
+      return mockDelay({ count: history.length, history: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  rollbackRagConfig: function (historyId) {
+    try {
+      var actor = _mockRequirePermission("rag.config.activate");
+      var entry = MOCK_RAG_CONFIG_HISTORY.filter(function (h) { return h.id === historyId; })[0];
+      if (!entry || entry.operation !== "activated") { var err = new Error("No activated configuration snapshot found for that history entry."); err.status = 404; throw err; }
+      var configVersion = (MOCK_RAG_ACTIVE_CONFIG ? MOCK_RAG_ACTIVE_CONFIG.config_version : 0) + 1;
+      MOCK_RAG_DRAFT_CONFIG = {
+        id: "draft", lifecycle_status: "draft", config_version: configVersion,
+        chunking: entry.safe_summary.chunking, retrieval: entry.safe_summary.retrieval, generation: entry.safe_summary.generation,
+        created_by: actor.username, created_at: new Date().toISOString(),
+      };
+      _mockRecordRagConfigChange("rolled_back_to_draft", actor.username, { rolled_back_to_history_id: historyId, config_version: configVersion });
+      return mockDelay(MOCK_RAG_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listRagPrompts: function () {
+    try {
+      _mockRequirePermission("rag.config.read");
+      return mockDelay({ prompts: MOCK_RAG_PROMPT_VERSIONS });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  createRagPromptDraft: function (promptId, template) {
+    try {
+      var actor = _mockRequirePermission("rag.prompts.manage");
+      var defaults = MOCK_RAG_PROMPT_DEFAULTS[promptId];
+      if (!defaults) { var err1 = new Error("Unknown prompt_id '" + promptId + "'."); err1.status = 404; throw err1; }
+      var missing = defaults.input_variables.filter(function (v) { return template.indexOf("{" + v + "}") === -1; });
+      if (missing.length) { var err2 = new Error("Template is missing required placeholder(s): " + JSON.stringify(missing) + "."); err2.status = 400; throw err2; }
+      var existing = MOCK_RAG_PROMPT_VERSIONS[promptId] || [];
+      var nextVersion = existing.reduce(function (max, v) { return Math.max(max, v.version); }, 0) + 1;
+      var doc = { id: promptId + ":v" + nextVersion, prompt_id: promptId, version: nextVersion, template: template, status: "draft", created_by: actor.username, created_at: new Date().toISOString() };
+      MOCK_RAG_PROMPT_VERSIONS[promptId] = existing.concat([doc]);
+      _mockRecordRagConfigChange("prompt_draft_created", actor.username, { prompt_id: promptId, version: nextVersion });
+      return mockDelay(doc);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateRagPromptVersion: function (promptId, version) {
+    try {
+      var actor = _mockRequirePermission("rag.prompts.manage");
+      version = Number(version);
+      var versions = MOCK_RAG_PROMPT_VERSIONS[promptId] || [];
+      var target = versions.filter(function (v) { return v.version === version; })[0];
+      if (!target) { var err = new Error("Prompt '" + promptId + "' has no version " + version + "."); err.status = 404; throw err; }
+      versions.forEach(function (v) { if (v.status === "active" && v.version !== version) v.status = "superseded"; });
+      target.status = "active";
+      _mockRecordRagConfigChange("prompt_activated", actor.username, { prompt_id: promptId, version: version });
+      return mockDelay(target);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  resumeProcessingReport: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      var extractionSpans = MOCK_AI_TRACES.filter(function (s) { return s.stage === "document_extraction"; });
+      var failed = extractionSpans.filter(function (s) { return s.status === "failed"; });
+      var succeeded = extractionSpans.filter(function (s) { return s.status === "succeeded"; }).length;
+      return mockDelay({
+        total_processing_attempts: extractionSpans.length, succeeded: succeeded, failed_count: failed.length,
+        failure_rate: extractionSpans.length ? Math.round((failed.length / extractionSpans.length) * 10000) / 10000 : null,
+        recent_failures: failed.slice(-20).map(function (s) { return { correlation_id: s.correlation_id, error: s.error, logged_at: s.logged_at }; }),
+        pending_queue_depth: null,
+        data_source: "Mock mode's illustrative AI trace data -- see MOCK_AI_TRACES.",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  communicationDeliveryReport: function () {
+    try {
+      _mockRequirePermission("comms.delivery.read");
+      var byChannel = {};
+      MOCK_COMMS_DELIVERY_LOG.forEach(function (d) {
+        var stats = byChannel[d.channel] || { submitted: 0, provider_accepted: 0, failed: 0 };
+        stats.submitted += 1;
+        if (d.outcome === "provider_accepted") stats.provider_accepted += 1;
+        else if (d.outcome === "failed") stats.failed += 1;
+        byChannel[d.channel] = stats;
+      });
+      return mockDelay({
+        count: MOCK_COMMS_DELIVERY_LOG.length, by_channel: byChannel, recent: MOCK_COMMS_DELIVERY_LOG.slice(0, 50),
+        note: "Mock mode has no real delivery log -- this reflects only what the Communications Configuration console's mock has recorded this session (likely nothing).",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getPersonaCatalogue: function () {
+    try {
+      _mockRequirePermission("roles.read");
+      return mockDelay({ personas: MOCK_PERSONA_CATALOGUE, validation_problems: [] });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getAzureReadiness: function () {
+    try {
+      _mockRequirePermission("azure.config.read");
+      var azStatus = _mockAzCliAccountStatus();
+      var services = MOCK_INTEGRATION_INSTANCES.map(function (i) { return _mockReadinessRecord(i, azStatus); });
+      var registeredTypes = MOCK_INTEGRATION_INSTANCES.map(function (i) { return i.adapter_type; });
+      MOCK_ADAPTER_TYPE_IDS.forEach(function (adapterType) {
+        if (registeredTypes.indexOf(adapterType) !== -1) return;
+        var adapter = MOCK_ADAPTER_TYPES[adapterType];
+        var verdict = _mockComputeReadiness(adapterType, null, azStatus.authenticated);
+        services.push({
+          integration_id: null, adapter_type: adapterType, service_name: adapter.name,
+          status: verdict.status, status_definition: MOCK_AZURE_READINESS_STATUS_DEFINITIONS[verdict.status],
+          reason: verdict.status !== "UNKNOWN" ? verdict.reason : "No instance of this integration is registered yet.",
+          environment: null, display_name: null, enabled: false, missing_configuration: [],
+          last_validated_at: null, last_successful_validation_at: null, validated_against: "config_only",
+          recommended_next_action: adapter.status !== "planned" ? "Register an instance from the Azure Service Hub console." : _mockReadinessRecommendedNextAction(verdict.status, adapterType),
+        });
+      });
+      return mockDelay({ count: services.length, services: services, azure_cli: azStatus });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getAzureReadinessCliStatus: function () {
+    try {
+      _mockRequirePermission("azure.read");
+      return mockDelay({
+        cli: { installed: false, version: null, detail: "Azure CLI is a local developer-machine concept -- not detectable from a browser tab running mock mode." },
+        account: _mockAzCliAccountStatus(),
+        subscriptions: { subscriptions: [], detail: "Not authenticated." },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getAzureCostUsage: function () {
+    try {
+      _mockRequirePermission("azure.read");
+      return mockDelay({
+        configured: false,
+        resources: { resources: [], detail: "Mock mode cannot reach the real Azure CLI or Cost Management API -- switch config.js to \"real\" mode with AZURE_RESOURCE_GROUP set to see real cost/usage." },
+        cost: { available: false, currency: null, total: null, by_resource: [],
+          detail: "Mock mode cannot reach the real Azure CLI or Cost Management API -- switch config.js to \"real\" mode with AZURE_RESOURCE_GROUP set to see real cost/usage." },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getObservabilityReportSummary: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      var unavailable = "Mock mode cannot reach the real Azure Monitor/Log Analytics query API -- switch config.js to \"real\" mode with AZURE_LOG_ANALYTICS_WORKSPACE_ID set to see real telemetry.";
+      return mockDelay({
+        reporting_period_hours: 24,
+        generated_at: new Date().toISOString(),
+        overall_status: "NOT_CONFIGURED",
+        telemetry_health: { azure_configured: false, ingestion_confirmed: false, last_ingested_at: null, reason: "not_configured", detail: unavailable },
+        azure_telemetry: { configured: false, total_requests: null, succeeded_requests: null, failed_requests: null,
+          success_rate: null, failure_rate: null, latency: { available: false, reason: "not_configured", detail: unavailable },
+          ai_requests: null, ai_total_tokens: null, ai_total_cost_usd: null, unavailable_reason: "not_configured" },
+        local_observability: { llm_calls: { total_calls: 0, total_tokens: 0, total_cost_usd: 0, by_label: [] },
+          ai_traces: { total_traces: 0 }, note: "Mock mode -- local observability data is simulated/empty here too (see AI Observability Center for the real local view in real mode)." },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+  getObservabilityReportTelemetry: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      var unavailable = "Mock mode cannot reach the real Azure Monitor/Log Analytics query API -- switch config.js to \"real\" mode with AZURE_LOG_ANALYTICS_WORKSPACE_ID set to see real telemetry.";
+      return mockDelay({
+        reporting_period_hours: 24,
+        request_volume: { available: false, reason: "not_configured", detail: unavailable, buckets: [] },
+        ai_usage: { available: false, reason: "not_configured", detail: unavailable, by_model: [] },
+        recent_errors: { available: false, reason: "not_configured", detail: unavailable, errors: [] },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+  exportObservabilityReportCsv: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      return mockDelay("timestamp,total,succeeded,failed\n");
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  validateAzureReadiness: function (integrationId) {
+    try {
+      var actor = _mockRequirePermission("azure.manage");
+      var instance = _mockGetIntegrationInstance(integrationId);
+      if (!instance) { var err = new Error("Integration '" + integrationId + "' not found."); err.status = 404; throw err; }
+      var result = _mockCheckConnection(instance.adapter_type);
+      result.integration_id = integrationId;
+      MOCK_INTEGRATION_HEALTH_CHECKS.push(result);
+      instance.last_connection_outcome = result.outcome;
+      instance.last_health_checked_at = result.checked_at;
+      instance.last_failure = result.outcome === "healthy" ? null : { outcome: result.outcome, error_category: result.error_category, detail: result.detail, checked_at: result.checked_at };
+      return mockDelay(_mockReadinessRecord(instance, _mockAzCliAccountStatus()));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  validateAllAzureReadiness: function () {
+    try {
+      _mockRequirePermission("azure.manage");
+      var azStatus = _mockAzCliAccountStatus();
+      var results = MOCK_INTEGRATION_INSTANCES.map(function (instance) {
+        if (MOCK_ADAPTER_TYPES[instance.adapter_type].status === "planned") return _mockReadinessRecord(instance, azStatus);
+        var result = _mockCheckConnection(instance.adapter_type);
+        result.integration_id = instance.id;
+        MOCK_INTEGRATION_HEALTH_CHECKS.push(result);
+        instance.last_connection_outcome = result.outcome;
+        instance.last_health_checked_at = result.checked_at;
+        instance.last_failure = result.outcome === "healthy" ? null : { outcome: result.outcome, error_category: result.error_category, detail: result.detail, checked_at: result.checked_at };
+        return _mockReadinessRecord(instance, azStatus);
+      });
+      return mockDelay({ count: results.length, services: results });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listEphemeralTests: function () {
+    try {
+      _mockRequirePermission("azure.config.read");
+      return mockDelay({ count: MOCK_EPHEMERAL_TEST_RUNS.length, runs: MOCK_EPHEMERAL_TEST_RUNS.slice().reverse(), allowed_resource_plans: MOCK_EPHEMERAL_RESOURCE_PLANS });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  planEphemeralTest: function (resourcePlanId, region) {
+    try {
+      var actor = _mockRequirePermission("azure.manage");
+      var plan = MOCK_EPHEMERAL_RESOURCE_PLANS[resourcePlanId];
+      if (!plan) { var err = new Error("Unknown or unapproved resource plan '" + resourcePlanId + "'. Allowed: " + Object.keys(MOCK_EPHEMERAL_RESOURCE_PLANS).join(", ") + "."); err.status = 400; throw err; }
+      if (plan.allowed_regions.indexOf(region) === -1) { var err2 = new Error("Region '" + region + "' is not in this plan's allowed region list: " + plan.allowed_regions.join(", ") + "."); err2.status = 400; throw err2; }
+      var runId = Math.random().toString(36).slice(2, 10);
+      var run = {
+        id: runId, run_id: runId, resource_plan_id: resourcePlanId, status: "AWAITING_APPROVAL",
+        requested_by: actor.username, region: region, resource_group_name: "rg-cdpi-ephemeral-" + runId,
+        storage_account_name: "cdpieph" + runId, estimated_cost_usd_per_hour: plan.estimated_cost_usd_per_hour,
+        max_duration_minutes: plan.max_duration_minutes,
+        tags: { project: "CDPI", purpose: "ephemeral-integration-test", testRunId: runId, managedBy: "CDPI-test-runner", createdAt: new Date().toISOString() },
+        test_status: null, cleanup_status: null, resources_actually_created: [],
+        created_at: new Date().toISOString(), approved: false, approved_by: null, blocked_reason: null,
+      };
+      MOCK_EPHEMERAL_TEST_RUNS.push(run);
+      return mockDelay(run);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  approveEphemeralTest: function (runId) {
+    try {
+      var actor = _mockRequirePermission("azure.manage");
+      var run = MOCK_EPHEMERAL_TEST_RUNS.filter(function (r) { return r.run_id === runId; })[0];
+      if (!run) { var err = new Error("Test run '" + runId + "' not found."); err.status = 404; throw err; }
+      if (run.status !== "AWAITING_APPROVAL") { var err2 = new Error("Run is in status '" + run.status + "', not AWAITING_APPROVAL."); err2.status = 400; throw err2; }
+      run.approved = true;
+      run.approved_by = actor.username;
+      return mockDelay(run);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  executeEphemeralTest: function (runId) {
+    // Mock mode can never provision real Azure resources -- this always,
+    // honestly, reports the same AUTHENTICATION_REQUIRED block the real
+    // backend reports in an environment with no 'az login' session,
+    // never a fabricated PROVISIONED/TEST_PASSED result.
+    try {
+      _mockRequirePermission("azure.manage");
+      var run = MOCK_EPHEMERAL_TEST_RUNS.filter(function (r) { return r.run_id === runId; })[0];
+      if (!run) { var err = new Error("Test run '" + runId + "' not found."); err.status = 404; throw err; }
+      if (!run.approved) {
+        run.status = "BLOCKED";
+        run.blocked_reason = "This run has not been explicitly approved -- refusing to provision anything.";
+      } else {
+        run.status = "BLOCKED";
+        run.blocked_reason = "Azure CLI authentication required: " + _mockAzCliAccountStatus().detail;
+      }
+      return mockDelay(run);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  cleanupEphemeralTest: function (runId) {
+    try {
+      _mockRequirePermission("azure.manage");
+      var run = MOCK_EPHEMERAL_TEST_RUNS.filter(function (r) { return r.run_id === runId; })[0];
+      if (!run) { var err = new Error("Test run '" + runId + "' not found."); err.status = 404; throw err; }
+      run.cleanup_status = "CLEANUP_FAILED";
+      run.blocked_reason = "Nothing to clean up for a run in status '" + run.status + "' (no resources were ever provisioned in mock mode).";
+      return mockDelay(run);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  testAzureAiFoundry: function () {
+    // Mock mode has no real AZURE_OPENAI_* configuration to read (it's a
+    // browser tab, not this app's real backend process) -- always
+    // honestly reports "not configured" rather than guessing.
+    try {
+      _mockRequirePermission("azure.manage");
+      return mockDelay({
+        configured: false, chat: null, embedding: null,
+        detail: "Mock mode cannot read real AZURE_OPENAI_* configuration. Switch config.js to mode:\"real\" against a deployed backend to run this for real.",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  testApplicationInsightsTelemetry: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      var correlationId = "connectivity-test-" + Math.random().toString(36).slice(2, 10);
+      return mockDelay({
+        correlation_id: correlationId, trace_id: correlationId, span_id: correlationId,
+        written_to_local_log: false, local_log_path: null,
+        application_insights_configured: false, application_insights_handed_off: false,
+        note: "Mock mode has no real local log file or Application Insights connection -- this is a simulated result, not a real telemetry emission. Switch config.js to mode:\"real\" to run this for real.",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getCommsConfig: function () {
+    try {
+      _mockRequirePermission("comms.config.read");
+      return mockDelay({
+        active: MOCK_COMMS_ACTIVE_CONFIG || Object.assign({}, MOCK_COMMS_DEFAULT_CONFIG, { id: "active", config_version: 0, note: "Never activated -- real send paths use their built-in defaults." }),
+        draft: MOCK_COMMS_DRAFT_CONFIG, channels: MOCK_COMMS_CHANNELS,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  validateCommsConfig: function (config) {
+    try {
+      _mockRequirePermission("comms.config.write");
+      var errors = _mockValidateCommsConfig(config);
+      return mockDelay({ valid: errors.length === 0, errors: errors });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  saveCommsConfigDraft: function (config) {
+    try {
+      var actor = _mockRequirePermission("comms.config.write");
+      var errors = _mockValidateCommsConfig(config);
+      if (errors.length) { var err = new Error("Invalid configuration: " + errors.join(" ")); err.status = 400; throw err; }
+      var configVersion = (MOCK_COMMS_ACTIVE_CONFIG ? MOCK_COMMS_ACTIVE_CONFIG.config_version : 0) + 1;
+      MOCK_COMMS_DRAFT_CONFIG = Object.assign({ id: "draft", lifecycle_status: "draft", config_version: configVersion, created_by: actor.username, created_at: new Date().toISOString() }, config);
+      _mockRecordCommsConfigChange("draft_saved", actor.username, { config_version: configVersion });
+      return mockDelay(MOCK_COMMS_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateCommsConfig: function () {
+    try {
+      var actor = _mockRequirePermission("comms.config.activate");
+      if (!MOCK_COMMS_DRAFT_CONFIG) { var err1 = new Error("No draft configuration exists to activate."); err1.status = 404; throw err1; }
+      var errors = _mockValidateCommsConfig(MOCK_COMMS_DRAFT_CONFIG);
+      if (errors.length) { var err2 = new Error("Cannot activate an invalid draft: " + errors.join(" ")); err2.status = 400; throw err2; }
+      MOCK_COMMS_ACTIVE_CONFIG = Object.assign({}, MOCK_COMMS_DRAFT_CONFIG, { id: "active", lifecycle_status: "active", updated_by: actor.username, updated_at: new Date().toISOString() });
+      MOCK_COMMS_DRAFT_CONFIG = null;
+      _mockRecordCommsConfigChange("activated", actor.username, { config_version: MOCK_COMMS_ACTIVE_CONFIG.config_version, email: MOCK_COMMS_ACTIVE_CONFIG.email, whatsapp: MOCK_COMMS_ACTIVE_CONFIG.whatsapp, delivery_policies: MOCK_COMMS_ACTIVE_CONFIG.delivery_policies });
+      return mockDelay(MOCK_COMMS_ACTIVE_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getCommsConfigHistory: function (limit) {
+    try {
+      _mockRequirePermission("comms.config.read");
+      var history = MOCK_COMMS_CONFIG_HISTORY.slice().sort(function (a, b) { return (a.recorded_at || "") < (b.recorded_at || "") ? 1 : -1; }).slice(0, limit || 50);
+      return mockDelay({ count: history.length, history: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  rollbackCommsConfig: function (historyId) {
+    try {
+      var actor = _mockRequirePermission("comms.config.activate");
+      var entry = MOCK_COMMS_CONFIG_HISTORY.filter(function (h) { return h.id === historyId; })[0];
+      if (!entry || entry.operation !== "activated") { var err = new Error("No activated configuration snapshot found for that history entry."); err.status = 404; throw err; }
+      var configVersion = (MOCK_COMMS_ACTIVE_CONFIG ? MOCK_COMMS_ACTIVE_CONFIG.config_version : 0) + 1;
+      MOCK_COMMS_DRAFT_CONFIG = {
+        id: "draft", lifecycle_status: "draft", config_version: configVersion,
+        email: entry.safe_summary.email, whatsapp: entry.safe_summary.whatsapp, delivery_policies: entry.safe_summary.delivery_policies,
+        created_by: actor.username, created_at: new Date().toISOString(),
+      };
+      _mockRecordCommsConfigChange("rolled_back_to_draft", actor.username, { rolled_back_to_history_id: historyId, config_version: configVersion });
+      return mockDelay(MOCK_COMMS_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getInterviewBotConfig: function () {
+    try {
+      _mockRequirePermission("comms.config.read");
+      return mockDelay({
+        active: MOCK_INTERVIEW_BOT_ACTIVE_CONFIG || Object.assign({}, MOCK_INTERVIEW_BOT_DEFAULT_CONFIG, { id: "active", config_version: 0, note: "Never activated -- voicebot/voice_bot.py is running on its built-in hardcoded defaults." }),
+        draft: MOCK_INTERVIEW_BOT_DRAFT_CONFIG,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  saveInterviewBotConfigDraft: function (config) {
+    try {
+      var actor = _mockRequirePermission("comms.config.write");
+      var fields = {};
+      Object.keys(MOCK_INTERVIEW_BOT_DEFAULT_CONFIG).forEach(function (k) { fields[k] = config[k] !== undefined ? config[k] : MOCK_INTERVIEW_BOT_DEFAULT_CONFIG[k]; });
+      var errors = _mockValidateInterviewBotConfig(fields);
+      if (errors.length) { var err = new Error("Invalid configuration: " + errors.join(" ")); err.status = 400; throw err; }
+      var configVersion = (MOCK_INTERVIEW_BOT_ACTIVE_CONFIG ? MOCK_INTERVIEW_BOT_ACTIVE_CONFIG.config_version : 0) + 1;
+      MOCK_INTERVIEW_BOT_DRAFT_CONFIG = Object.assign({ id: "draft", lifecycle_status: "draft", config_version: configVersion, created_by: actor.username, created_at: new Date().toISOString() }, fields);
+      _mockRecordCommsConfigChange("interview_bot_draft_saved", actor.username, { config_version: configVersion });
+      return mockDelay(MOCK_INTERVIEW_BOT_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateInterviewBotConfig: function () {
+    try {
+      var actor = _mockRequirePermission("comms.config.activate");
+      if (!MOCK_INTERVIEW_BOT_DRAFT_CONFIG) { var err = new Error("No draft interview bot configuration exists to activate."); err.status = 404; throw err; }
+      MOCK_INTERVIEW_BOT_ACTIVE_CONFIG = Object.assign({}, MOCK_INTERVIEW_BOT_DRAFT_CONFIG, { id: "active", lifecycle_status: "active", updated_by: actor.username, updated_at: new Date().toISOString() });
+      MOCK_INTERVIEW_BOT_DRAFT_CONFIG = null;
+      _mockRecordCommsConfigChange("interview_bot_activated", actor.username, { config_version: MOCK_INTERVIEW_BOT_ACTIVE_CONFIG.config_version });
+      return mockDelay(MOCK_INTERVIEW_BOT_ACTIVE_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  listCommsTemplates: function () {
+    try {
+      _mockRequirePermission("comms.config.read");
+      return mockDelay({ templates: MOCK_COMMS_TEMPLATE_VERSIONS });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  createCommsTemplateDraft: function (templateId, subject, body) {
+    try {
+      var actor = _mockRequirePermission("comms.templates.manage");
+      var defaults = MOCK_TEMPLATE_DEFAULTS[templateId];
+      if (!defaults) { var err1 = new Error("Unknown template_id '" + templateId + "'."); err1.status = 404; throw err1; }
+      var missing = defaults.input_variables.filter(function (v) { return body.indexOf("{" + v + "}") === -1; });
+      if (missing.length) { var err2 = new Error("Template body is missing required placeholder(s): " + JSON.stringify(missing) + "."); err2.status = 400; throw err2; }
+      var existing = MOCK_COMMS_TEMPLATE_VERSIONS[templateId] || [];
+      var nextVersion = existing.reduce(function (max, v) { return Math.max(max, v.version); }, 0) + 1;
+      var doc = { id: templateId + ":v" + nextVersion, template_id: templateId, version: nextVersion, subject: subject, body: body, status: "draft", created_by: actor.username, created_at: new Date().toISOString() };
+      MOCK_COMMS_TEMPLATE_VERSIONS[templateId] = existing.concat([doc]);
+      _mockRecordCommsConfigChange("template_draft_created", actor.username, { template_id: templateId, version: nextVersion });
+      return mockDelay(doc);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateCommsTemplateVersion: function (templateId, version) {
+    try {
+      var actor = _mockRequirePermission("comms.templates.manage");
+      version = Number(version);
+      var versions = MOCK_COMMS_TEMPLATE_VERSIONS[templateId] || [];
+      var target = versions.filter(function (v) { return v.version === version; })[0];
+      if (!target) { var err = new Error("Template '" + templateId + "' has no version " + version + "."); err.status = 404; throw err; }
+      versions.forEach(function (v) { if (v.status === "active" && v.version !== version) v.status = "superseded"; });
+      target.status = "active";
+      _mockRecordCommsConfigChange("template_activated", actor.username, { template_id: templateId, version: version });
+      return mockDelay(target);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  previewCommsTemplate: function (templateId) {
+    try {
+      _mockRequirePermission("comms.config.read");
+      var defaults = MOCK_TEMPLATE_DEFAULTS[templateId];
+      if (!defaults) { var err = new Error("Unknown template_id '" + templateId + "'."); err.status = 404; throw err; }
+      var versions = MOCK_COMMS_TEMPLATE_VERSIONS[templateId] || [];
+      var active = versions.filter(function (v) { return v.status === "active"; })[0] || Object.assign({ version: "default" }, defaults);
+      function render(text) { return text.replace(/\{(\w+)\}/g, function (m, key) { return MOCK_TEMPLATE_PREVIEW_EXAMPLE_DATA[key] !== undefined ? MOCK_TEMPLATE_PREVIEW_EXAMPLE_DATA[key] : m; }); }
+      return mockDelay({ template_id: templateId, version: active.version, is_synthetic_example_data: true, rendered_subject: render(active.subject || ""), rendered_body: render(active.body) });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  testEmailConnectivity: function () {
+    try {
+      _mockRequirePermission("comms.test.send");
+      return mockDelay({ outcome: "unknown", error_category: "configuration_invalid", detail: "Mock mode has no real SMTP server to check against.", duration_ms: 1.0 });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  sendTestEmail: function (to, subject, body) {
+    try {
+      _mockRequirePermission("comms.test.send");
+      if (!to) { var err = new Error("'to' (an explicit recipient email address) is required."); err.status = 400; throw err; }
+      var rejectErr = new Error("Mock mode has no real SMTP server -- no test email was actually sent. Switch config.js to mode:\"real\" against a deployed backend to send a real test email.");
+      rejectErr.status = 502;
+      return Promise.reject(rejectErr);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  testWhatsappConnectivity: function () {
+    try {
+      _mockRequirePermission("comms.test.send");
+      return mockDelay({ outcome: "unknown", error_category: "configuration_invalid", detail: "Mock mode has no real WhatsApp Graph API access to check against.", duration_ms: 1.0 });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getCommsDeliveryLog: function (correlationId) {
+    try {
+      _mockRequirePermission("comms.delivery.read");
+      var deliveries = MOCK_COMMS_DELIVERY_LOG.filter(function (d) { return d.correlation_id === correlationId; });
+      return mockDelay({ count: deliveries.length, deliveries: deliveries });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  previewRagConfig: function (jdText, options) {
+    try {
+      _mockRequirePermission("rag.preview.run");
+      options = options || {};
+      var emptyRetrieval = { chunks: [], latency_ms: 0, total_candidates: 0, insufficient_evidence: true };
+      if (options.compare) {
+        return mockDelay({
+          retrieval: null, generation: null,
+          compare: { active: emptyRetrieval, draft: MOCK_RAG_DRAFT_CONFIG ? Object.assign({}, emptyRetrieval) : null },
+        });
+      }
+      return mockDelay({
+        retrieval: emptyRetrieval, compare: null,
+        generation: options.includeGeneration ? { error: "Mock mode has no real semantic index to retrieve from, so generation preview has nothing to run against." } : null,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
 };
+
+// Mirrors api_blueprint.py's _ai_trace_summary()/_percentile()/
+// _latency_stats()/_cost_breakdown()/_instrumentation_coverage()/
+// _group_spans_into_traces() -- same logic, not a second invented shape.
+var _MOCK_MIN_SAMPLE_FOR_PERCENTILE = 5;
+var _MOCK_DOCUMENTED_STAGES = [
+  "document_extraction", "chunking", "embedding_generation", "retrieval_ranking",
+  "resume_chunk_summarization", "resume_merge_structured_extraction",
+  "output_parsing_validation", "persistence",
+];
+var _MOCK_STAGES_NOT_APPLICABLE = [
+  "vector_indexing (no separate indexing service -- LocalVectorStore.add() is part of the embedding step)",
+  "safety_checks (no content-safety/moderation pass exists anywhere in this repo)",
+  "citation_grounding_checks (no RAG citation mechanism exists -- resume scoring doesn't cite retrieved chunks)",
+];
+
+function _mockAiTraceSummary(spans) {
+  var byWorkflow = {};
+  spans.forEach(function (s) {
+    var stats = byWorkflow[s.workflow] || { total: 0, succeeded: 0, failed: 0, started: 0, _durationSum: 0 };
+    stats.total += 1;
+    if (stats[s.status] !== undefined) stats[s.status] += 1;
+    stats._durationSum += s.duration_ms || 0;
+    byWorkflow[s.workflow] = stats;
+  });
+  Object.keys(byWorkflow).forEach(function (wf) {
+    var stats = byWorkflow[wf];
+    var completed = stats.succeeded + stats.failed;
+    stats.avg_duration_ms = completed ? Math.round((stats._durationSum / completed) * 10) / 10 : null;
+    delete stats._durationSum;
+  });
+  var distinctTraces = {};
+  spans.forEach(function (s) { if (s.trace_id) distinctTraces[s.trace_id] = true; });
+  return { total_spans: spans.length, distinct_traces: Object.keys(distinctTraces).length, by_workflow: byWorkflow };
+}
+
+function _mockPercentile(values, p) {
+  var clean = values.filter(function (v) { return v !== null && v !== undefined; }).slice().sort(function (a, b) { return a - b; });
+  if (clean.length < _MOCK_MIN_SAMPLE_FOR_PERCENTILE) return null;
+  var k = Math.max(0, Math.min(clean.length - 1, Math.round((p / 100) * (clean.length - 1))));
+  return Math.round(clean[k] * 10) / 10;
+}
+
+function _mockLatencyStats(durations) {
+  var clean = durations.filter(function (v) { return v !== null && v !== undefined; });
+  var avg = clean.length ? Math.round((clean.reduce(function (a, b) { return a + b; }, 0) / clean.length) * 10) / 10 : null;
+  return {
+    sample_count: clean.length, avg_ms: avg,
+    p50_ms: _mockPercentile(clean, 50), p95_ms: _mockPercentile(clean, 95), p99_ms: _mockPercentile(clean, 99),
+    insufficient_sample: clean.length < _MOCK_MIN_SAMPLE_FOR_PERCENTILE,
+  };
+}
+
+function _mockCostBreakdown(spans) {
+  var byWorkflow = {}, byModel = {}, total = 0, pricedCount = 0;
+  spans.forEach(function (s) {
+    var meta = s.metadata || {};
+    if (meta.cost_usd === undefined || meta.cost_usd === null) return;
+    pricedCount += 1;
+    total += meta.cost_usd;
+    byWorkflow[s.workflow] = Math.round(((byWorkflow[s.workflow] || 0) + meta.cost_usd) * 1e8) / 1e8;
+    var model = meta.model || "unknown";
+    byModel[model] = Math.round(((byModel[model] || 0) + meta.cost_usd) * 1e8) / 1e8;
+  });
+  return {
+    total_cost_usd: Math.round(total * 1e6) / 1e6, priced_span_count: pricedCount,
+    by_workflow: byWorkflow, by_model: byModel,
+    pricing_version: "2026-10-20.1", pricing_source: "OpenAI published list pricing, manually entered -- not a live pricing API.",
+    pricing_last_updated: "2026-10-20",
+  };
+}
+
+function _mockInstrumentationCoverage(observedStageList) {
+  var observed = {};
+  observedStageList.forEach(function (s) { observed[s] = true; });
+  var documented = _MOCK_DOCUMENTED_STAGES.slice().sort();
+  var covered = documented.filter(function (s) { return observed[s]; });
+  var missing = documented.filter(function (s) { return !observed[s]; });
+  return {
+    documented_stage_count: documented.length, covered_stage_count: covered.length,
+    coverage_pct: documented.length ? Math.round((covered.length / documented.length) * 1000) / 10 : null,
+    covered_stages: covered, uninstrumented_stages: missing,
+    not_applicable_to_this_repo: _MOCK_STAGES_NOT_APPLICABLE,
+  };
+}
+
+function _mockGroupSpansIntoTraces(spans) {
+  var byTrace = {};
+  spans.forEach(function (s) {
+    if (!s.trace_id) return;
+    (byTrace[s.trace_id] = byTrace[s.trace_id] || []).push(s);
+  });
+  return Object.keys(byTrace).map(function (traceId) {
+    var traceSpans = byTrace[traceId].slice().sort(function (a, b) { return (a.logged_at || "") < (b.logged_at || "") ? -1 : 1; });
+    var hasFailed = traceSpans.some(function (s) { return s.status === "failed"; });
+    var hasStarted = traceSpans.some(function (s) { return s.status === "started"; });
+    var durations = traceSpans.map(function (s) { return s.duration_ms; }).filter(function (d) { return d !== null && d !== undefined; });
+    var costs = traceSpans.map(function (s) { return (s.metadata || {}).cost_usd; }).filter(function (c) { return c !== null && c !== undefined; });
+    var correlationId = traceSpans.map(function (s) { return s.correlation_id; }).filter(Boolean)[0] || null;
+    var workflows = Array.from(new Set(traceSpans.map(function (s) { return s.workflow; }).filter(Boolean)));
+    return {
+      trace_id: traceId, correlation_id: correlationId,
+      workflow: workflows.length === 1 ? workflows[0] : (workflows.length ? "mixed" : "unknown"),
+      status: hasFailed ? "failed" : (hasStarted ? "started" : "succeeded"),
+      span_count: traceSpans.length, stages: traceSpans.map(function (s) { return s.stage; }),
+      started_at: traceSpans.length ? traceSpans[0].logged_at : null,
+      ended_at: traceSpans.length ? traceSpans[traceSpans.length - 1].logged_at : null,
+      total_duration_ms: durations.length ? Math.round(durations.reduce(function (a, b) { return a + b; }, 0) * 10) / 10 : null,
+      total_cost_usd: costs.length ? Math.round(costs.reduce(function (a, b) { return a + b; }, 0) * 1e8) / 1e8 : null,
+      has_error: hasFailed,
+    };
+  });
+}
+
+function _mockLlmObservabilitySummary() {
+  return {
+    total_calls: 23, total_tokens: 15420, total_cost_usd: 0.028114,
+    by_label: {
+      resume_chunk_summarization: { calls: 12, tokens: 7230, cost_usd: 0.011568 },
+      resume_merge_structured_extraction: { calls: 4, tokens: 5890, cost_usd: 0.009547 },
+      interview_questions_generation: { calls: 4, tokens: 1680, cost_usd: 0.002688 },
+      voicebot_transcript_scoring: { calls: 3, tokens: 620, cost_usd: 0.004311 },
+    },
+  };
+}
+
+// Illustrative only -- see the "AI Observability Center" comment above on
+// window.CDPI_MOCK_API for why this is clearly mock-only demo data, not a
+// claim about real pipeline runs. Mirrors the real backend's
+// logs/ai_traces.jsonl record shape exactly (observability.record_ai_trace()).
+// Each span's shape mirrors observability.record_ai_trace()'s real
+// record exactly (trace_id groups a workflow run, span_id is unique per
+// stage, correlation_id is the external business key). Two full
+// resume_parsing traces below (trace-rp-1, trace-rp-2) show the real
+// multi-stage shape ResumeParser.py now produces end to end; the rest
+// are standalone single-span traces, same as a call site that doesn't
+// pass a trace_id gets in the real backend.
+var MOCK_AI_TRACES = [
+  // trace-rp-1: one resume parsed successfully, full pipeline.
+  { trace_id: "trace-rp-1", span_id: "span-1a", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "document_extraction", status: "succeeded", duration_ms: 180.2, metadata: {}, error: null, logged_at: "2026-10-19T09:15:00Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1b", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "chunking", status: "succeeded", duration_ms: 42.5, metadata: {}, error: null, logged_at: "2026-10-19T09:15:00Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1c", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "embedding_generation", status: "succeeded", duration_ms: 240.7, metadata: { model: "text-embedding-3-small", total_tokens: 1180, cost_usd: 0.0000236, cost_source: "documented_estimate" }, error: null, logged_at: "2026-10-19T09:15:01Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1d", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "retrieval_ranking", status: "succeeded", duration_ms: 3.1, metadata: { top_k: 5, total_chunks: 9 }, error: null, logged_at: "2026-10-19T09:15:01Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1e", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "resume_chunk_summarization", status: "succeeded", duration_ms: 812.4, metadata: { model: "gpt-3.5-turbo", provider: "openai", total_tokens: 602, cost_usd: 0.0009, cost_source: "langchain_openai_callback", prompt_version: "v1" }, error: null, logged_at: "2026-10-19T09:15:03Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1f", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "resume_merge_structured_extraction", status: "succeeded", duration_ms: 1340.1, metadata: { model: "gpt-3.5-turbo", provider: "openai", total_tokens: 1472, cost_usd: 0.0021, cost_source: "langchain_openai_callback", prompt_version: "v2" }, error: null, logged_at: "2026-10-19T09:15:05Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1g", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "output_parsing_validation", status: "succeeded", duration_ms: 0.8, metadata: {}, error: null, logged_at: "2026-10-19T09:15:05Z" },
+  { trace_id: "trace-rp-1", span_id: "span-1h", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "persistence", status: "succeeded", duration_ms: 95.3, metadata: {}, error: null, logged_at: "2026-10-19T09:15:06Z" },
+
+  // trace-rp-2: a second resume where the merge step's JSON output failed to validate.
+  { trace_id: "trace-rp-2", span_id: "span-2a", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "document_extraction", status: "succeeded", duration_ms: 165.0, metadata: {}, error: null, logged_at: "2026-10-19T10:02:00Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2b", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "chunking", status: "succeeded", duration_ms: 38.0, metadata: {}, error: null, logged_at: "2026-10-19T10:02:00Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2c", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "embedding_generation", status: "succeeded", duration_ms: 255.0, metadata: { model: "text-embedding-3-small", total_tokens: 1340, cost_usd: 0.0000268, cost_source: "documented_estimate" }, error: null, logged_at: "2026-10-19T10:02:01Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2d", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "resume_chunk_summarization", status: "succeeded", duration_ms: 790.0, metadata: { model: "gpt-3.5-turbo", total_tokens: 580, cost_usd: 0.00087, cost_source: "langchain_openai_callback", prompt_version: "v1" }, error: null, logged_at: "2026-10-19T10:02:03Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2e", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "resume_merge_structured_extraction", status: "succeeded", duration_ms: 1290.0, metadata: { model: "gpt-3.5-turbo", total_tokens: 1510, cost_usd: 0.0022, cost_source: "langchain_openai_callback", prompt_version: "v2" }, error: null, logged_at: "2026-10-19T10:02:05Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2f", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "output_parsing_validation", status: "failed", duration_ms: 0.5, metadata: {}, error: "JSONDecodeError: Expecting value: line 1 column 1 (char 0)", logged_at: "2026-10-19T10:02:05Z" },
+  { trace_id: "trace-rp-2", span_id: "span-2g", correlation_id: "cand-d4e5f6", workflow: "resume_parsing", stage: "persistence", status: "succeeded", duration_ms: 88.0, metadata: {}, error: null, logged_at: "2026-10-19T10:02:06Z" },
+
+  // Standalone single-span traces (no trace_id correlation attempted by their call sites).
+  { trace_id: "trace-dv-1", span_id: "span-3a", correlation_id: null, workflow: "document_verification", stage: "document_extraction", status: "succeeded", duration_ms: 2110.9, metadata: { model_id: "prebuilt-document" }, error: null, logged_at: "2026-10-19T11:02:11Z" },
+  { trace_id: "trace-dv-2", span_id: "span-3b", correlation_id: null, workflow: "document_verification", stage: "document_extraction", status: "failed", duration_ms: 430.2, metadata: { model_id: "prebuilt-document" }, error: "Document Intelligence is not available: Missing required secret(s): DOCUMENT_INTELLIGENCE_ENDPOINT, DOCUMENT_INTELLIGENCE_KEY.", logged_at: "2026-10-19T11:05:44Z" },
+  { trace_id: "trace-iq-1", span_id: "span-3c", correlation_id: null, workflow: "llm", stage: "interview_questions_generation", status: "succeeded", duration_ms: 980.3, metadata: { model: "gpt-3.5-turbo", total_tokens: 420, cost_usd: 0.0006, cost_source: "langchain_openai_callback" }, error: null, logged_at: "2026-10-19T12:30:02Z" },
+  { trace_id: "trace-vb-1", span_id: "span-3d", correlation_id: null, workflow: "llm", stage: "voicebot_transcript_scoring", status: "succeeded", duration_ms: 655.0, metadata: { model: "gpt-3.5-turbo", total_tokens: 310, cost_usd: 0.0004, cost_source: "langchain_openai_callback" }, error: null, logged_at: "2026-10-19T13:45:20Z" },
+];
+
+// Adapter TYPE registry -- mirrors azure_integrations.ADAPTER_TYPES exactly
+// (adapter_type/config_schema/capabilities/azure_resource_type), verified
+// against the real repo, not invented. Registering an INSTANCE of one of
+// these (MOCK_INTEGRATION_INSTANCES below) never accepts a secret VALUE --
+// only non-secret fields (display_name/environment/subscription_id/
+// resource_group) -- same rule as the real backend.
+var MOCK_ADAPTER_TYPES = {
+  cosmos_db: { adapter_type: "cosmos_db", name: "Azure Cosmos DB", category: "Data", status: "supported",
+    description: "Primary data store -- candidates, users, roles, pages, audit log, and every other container.",
+    source_module: "context-lake/client.py",
+    config_schema: [
+      { key: "COSMOS_ENDPOINT", label: "Endpoint URL", required: true, secret: false },
+      { key: "COSMOS_KEY", label: "Primary key", required: true, secret: true },
+      { key: "COSMOS_DATABASE", label: "Database name", required: true, secret: false },
+      { key: "subscription_id", label: "Azure subscription ID (for resource discovery)", required: false, secret: false },
+      { key: "resource_group", label: "Resource group (for resource discovery)", required: false, secret: false },
+    ],
+    auth_methods: ["key", "managed_identity"],
+    capabilities: { health_check: true, resource_discovery: true, resource_operations: [] },
+    azure_resource_type: "Microsoft.DocumentDB/databaseAccounts" },
+  blob_storage: { adapter_type: "blob_storage", name: "Azure Blob Storage", category: "Storage", status: "supported",
+    description: "Raw and parsed resume file storage (raw-resumes, parsed-resumes containers).",
+    source_module: "context-lake/blob_store.py",
+    config_schema: [
+      { key: "BLOB_CONNECTION_STRING", label: "Connection string", required: true, secret: true },
+      { key: "subscription_id", label: "Azure subscription ID (for resource discovery)", required: false, secret: false },
+      { key: "resource_group", label: "Resource group (for resource discovery)", required: false, secret: false },
+    ],
+    auth_methods: ["connection_string", "managed_identity"],
+    capabilities: { health_check: true, resource_discovery: true, resource_operations: [] },
+    azure_resource_type: "Microsoft.Storage/storageAccounts" },
+  document_intelligence: { adapter_type: "document_intelligence", name: "Azure AI Document Intelligence", category: "AI", status: "supported",
+    description: "Certificate/marksheet OCR and cross-check verification.",
+    source_module: "document_intelligence_client.py",
+    config_schema: [
+      { key: "DOCUMENT_INTELLIGENCE_ENDPOINT", label: "Endpoint URL", required: true, secret: false },
+      { key: "DOCUMENT_INTELLIGENCE_KEY", label: "API key", required: true, secret: true },
+    ],
+    auth_methods: ["key"],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null },
+  azure_speech: { adapter_type: "azure_speech", name: "Azure AI Speech", category: "AI", status: "supported",
+    description: "Voicebot interview text-to-speech and speech-to-text.",
+    source_module: "voicebot/azure_speech_utils.py",
+    config_schema: [
+      { key: "AZURE_SPEECH_KEY", label: "API key", required: true, secret: true },
+      { key: "AZURE_SPEECH_REGION", label: "Region", required: true, secret: false },
+    ],
+    auth_methods: ["key"],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null },
+  key_vault: { adapter_type: "key_vault", name: "Azure Key Vault", category: "Identity & Secrets", status: "supported",
+    description: "Centralized secret storage -- secrets_loader.py falls back to .env when this isn't configured.",
+    source_module: "secrets_loader.py",
+    config_schema: [{ key: "AZURE_KEY_VAULT_URL", label: "Vault URL", required: true, secret: false }],
+    auth_methods: ["managed_identity"],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null },
+  application_insights: { adapter_type: "application_insights", name: "Azure Application Insights", category: "Observability", status: "supported",
+    description: "Optional telemetry sink for LLM call and AI trace records.",
+    source_module: "observability.py",
+    config_schema: [{ key: "APPLICATIONINSIGHTS_CONNECTION_STRING", label: "Connection string", required: true, secret: true }],
+    auth_methods: ["connection_string"],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null },
+  // PLANNED, NOT IMPLEMENTED -- mirrors azure_integrations.ADAPTER_TYPES'
+  // azure_ai_foundry/azure_ai_search entries exactly (see that module's
+  // comment for the repo evidence: embeddings.py/llm_utils.py call plain
+  // OpenAI directly, vector_store.py's LocalVectorStore is local JSON+
+  // numpy, not Azure AI Search). Listed so the console can honestly show
+  // "Planned" rather than omitting them or implying they're active.
+  azure_ai_foundry: { adapter_type: "azure_ai_foundry", name: "Azure AI Foundry", category: "AI", status: "planned",
+    description: "Chat and embedding model hosting. NOT integrated -- this repo calls the plain OpenAI API "
+      + "directly via LangChain. Requires provisioning a Foundry project + deployments and new application code.",
+    source_module: null, config_schema: [], auth_methods: [],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null, requires_development_work: true },
+  azure_ai_search: { adapter_type: "azure_ai_search", name: "Azure AI Search", category: "Data", status: "planned",
+    description: "Vector search / retrieval index. NOT integrated -- this repo uses a local JSON+numpy "
+      + "cosine-similarity store (LocalVectorStore). Requires provisioning a Search service and a validated "
+      + "migration, not a drop-in swap.",
+    source_module: null, config_schema: [], auth_methods: [],
+    capabilities: { health_check: false, resource_discovery: false, resource_operations: [] },
+    azure_resource_type: null, requires_development_work: true },
+};
+var MOCK_ADAPTER_TYPE_IDS = Object.keys(MOCK_ADAPTER_TYPES);
+
+function _mockSecretPresence(adapterType) {
+  // Mock mode has no real secrets store -- every required secret field
+  // honestly reports "not present", same as a real unprovisioned
+  // deployment would (azure_integrations.py never fabricates presence).
+  var adapter = MOCK_ADAPTER_TYPES[adapterType];
+  var presence = {};
+  if (!adapter) return presence;
+  adapter.config_schema.forEach(function (f) { if (f.required) presence[f.key] = false; });
+  return presence;
+}
+
+function _mockValidateAdapterConfig(adapterType) {
+  var adapter = MOCK_ADAPTER_TYPES[adapterType];
+  if (adapter && adapter.status === "planned") {
+    return ["'" + adapter.name + "' is planned but not implemented in this repository -- there is no code path to configure or validate yet."];
+  }
+  var presence = _mockSecretPresence(adapterType);
+  var missing = Object.keys(presence).filter(function (k) { return !presence[k]; });
+  return missing.length ? ["Missing required secret(s): " + missing.join(", ") + "."] : [];
+}
+
+// Registered integration INSTANCES -- mirrors repositories.py's
+// integration_instances container exactly (one per adapter_type this repo
+// already uses, pre-enabled, same as ensure_default_integration_instances()
+// seeds a real deployment on first boot -- these represent integrations
+// already in active use before this feature existed).
+var MOCK_INTEGRATION_INSTANCES = MOCK_ADAPTER_TYPE_IDS
+  .filter(function (adapterType) { return MOCK_ADAPTER_TYPES[adapterType].status !== "planned"; }) // nothing is "already in use" for a planned adapter
+  .map(function (adapterType) {
+    return {
+      id: adapterType, adapter_type: adapterType, display_name: MOCK_ADAPTER_TYPES[adapterType].name,
+      environment: "production", config: {}, config_version: 1, enabled: true, lifecycle_status: "active",
+      last_connection_outcome: null, last_health_checked_at: null, last_failure: null,
+      created_by: "system:initial_seed", updated_by: null, created_at: "2026-01-01T00:00:00Z",
+    };
+  });
+var MOCK_INTEGRATION_HEALTH_CHECKS = []; // [{integration_id, outcome, error_category, detail, duration_ms, checked_at}]
+var MOCK_INTEGRATION_CONFIG_HISTORY = []; // [{id, integration_id, operation, actor, safe_summary, recorded_at}]
+MOCK_INTEGRATION_INSTANCES.forEach(function (instance) {
+  MOCK_INTEGRATION_CONFIG_HISTORY.push({
+    id: "cfh-seed-" + instance.id, integration_id: instance.id, operation: "registered",
+    actor: instance.created_by, safe_summary: { adapter_type: instance.adapter_type, environment: instance.environment, config: instance.config, config_version: 1 },
+    recorded_at: instance.created_at,
+  });
+});
+
+function _mockRecordConfigChange(integrationId, operation, actor, safeSummary) {
+  var entry = { id: "cfh-" + Math.random().toString(36).slice(2, 10), integration_id: integrationId, operation: operation, actor: actor, safe_summary: safeSummary || {}, recorded_at: new Date().toISOString() };
+  MOCK_INTEGRATION_CONFIG_HISTORY.push(entry);
+  return entry;
+}
+
+function _mockGetIntegrationInstance(integrationId) {
+  return MOCK_INTEGRATION_INSTANCES.filter(function (i) { return i.id === integrationId; })[0] || null;
+}
+
+// Mirrors azure_integrations.check_connection() -- same outcome vocabulary
+// (healthy/unhealthy/unknown + error_category), same "never fabricate
+// healthy" rule. Mock mode can't make a real network call, so cosmos_db/
+// blob_storage (the only adapters with health_check:true) still report
+// "unknown"/"configuration_invalid" here, honestly -- never "healthy".
+function _mockCheckConnection(adapterType) {
+  var adapter = MOCK_ADAPTER_TYPES[adapterType];
+  if (!adapter) {
+    return { adapter_type: adapterType, outcome: "unknown", error_category: "configuration_invalid", detail: "Unknown adapter type.", duration_ms: 0, checked_at: new Date().toISOString() };
+  }
+  var errors = _mockValidateAdapterConfig(adapterType);
+  if (errors.length) {
+    return { adapter_type: adapterType, outcome: "unknown", error_category: "configuration_invalid", detail: errors[0], duration_ms: 1.0, checked_at: new Date().toISOString() };
+  }
+  if (!adapter.capabilities.health_check) {
+    return { adapter_type: adapterType, outcome: "unknown", error_category: null,
+      detail: "Required secrets are present, but this integration has no safe, free operation to verify connectivity without a billable call.",
+      duration_ms: 1.0, checked_at: new Date().toISOString() };
+  }
+  return { adapter_type: adapterType, outcome: "unknown", error_category: "configuration_invalid",
+    detail: "Mock mode has no real secrets/network to check against. Switch config.js to mode:\"real\" against a deployed backend to see actual connection status.",
+    duration_ms: 1.0, checked_at: new Date().toISOString() };
+}
+
+// ---------------------------------------------------------------------------
+// Azure Readiness (mirrors azure_readiness.py's STATUS_DEFINITIONS and
+// compute_readiness() composition exactly -- never a separate
+// classification). az_cli.py has no browser equivalent -- "Azure CLI" is
+// a LOCAL developer-machine concept, so this honestly always reports
+// not-installed/not-authenticated in mock mode, same as it would in any
+// browser (switch to mode:"real" against a deployed backend with a
+// locally-run 'az login' session to see real CLI status).
+// ---------------------------------------------------------------------------
+var MOCK_AZURE_READINESS_STATUS_DEFINITIONS = {
+  NOT_INTEGRATED: "This repository has no implementation for this Azure service yet.",
+  NOT_CONFIGURED: "Required configuration (a secret or setting) is missing.",
+  AUTHENTICATION_REQUIRED: "No usable authentication context is available.",
+  PERMISSION_DENIED: "Authentication succeeded, but the operation was denied.",
+  CONNECTION_FAILED: "The configured service could not be reached, or the connection failed.",
+  PARTIALLY_VERIFIED: "Configuration is present, but no further safe, free functional check exists for this integration.",
+  READY: "Configuration, authentication, permissions, and the deepest safe connectivity check available all succeeded.",
+  DEGRADED: "The integration works, but with a known operational problem.",
+  UNKNOWN: "No validation has been run yet, or available evidence is insufficient to determine the state.",
+};
+var _MOCK_CLI_DEPENDENT_ADAPTERS = ["key_vault"];
+
+function _mockComputeReadiness(adapterType, checkResult, azAuthenticated) {
+  var adapter = MOCK_ADAPTER_TYPES[adapterType];
+  if (!adapter) return { status: "UNKNOWN", reason: "Unknown adapter type '" + adapterType + "'." };
+  if (adapter.status === "planned") return { status: "NOT_INTEGRATED", reason: adapter.description };
+
+  var configErrors = _mockValidateAdapterConfig(adapterType);
+  if (configErrors.length) return { status: "NOT_CONFIGURED", reason: configErrors[0] };
+
+  if (_MOCK_CLI_DEPENDENT_ADAPTERS.indexOf(adapterType) !== -1 && !azAuthenticated) {
+    return { status: "AUTHENTICATION_REQUIRED", reason: "This integration's only supported auth method is Azure CLI/managed identity, and no active Azure CLI session was detected. Run 'az login'." };
+  }
+  if (!checkResult) return { status: "UNKNOWN", reason: "No validation has been run yet for this integration." };
+
+  var outcome = checkResult.outcome, category = checkResult.error_category, detail = checkResult.detail || "";
+  if (outcome === "healthy") return { status: "READY", reason: detail || "Live connectivity check succeeded." };
+  if (outcome === "degraded") return { status: "DEGRADED", reason: detail || "Connectivity check succeeded with a caveat." };
+  if (outcome === "unknown") {
+    if (category === "configuration_invalid") return { status: "NOT_CONFIGURED", reason: detail };
+    return { status: "PARTIALLY_VERIFIED", reason: detail || "Configuration confirmed present; no further safe check exists." };
+  }
+  if (outcome === "unhealthy") {
+    if (category === "authentication_failed") return { status: "AUTHENTICATION_REQUIRED", reason: detail };
+    if (category === "authorization_denied") return { status: "PERMISSION_DENIED", reason: detail };
+    return { status: "CONNECTION_FAILED", reason: detail };
+  }
+  return { status: "UNKNOWN", reason: "Unrecognized check outcome '" + outcome + "'." };
+}
+
+function _mockCheckResultFromInstance(instance) {
+  if (!instance.last_connection_outcome) return null;
+  if (instance.last_connection_outcome === "healthy") {
+    return { outcome: "healthy", error_category: null, detail: "Live connection check succeeded.", checked_at: instance.last_health_checked_at };
+  }
+  var failure = instance.last_failure || {};
+  return { outcome: instance.last_connection_outcome, error_category: failure.error_category, detail: failure.detail, checked_at: instance.last_health_checked_at };
+}
+
+function _mockAzCliAccountStatus() {
+  return { authenticated: false, tenant_id: null, subscription_id: null, subscription_name: null, user: null,
+    detail: "Azure CLI is a local developer-machine concept -- mock mode runs entirely in this browser tab and can never detect or use a local 'az login' session. Switch config.js to mode:\"real\" against a deployed backend to see real Azure CLI status." };
+}
+
+function _mockReadinessRecommendedNextAction(status, adapterType) {
+  if (status === "NOT_INTEGRATED") return "Not applicable -- this service requires new application code, not configuration.";
+  if (status === "NOT_CONFIGURED") return "Set the missing secret(s)/setting(s) via the Secrets Management console or .env, then re-validate.";
+  if (status === "AUTHENTICATION_REQUIRED") return _MOCK_CLI_DEPENDENT_ADAPTERS.indexOf(adapterType) !== -1 ? "Run 'az login' locally, then re-validate." : "Check the configured credential is still valid, then re-validate.";
+  if (status === "PERMISSION_DENIED") return "Grant the minimum required role/permission to the credential or identity in use, then re-validate.";
+  if (status === "CONNECTION_FAILED") return "Check network reachability and the configured endpoint, then re-validate.";
+  if (status === "PARTIALLY_VERIFIED") return "No further safe/free check exists for this integration -- this is its fullest achievable readiness state.";
+  if (status === "READY") return "No action needed.";
+  if (status === "UNKNOWN") return "Run a validation check.";
+  return "Review the reason above.";
+}
+
+function _mockReadinessRecord(instance, azStatus) {
+  var adapter = MOCK_ADAPTER_TYPES[instance.adapter_type] || {};
+  var checkResult = _mockCheckResultFromInstance(instance);
+  var verdict = _mockComputeReadiness(instance.adapter_type, checkResult, azStatus.authenticated);
+  var presence = _mockSecretPresence(instance.adapter_type);
+  return {
+    integration_id: instance.id, adapter_type: instance.adapter_type, service_name: adapter.name || instance.adapter_type,
+    status: verdict.status, status_definition: MOCK_AZURE_READINESS_STATUS_DEFINITIONS[verdict.status], reason: verdict.reason,
+    environment: instance.environment, display_name: instance.display_name, enabled: instance.enabled,
+    missing_configuration: Object.keys(presence).filter(function (k) { return !presence[k]; }),
+    last_validated_at: checkResult ? checkResult.checked_at : null,
+    last_successful_validation_at: (checkResult && checkResult.outcome === "healthy") ? checkResult.checked_at : null,
+    validated_against: checkResult ? "config_only" : "config_only",
+    recommended_next_action: _mockReadinessRecommendedNextAction(verdict.status, instance.adapter_type),
+  };
+}
+
+var MOCK_EPHEMERAL_TEST_RUNS = [];
+var MOCK_EPHEMERAL_RESOURCE_PLANS = {
+  blob_storage_test: {
+    label: "Blob Storage connectivity test (1 Standard_LRS storage account)", adapter_type: "blob_storage",
+    azure_resource_types: ["Microsoft.Storage/storageAccounts"], estimated_cost_usd_per_hour: 0.02,
+    allowed_regions: ["eastus", "eastus2", "westus2", "centralus", "westeurope"], max_duration_minutes: 60,
+  },
+};
+// A frozen snapshot of what persona_catalogue.describe_all_personas()
+// (persona_catalogue.py, CDPI Product Personas doc Section 8) actually
+// returns -- generated once from the real module, not hand-typed, so
+// mock mode shows the exact same role/page/report data the real
+// GET /admin/personas endpoint does. Re-run that generation if
+// persona_catalogue.py's PERSONAS/REPORTS ever change.
+var MOCK_PERSONA_CATALOGUE = [{"persona_id": "P01", "demo_display_name": "Demo Candidate", "role_key": "candidate", "role_display_name": "Candidate", "responsibilities": "Submit an application, track its status, view released outcomes for themselves only.", "allowed_pages": ["candidate_portal"], "restricted_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue"], "allowed_reports": [{"name": "My Applications", "status": "available", "gating_permission": null, "note": "Candidate's own application status via the existing anonymous by-email lookup (GET /candidates/by-email/{email}) -- self-scoped, not RBAC-gated.", "slug": "my_applications", "authorized": true}, {"name": "Profile & Document Status", "status": "available", "gating_permission": null, "note": "Same by-email lookup surfaces document verification status -- self-scoped.", "slug": "profile_document_status", "authorized": true}, {"name": "My Interview Schedule", "status": "data_dependent", "gating_permission": null, "note": "No structured interview date/time field exists on a candidate record or stage-history entry -- only stage name and timestamp of the stage CHANGE, not a scheduled future time.", "slug": "interview_schedule_candidate", "authorized": true}, {"name": "My Pending Actions", "status": "planned", "gating_permission": null, "note": "No candidate-facing 'action required' endpoint exists yet.", "slug": "pending_actions", "authorized": true}, {"name": "My Communication History", "status": "planned", "gating_permission": null, "note": "Delivery records exist in comms_delivery_log, but no candidate-facing (by-email, self-scoped) endpoint exposes them yet.", "slug": "communication_history_candidate", "authorized": true}, {"name": "Released Interview Feedback", "status": "data_dependent", "gating_permission": null, "note": "No 'feedback release' flag/workflow exists -- interview feedback is internal-only today, with no concept of selectively releasing it to the candidate.", "slug": "released_interview_feedback", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "recruiter_workload_report", "recruitment_sla_report", "bottleneck_aging_report", "interview_operations_report", "funnel_conversion_report", "workflow_exception_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "score_distribution_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "Self only (own application record, looked up by the candidate's own email).", "export_permission": false, "report_status_breakdown": {"available": 2, "planned": 2, "data_dependent": 2}}, {"persona_id": "P02", "demo_display_name": "Demo Recruiter", "role_key": "recruiter", "role_display_name": "Recruiter", "responsibilities": "Screen and review candidates, manage interview stages, propose bulk decisions.", "allowed_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "ai_observability"], "restricted_pages": ["user_management", "role_management", "page_access_management", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Recruitment Pipeline Report", "status": "available", "gating_permission": "interviews.manage", "note": "Pipeline.jsx's kanban board + /audit-log stage-change history.", "slug": "recruitment_pipeline_report", "authorized": true}, {"name": "Candidate Screening and Ranking Report", "status": "available", "gating_permission": "candidates.read", "note": "AdminReports.jsx tier/score/rank charts.", "slug": "candidate_screening_ranking_report", "authorized": true}, {"name": "Job-Wise Applicant Report", "status": "data_dependent", "gating_permission": "jds.read", "note": "No jd_id field exists on a candidate record -- confirmed in list_jds_endpoint's own docstring in api_blueprint.py. Cannot attribute applicants to a specific job description.", "slug": "job_wise_applicant_report", "authorized": true}, {"name": "Resume Processing Report", "status": "available", "gating_permission": "observability.read", "note": "GET /admin/reports/resume-processing, real document_extraction trace spans.", "slug": "resume_processing_report", "authorized": true}, {"name": "Interview Schedule and Feedback Report", "status": "available", "gating_permission": "interviews.read", "note": "StageTimelineModal + interview transcripts.", "slug": "interview_schedule_feedback_report", "authorized": true}, {"name": "Communication Delivery Report", "status": "available", "gating_permission": "comms.delivery.read", "note": "GET /admin/reports/communication-delivery, real comms_delivery_log (WhatsApp only -- email has no delivery logging anywhere in this repo).", "slug": "communication_delivery_report", "authorized": true}, {"name": "Candidate Status and Follow-up Report", "status": "planned", "gating_permission": "candidates.read", "note": "Underlying stage/status data exists; no aggregated follow-up report has been built on top of it.", "slug": "candidate_status_followup_report", "authorized": true}], "restricted_reports": ["workflow_exception_report", "configuration_inventory", "template_inventory", "configuration_change_history", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_workflow_traces", "ai_error_analysis", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "All candidates (no per-recruiter candidate assignment exists in this repo's data model).", "export_permission": false, "report_status_breakdown": {"available": 5, "planned": 1, "data_dependent": 1}}, {"persona_id": "P03", "demo_display_name": "Demo Hiring Manager", "role_key": "hiring_manager", "role_display_name": "Hiring Manager", "responsibilities": "Review shortlists and candidate evidence, submit hiring feedback/decisions -- read-focused.", "allowed_pages": ["dashboard", "admin_reports"], "restricted_pages": ["pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Shortlist Review Report", "status": "planned", "gating_permission": "candidates.read", "note": "No 'shortlist' concept (a named, curated subset of candidates) exists -- candidates.read returns the full list, not a shortlist view.", "slug": "shortlist_review_report", "authorized": true}, {"name": "Candidate Comparison Report", "status": "planned", "gating_permission": "candidates.read", "note": "No side-by-side comparison view has been built.", "slug": "candidate_comparison_report", "authorized": true}, {"name": "Interview Feedback Report", "status": "available", "gating_permission": "interviews.read", "note": "Same interview transcript/feedback data as P02's Interview Schedule and Feedback Report.", "slug": "interview_feedback_report", "authorized": true}, {"name": "Hiring Decision Report", "status": "planned", "gating_permission": "candidates.read", "note": "No explicit final hiring-decision field beyond the existing accept/reject tier -- no aggregated decision-outcome report exists.", "slug": "hiring_decision_report", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "job_wise_applicant_report", "resume_processing_report", "communication_delivery_report", "vacancy_status_aging_report", "pending_interview_feedback", "feedback_submission_status", "interview_operations_report", "workflow_exception_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "All candidates (no per-vacancy assignment concept exists).", "export_permission": false, "report_status_breakdown": {"available": 1, "planned": 3, "data_dependent": 2}}, {"persona_id": "P04", "demo_display_name": "Demo Interviewer", "role_key": "interviewer", "role_display_name": "Interviewer", "responsibilities": "View candidates and interview timelines, record stage feedback.", "allowed_pages": ["dashboard", "pipeline"], "restricted_pages": ["admin_reports", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Interview Schedule", "status": "available", "gating_permission": "interviews.read", "note": "Reuses existing interview timeline data -- not scoped to only this interviewer's assignments (no assignment concept exists, see README known limitations).", "slug": "interview_schedule", "authorized": true}, {"name": "Assigned Candidate Briefs", "status": "planned", "gating_permission": "interviews.read", "note": "No interviewer-to-candidate assignment concept exists in this repo's data model.", "slug": "assigned_candidate_briefs", "authorized": true}, {"name": "Pending Interview Feedback", "status": "planned", "gating_permission": "interviews.manage", "note": "No per-interviewer 'feedback owed' tracking exists.", "slug": "pending_interview_feedback", "authorized": true}, {"name": "Interview Completion Report", "status": "planned", "gating_permission": "interviews.read", "note": "No aggregated completion-rate report exists.", "slug": "interview_completion_report", "authorized": true}, {"name": "Feedback Submission Status", "status": "planned", "gating_permission": "interviews.manage", "note": "No per-interviewer submission-status tracking exists.", "slug": "feedback_submission_status", "authorized": true}, {"name": "Interview Assessment History", "status": "available", "gating_permission": "interviews.read", "note": "Existing interview transcript history.", "slug": "interview_assessment_history", "authorized": true}], "restricted_reports": ["job_wise_applicant_report", "resume_processing_report", "communication_delivery_report", "vacancy_status_aging_report", "recruiter_workload_report", "recruitment_sla_report", "funnel_conversion_report", "workflow_exception_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "configuration_inventory", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "score_distribution_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "All candidates (no per-interviewer assignment scoping exists -- documented limitation, see auth.DEFAULT_ROLES' interviewer role docstring).", "export_permission": false, "report_status_breakdown": {"available": 2, "planned": 4, "data_dependent": 0}}, {"persona_id": "P05", "demo_display_name": "Demo Recruitment Operations Manager", "role_key": "recruitment_ops_manager", "role_display_name": "Recruitment Operations Manager", "responsibilities": "Monitor pipeline throughput, recruiter workload, interview/communication operations across the team.", "allowed_pages": ["dashboard", "admin_reports", "pipeline", "ai_observability"], "restricted_pages": ["review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Recruitment Pipeline Report", "status": "available", "gating_permission": "interviews.manage", "note": "Pipeline.jsx's kanban board + /audit-log stage-change history.", "slug": "recruitment_pipeline_report", "authorized": true}, {"name": "Resume Processing Report", "status": "available", "gating_permission": "observability.read", "note": "GET /admin/reports/resume-processing, real document_extraction trace spans.", "slug": "resume_processing_report", "authorized": true}, {"name": "Communication Delivery Report", "status": "available", "gating_permission": "comms.delivery.read", "note": "GET /admin/reports/communication-delivery, real comms_delivery_log (WhatsApp only -- email has no delivery logging anywhere in this repo).", "slug": "communication_delivery_report", "authorized": true}, {"name": "Recruiter Workload Report", "status": "planned", "gating_permission": "analytics.read", "note": "No per-recruiter workload/assignment tracking exists.", "slug": "recruiter_workload_report", "authorized": true}, {"name": "Recruitment SLA Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "No SLA targets are configured anywhere in this repo -- nothing to measure actual timings against.", "slug": "recruitment_sla_report", "authorized": true}, {"name": "Bottleneck / Aging Report", "status": "planned", "gating_permission": "interviews.read", "note": "No per-stage aging/duration aggregation has been built.", "slug": "bottleneck_aging_report", "authorized": true}, {"name": "Interview Operations Report", "status": "planned", "gating_permission": "interviews.manage", "note": "No operational interview-throughput report exists.", "slug": "interview_operations_report", "authorized": true}, {"name": "Funnel Conversion Report", "status": "planned", "gating_permission": "analytics.read", "note": "Only a partial tier-count proxy exists via the executive summary -- not a full stage-to-stage conversion funnel.", "slug": "funnel_conversion_report", "authorized": true}, {"name": "Workflow Exception Report", "status": "planned", "gating_permission": "audit.read", "note": "No exception/anomaly flagging exists in the stage-change pipeline.", "slug": "workflow_exception_report", "authorized": true}], "restricted_reports": ["configuration_inventory", "template_inventory", "configuration_change_history", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "platform_configuration_inventory", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_workflow_traces", "ai_error_analysis", "access_control_audit", "secret_management_compliance", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report"], "data_scope": "All candidates, aggregate operational views.", "export_permission": false, "report_status_breakdown": {"available": 3, "planned": 5, "data_dependent": 1}}, {"persona_id": "P06", "demo_display_name": "Demo HR Director", "role_key": "hr_director", "role_display_name": "HR Director / Talent Acquisition Leader", "responsibilities": "Executive view of aggregate, organization-level recruitment performance only.", "allowed_pages": ["admin_reports"], "restricted_pages": ["dashboard", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Executive Recruitment Overview", "status": "available", "gating_permission": "analytics.read", "note": "GET /analytics/executive-summary + AdminReports.jsx.", "slug": "executive_recruitment_overview", "authorized": true}, {"name": "Organization-Level Recruitment Pipeline", "status": "planned", "gating_permission": "analytics.read", "note": "No org/department-level rollup exists on top of the existing pipeline data.", "slug": "org_level_recruitment_pipeline", "authorized": true}, {"name": "Time-to-Hire Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "No explicit 'hire' event exists to compute a duration against (only stage-change timestamps).", "slug": "time_to_hire_report", "authorized": true}, {"name": "Hiring Plan Attainment Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "No hiring plan/target configuration exists anywhere in this repo.", "slug": "hiring_plan_attainment_report", "authorized": true}, {"name": "Recruiter Productivity Summary", "status": "planned", "gating_permission": "analytics.read", "note": "Same gap as Recruiter Workload Report -- no per-recruiter attribution exists.", "slug": "recruiter_productivity_summary", "authorized": true}, {"name": "Source Effectiveness Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "No candidate-source field exists on a candidate record.", "slug": "source_effectiveness_report", "authorized": true}, {"name": "Candidate Experience Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "No response-time or satisfaction capture exists anywhere.", "slug": "candidate_experience_report", "authorized": true}, {"name": "Hiring Quality and Retention Report", "status": "data_dependent", "gating_permission": "analytics.read", "note": "Flagged in the original Product Personas doc itself (Section 19.5) -- requires post-hire instrumentation this repo doesn't have.", "slug": "hiring_quality_retention_report", "authorized": true}, {"name": "Organization Hiring Efficiency Report", "status": "planned", "gating_permission": "analytics.read", "note": "No org-level efficiency rollup has been built.", "slug": "org_hiring_efficiency_report", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "bottleneck_aging_report", "interview_operations_report", "workflow_exception_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "Aggregate/organization-level only -- explicitly NO individual candidate records (persona must not receive candidate-data access via its analytics role).", "export_permission": false, "report_status_breakdown": {"available": 1, "planned": 3, "data_dependent": 5}}, {"persona_id": "P07", "demo_display_name": "Demo Recruitment Administrator", "role_key": "recruitment_administrator", "role_display_name": "Recruitment Administrator", "responsibilities": "Maintain recruitment-specific operational settings (templates, stage configuration) -- not platform-wide administration.", "allowed_pages": ["pipeline", "communications_config"], "restricted_pages": ["dashboard", "admin_reports", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Configuration Inventory", "status": "available", "gating_permission": "comms.config.read", "note": "GET /comms/config (active/draft) + history.", "slug": "configuration_inventory", "authorized": true}, {"name": "Workflow Configuration Report", "status": "available", "gating_permission": "interviews.manage", "note": "Existing pipeline-config GET/PUT endpoints (stage list).", "slug": "workflow_configuration_report", "authorized": true}, {"name": "Template Inventory", "status": "available", "gating_permission": "comms.templates.manage", "note": "Existing message-template version list/activation history.", "slug": "template_inventory", "authorized": true}, {"name": "Configuration Change History", "status": "available", "gating_permission": "comms.config.read", "note": "comms_config_history container.", "slug": "configuration_change_history", "authorized": true}, {"name": "Configuration Completeness Report", "status": "planned", "gating_permission": "comms.config.read", "note": "No cross-module 'completeness score' has been built.", "slug": "configuration_completeness_report", "authorized": true}], "restricted_reports": ["candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "interview_completion_report", "interview_assessment_history", "recruiter_workload_report", "recruitment_sla_report", "bottleneck_aging_report", "funnel_conversion_report", "workflow_exception_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "reference_data_status", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "score_distribution_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "Configuration objects only -- no candidate records.", "export_permission": false, "report_status_breakdown": {"available": 4, "planned": 3, "data_dependent": 0}}, {"persona_id": "P08", "demo_display_name": "Demo Platform Administrator", "role_key": "admin", "role_display_name": "Admin", "responsibilities": "Full platform access: users, roles/permissions, every module -- this app's single top-level role (no separate Super Admin tier).", "allowed_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue"], "restricted_pages": ["candidate_portal"], "allowed_reports": [{"name": "User Inventory", "status": "available", "gating_permission": "users.read", "note": "Existing Admin Panel user list.", "slug": "user_inventory", "authorized": true}, {"name": "Role/Permission Matrix", "status": "available", "gating_permission": "roles.read", "note": "Existing Roles & Permissions page.", "slug": "role_permission_matrix", "authorized": true}, {"name": "Page Access Configuration", "status": "available", "gating_permission": "pages.manage", "note": "Existing Page Access Management page.", "slug": "page_access_configuration", "authorized": true}, {"name": "Privileged Access Report", "status": "planned", "gating_permission": "roles.read", "note": "No aggregated 'who holds high-risk permissions' report exists yet, though the raw role data could support one.", "slug": "privileged_access_report", "authorized": true}, {"name": "Authentication Failure Report", "status": "available", "gating_permission": "audit.read", "note": "audit_log already records login_failed/login_success actions.", "slug": "auth_failure_report", "authorized": true}, {"name": "Platform Configuration Inventory", "status": "planned", "gating_permission": "roles.read", "note": "No single cross-module configuration-inventory report exists (azure/rag/comms each have their own, not unified).", "slug": "platform_configuration_inventory", "authorized": true}, {"name": "Administrative Audit Report", "status": "available", "gating_permission": "audit.read", "note": "Existing audit log.", "slug": "administrative_audit_report", "authorized": true}, {"name": "Configuration Drift Report", "status": "data_dependent", "gating_permission": "audit.read", "note": "No approved-baseline concept exists to compare current configuration against.", "slug": "configuration_drift_report", "authorized": true}, {"name": "Platform Readiness Report", "status": "planned", "gating_permission": "azure.config.read", "note": "No cross-cutting readiness scorecard has been built.", "slug": "platform_readiness_report", "authorized": true}, {"name": "User Lifecycle Report", "status": "planned", "gating_permission": "users.read", "note": "Raw audit data (create/disable events) exists but no aggregated lifecycle report has been built.", "slug": "user_lifecycle_report", "authorized": true}], "restricted_reports": [], "data_scope": "Unrestricted (the one persona for which this is appropriate).", "export_permission": true, "report_status_breakdown": {"available": 5, "planned": 4, "data_dependent": 1}}, {"persona_id": "P09", "demo_display_name": "Demo AI Configuration Administrator", "role_key": "ai_configuration_administrator", "role_display_name": "AI Configuration Administrator", "responsibilities": "Configure candidate-scoring-adjacent RAG settings and prompt templates. No Azure credential or platform security access.", "allowed_pages": ["admin_reports", "rag_config"], "restricted_pages": ["dashboard", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "azure_services", "secrets_management", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Candidate Scoring Configuration Report", "status": "planned", "gating_permission": "rag.config.read", "note": "config/scoring_config.json exists as a static file -- no admin console or API exposes/versions it yet.", "slug": "candidate_scoring_configuration_report", "authorized": true}, {"name": "Score Distribution Report", "status": "available", "gating_permission": "analytics.read", "note": "Reuses the existing Admin Reports score-distribution chart.", "slug": "score_distribution_report", "authorized": true}, {"name": "Scoring Evaluation Report", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "No scoring-evaluation harness (labeled ground truth) exists.", "slug": "scoring_evaluation_report", "authorized": true}, {"name": "Scoring Configuration Comparison", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "Same gap -- no evaluation harness to compare configurations against.", "slug": "scoring_configuration_comparison", "authorized": true}, {"name": "RAG Configuration Report", "status": "available", "gating_permission": "rag.config.read", "note": "Active/draft RAG config + change history.", "slug": "rag_configuration_report", "authorized": true}, {"name": "Retrieval Quality Report", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "No labeled relevance dataset exists to score retrieval quality against.", "slug": "retrieval_quality_report", "authorized": true}, {"name": "Groundedness / Citation Report", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "No citation mechanism exists in the generation pipeline.", "slug": "groundedness_citation_report", "authorized": true}, {"name": "Prompt Version Comparison", "status": "available", "gating_permission": "rag.config.read", "note": "Existing prompt-template version history/draft-vs-active compare.", "slug": "prompt_version_comparison", "authorized": true}, {"name": "Model/Embedding Compatibility Report", "status": "planned", "gating_permission": "rag.config.read", "note": "Only a single fixed embedding model is used -- no compatibility-matrix report has been built.", "slug": "model_embedding_compatibility_report", "authorized": true}, {"name": "Evaluation Dataset Status", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "No evaluation dataset infrastructure exists.", "slug": "evaluation_dataset_status", "authorized": true}, {"name": "AI Configuration History", "status": "available", "gating_permission": "rag.config.read", "note": "rag_config_history container.", "slug": "ai_configuration_history", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "bottleneck_aging_report", "interview_operations_report", "workflow_exception_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "AI/RAG configuration objects only -- no candidate PII, no secret values, no Azure resource access.", "export_permission": false, "report_status_breakdown": {"available": 4, "planned": 2, "data_dependent": 5}}, {"persona_id": "P10", "demo_display_name": "Demo Azure / Cloud Administrator", "role_key": "azure_cloud_administrator", "role_display_name": "Azure / Cloud Administrator", "responsibilities": "Configure and validate Azure service integrations. No candidate-scoring or platform-identity access.", "allowed_pages": ["azure_services", "secrets_management"], "restricted_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "ai_observability", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "Azure Integration Inventory", "status": "available", "gating_permission": "azure.read", "note": "Existing Azure Service Hub integration registry.", "slug": "azure_integration_inventory", "authorized": true}, {"name": "Azure Configuration Completeness Report", "status": "available", "gating_permission": "azure.config.read", "note": "Existing per-integration configuration/diagnostics view.", "slug": "azure_configuration_completeness_report", "authorized": true}, {"name": "Connection Validation Report", "status": "available", "gating_permission": "azure.manage", "note": "Existing live connection-check history.", "slug": "connection_validation_report", "authorized": true}, {"name": "Key Vault Reference Status", "status": "available", "gating_permission": "secrets.read", "note": "Existing Secrets inventory -- presence/source, never values.", "slug": "key_vault_reference_status", "authorized": true}, {"name": "Cosmos DB Configuration Report", "status": "available", "gating_permission": "azure.config.read", "note": "Cosmos integration instance's configuration/diagnostics view.", "slug": "cosmos_db_configuration_report", "authorized": true}, {"name": "AI Foundry Deployment Status", "status": "data_dependent", "gating_permission": "azure.read", "note": "Azure AI Foundry is not integrated anywhere in this repo (confirmed earlier this session) -- nothing to report on.", "slug": "ai_foundry_deployment_status", "authorized": true}, {"name": "AI Search Index Status", "status": "data_dependent", "gating_permission": "azure.read", "note": "Azure AI Search is not integrated -- this repo uses a local embedding index (semantic-library), not Azure AI Search.", "slug": "ai_search_index_status", "authorized": true}, {"name": "Blob Storage Configuration Report", "status": "available", "gating_permission": "azure.config.read", "note": "Blob Storage integration instance's configuration/diagnostics view.", "slug": "blob_storage_configuration_report", "authorized": true}, {"name": "Azure Functions Health Report", "status": "data_dependent", "gating_permission": "azure.read", "note": "No execution-health instrumentation (invocation success rate, cold-start latency) exists on the deployed Function App.", "slug": "azure_functions_health_report", "authorized": true}, {"name": "Azure Dependency Report", "status": "planned", "gating_permission": "azure.read", "note": "No cross-integration dependency graph has been built.", "slug": "azure_dependency_report", "authorized": true}, {"name": "Environment Comparison", "status": "planned", "gating_permission": "azure.config.read", "note": "'environment' is free text per integration instance -- no structured multi-environment comparison exists.", "slug": "environment_comparison", "authorized": true}, {"name": "Integration Configuration Audit", "status": "available", "gating_permission": "azure.config.read", "note": "Existing integration config-change history.", "slug": "integration_configuration_audit", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "recruiter_workload_report", "recruitment_sla_report", "bottleneck_aging_report", "interview_operations_report", "funnel_conversion_report", "workflow_exception_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "score_distribution_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "Azure integration configuration + secret presence (never secret values, never candidate data).", "export_permission": false, "report_status_breakdown": {"available": 7, "planned": 2, "data_dependent": 3}}, {"persona_id": "P11", "demo_display_name": "Demo AI Operations / MLOps Engineer", "role_key": "ai_operations_mlops", "role_display_name": "AI Operations / MLOps Engineer", "responsibilities": "Monitor AI workflow reliability, latency, and cost via the AI Observability Center. Cannot change scoring/RAG configuration or Azure resources.", "allowed_pages": ["ai_observability"], "restricted_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "user_management", "role_management", "page_access_management", "azure_services", "secrets_management", "rag_config", "communications_config", "persona_catalogue", "candidate_portal"], "allowed_reports": [{"name": "AI System Health", "status": "available", "gating_permission": "observability.read", "note": "AI Observability Center aggregate metrics.", "slug": "ai_system_health", "authorized": true}, {"name": "AI Workflow Traces", "status": "available", "gating_permission": "observability.traces.read", "note": "Individual trace/span detail.", "slug": "ai_workflow_traces", "authorized": true}, {"name": "Model/LLM Performance Report", "status": "available", "gating_permission": "observability.read", "note": "Latency percentiles already aggregated in observability.py.", "slug": "model_llm_performance", "authorized": true}, {"name": "AI Cost Report", "status": "available", "gating_permission": "observability.read", "note": "Token/cost breakdown already aggregated in observability.py.", "slug": "ai_cost_report", "authorized": true}, {"name": "RAG Pipeline Health", "status": "available", "gating_permission": "observability.read", "note": "Embedding/retrieval stage spans in the same trace log.", "slug": "rag_pipeline_health", "authorized": true}, {"name": "Evaluation / Regression Report", "status": "data_dependent", "gating_permission": "observability.read", "note": "No evaluation harness exists to detect regressions against.", "slug": "evaluation_regression_report", "authorized": true}, {"name": "Deployment Health", "status": "data_dependent", "gating_permission": "observability.read", "note": "No deployment-level health signal distinct from overall system health exists.", "slug": "deployment_health", "authorized": true}, {"name": "AI Error Analysis", "status": "available", "gating_permission": "observability.traces.read", "note": "Failed-span detail already in trace log.", "slug": "ai_error_analysis", "authorized": true}, {"name": "Token Usage Report", "status": "available", "gating_permission": "observability.read", "note": "Existing token usage aggregation.", "slug": "token_usage", "authorized": true}, {"name": "Embedding/Indexing Operations Report", "status": "available", "gating_permission": "observability.read", "note": "embedding_generation stage spans.", "slug": "embedding_indexing_operations", "authorized": true}, {"name": "Safety / Output Validation Report", "status": "data_dependent", "gating_permission": "observability.read", "note": "No content-safety validation pass exists anywhere in the pipeline.", "slug": "safety_output_validation", "authorized": true}, {"name": "Capacity and Limits Report", "status": "data_dependent", "gating_permission": "observability.read", "note": "In-memory rate limiters exist in code but are not surfaced as a report.", "slug": "capacity_limits_report", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "recruiter_workload_report", "recruitment_sla_report", "bottleneck_aging_report", "interview_operations_report", "funnel_conversion_report", "workflow_exception_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "configuration_inventory", "workflow_configuration_report", "template_inventory", "configuration_change_history", "reference_data_status", "configuration_completeness_report", "user_inventory", "role_permission_matrix", "page_access_configuration", "privileged_access_report", "auth_failure_report", "platform_configuration_inventory", "administrative_audit_report", "configuration_drift_report", "platform_readiness_report", "user_lifecycle_report", "candidate_scoring_configuration_report", "score_distribution_report", "scoring_evaluation_report", "scoring_configuration_comparison", "rag_configuration_report", "retrieval_quality_report", "groundedness_citation_report", "prompt_version_comparison", "model_embedding_compatibility_report", "evaluation_dataset_status", "ai_configuration_history", "azure_integration_inventory", "azure_configuration_completeness_report", "connection_validation_report", "key_vault_reference_status", "cosmos_db_configuration_report", "ai_foundry_deployment_status", "ai_search_index_status", "blob_storage_configuration_report", "azure_functions_health_report", "azure_dependency_report", "environment_comparison", "integration_configuration_audit", "access_control_audit", "privileged_action_audit", "auth_security_events", "configuration_change_audit", "secret_management_compliance", "candidate_data_access_audit", "data_retention_deletion_report", "scoring_governance_report", "fairness_consistency_evaluation", "ai_governance_report", "incident_report", "compliance_evidence_inventory"], "data_scope": "Aggregate AI telemetry + trace-level detail -- no candidate record access, no configuration-write access.", "export_permission": false, "report_status_breakdown": {"available": 8, "planned": 0, "data_dependent": 4}}, {"persona_id": "P12", "demo_display_name": "Demo Security, Risk & Compliance Auditor", "role_key": "security_compliance_auditor", "role_display_name": "Security, Risk & Compliance Auditor", "responsibilities": "Read-only review of audit evidence, secret presence, user/role configuration, and AI/Azure/comms configuration history. Cannot modify anything it reviews.", "allowed_pages": ["user_management", "role_management", "secrets_management", "rag_config", "communications_config", "persona_catalogue"], "restricted_pages": ["dashboard", "admin_reports", "pipeline", "review_queue", "recruiter_reports", "page_access_management", "ai_observability", "azure_services", "candidate_portal"], "allowed_reports": [{"name": "Access Control Audit", "status": "available", "gating_permission": "roles.read", "note": "Role/permission matrix cross-referenced with user role assignments (users.read).", "slug": "access_control_audit", "authorized": true}, {"name": "Privileged Action Audit", "status": "available", "gating_permission": "audit.read", "note": "Existing audit log.", "slug": "privileged_action_audit", "authorized": true}, {"name": "Authentication Security Events", "status": "available", "gating_permission": "audit.read", "note": "Same login_failed/login_success events as P08's Authentication Failure Report.", "slug": "auth_security_events", "authorized": true}, {"name": "Configuration Change Audit", "status": "available", "gating_permission": "audit.read", "note": "_audit_admin_action-recorded rag/azure/comms *_changed actions.", "slug": "configuration_change_audit", "authorized": true}, {"name": "Secret Management Compliance Report", "status": "available", "gating_permission": "secrets.read", "note": "Existing secrets inventory (presence/source, never values).", "slug": "secret_management_compliance", "authorized": true}, {"name": "Candidate Data Access Audit", "status": "data_dependent", "gating_permission": "audit.read", "note": "No field-level 'who viewed this candidate record' logging exists -- the audit log records stage/decision actions, not read access.", "slug": "candidate_data_access_audit", "authorized": true}, {"name": "Data Retention and Deletion Report", "status": "data_dependent", "gating_permission": "audit.read", "note": "No retention-policy tracking exists anywhere.", "slug": "data_retention_deletion_report", "authorized": true}, {"name": "Scoring Governance Report", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "Same gap as P09's scoring-evaluation reports -- no governance/evaluation harness.", "slug": "scoring_governance_report", "authorized": true}, {"name": "Fairness and Consistency Evaluation", "status": "data_dependent", "gating_permission": "rag.config.read", "note": "No fairness/bias evaluation harness exists -- confirmed earlier this session.", "slug": "fairness_consistency_evaluation", "authorized": true}, {"name": "AI Governance Report", "status": "available", "gating_permission": "rag.config.read", "note": "Prompt version/activation/rollback trail.", "slug": "ai_governance_report", "authorized": true}, {"name": "Incident Report", "status": "data_dependent", "gating_permission": "audit.read", "note": "No security-incident tracking exists anywhere in this repo.", "slug": "incident_report", "authorized": true}, {"name": "Compliance Evidence Inventory", "status": "planned", "gating_permission": "audit.read", "note": "Individual pieces of evidence exist across several reports above, but no single aggregated export has been built.", "slug": "compliance_evidence_inventory", "authorized": true}], "restricted_reports": ["recruitment_pipeline_report", "candidate_screening_ranking_report", "job_wise_applicant_report", "resume_processing_report", "interview_schedule_feedback_report", "communication_delivery_report", "candidate_status_followup_report", "shortlist_review_report", "candidate_comparison_report", "interview_feedback_report", "hiring_decision_report", "vacancy_status_aging_report", "interview_schedule", "assigned_candidate_briefs", "pending_interview_feedback", "interview_completion_report", "feedback_submission_status", "interview_assessment_history", "recruiter_workload_report", "recruitment_sla_report", "bottleneck_aging_report", "interview_operations_report", "funnel_conversion_report", "executive_recruitment_overview", "org_level_recruitment_pipeline", "time_to_hire_report", "hiring_plan_attainment_report", "recruiter_productivity_summary", "source_effectiveness_report", "candidate_experience_report", "hiring_quality_retention_report", "org_hiring_efficiency_report", "workflow_configuration_report", "template_inventory", "reference_data_status", "page_access_configuration", "score_distribution_report", "azure_integration_inventory", "connection_validation_report", "ai_foundry_deployment_status", "ai_search_index_status", "azure_functions_health_report", "azure_dependency_report", "ai_system_health", "ai_workflow_traces", "model_llm_performance", "ai_cost_report", "rag_pipeline_health", "evaluation_regression_report", "deployment_health", "ai_error_analysis", "token_usage", "embedding_indexing_operations", "safety_output_validation", "capacity_limits_report"], "data_scope": "Audit/compliance evidence only -- read-only everywhere, no candidate record access, no configuration-write access anywhere.", "export_permission": false, "report_status_breakdown": {"available": 6, "planned": 1, "data_dependent": 5}}];

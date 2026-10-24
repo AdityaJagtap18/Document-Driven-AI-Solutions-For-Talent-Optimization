@@ -77,7 +77,15 @@ var NAV_ITEMS = [
   { tab: "recruiter-reports", label: "Recruiter Reports", Icon: IconReports, pageId: "recruiter_reports" },
   { tab: "users", label: "Users", Icon: IconUsers, pageId: "user_management" },
   { tab: "roles", label: "Roles & Permissions", Icon: IconShield, pageId: "role_management" },
+  { tab: "persona-catalogue", label: "Persona Catalogue", Icon: IconShield, pageId: "persona_catalogue" },
   { tab: "page-access", label: "Page Access", Icon: IconShield, pageId: "page_access_management" },
+  { tab: "ai-observability", label: "AI Observability", Icon: IconPulse, pageId: "ai_observability" },
+  { tab: "azure-observability-report", label: "Azure Observability Report", Icon: IconPulse, pageId: "azure_observability_report" },
+  { tab: "azure-services", label: "Azure Service Hub", Icon: IconCloud, pageId: "azure_services" },
+  { tab: "azure-readiness", label: "Azure Readiness", Icon: IconCloud, pageId: "azure_readiness" },
+  { tab: "secrets", label: "Secrets", Icon: IconKey, pageId: "secrets_management" },
+  { tab: "rag-config", label: "RAG Configuration", Icon: IconSearch, pageId: "rag_config" },
+  { tab: "communications-config", label: "Communications", Icon: IconMail, pageId: "communications_config" },
   { tab: "portal", label: "Candidate Portal", Icon: IconPortal, pageId: "candidate_portal" },
 ];
 
@@ -93,6 +101,9 @@ function App() {
   var pagesState = React.useState([]);
   var pages = pagesState[0];
   var setPages = pagesState[1];
+  var permissionsState = React.useState([]);
+  var permissions = permissionsState[0];
+  var setPermissions = permissionsState[1];
   var statusState = React.useState("loading"); // "loading" | "ready" | "signed-out"
   var status = statusState[0];
   var setStatus = statusState[1];
@@ -105,6 +116,7 @@ function App() {
     api.setAuthToken(null);
     setSession(null);
     setPages([]);
+    setPermissions([]);
     setStatus("signed-out");
   }
 
@@ -124,6 +136,7 @@ function App() {
     api.getMe()
       .then(function (result) {
         setPages(result.pages || []);
+        setPermissions(result.permissions || []);
         setTab(function (current) { return current || (navItemsFor(result.pages || [])[0] || {}).tab || null; });
         setStatus("ready");
       })
@@ -217,14 +230,22 @@ function App() {
 
         <main className="app-main">
           {activeTab === "dashboard" && <Dashboard api={api} />}
-          {activeTab === "reports" && <AdminReports api={api} />}
+          {activeTab === "reports" && <AdminReports api={api} permissions={permissions} />}
           {activeTab === "pipeline" && <Pipeline api={api} />}
           {activeTab === "review" && <ReviewQueue api={api} />}
           {activeTab === "recruiter-reports" && <RecruiterReports api={api} />}
           {activeTab === "portal" && <CandidatePortal api={api} />}
           {activeTab === "users" && <UserManagement api={api} currentUser={user} />}
           {activeTab === "roles" && <RoleManagement api={api} />}
+          {activeTab === "persona-catalogue" && <PersonaCatalogue api={api} />}
           {activeTab === "page-access" && <PageAccessManagement api={api} />}
+          {activeTab === "ai-observability" && <AIObservabilityCenter api={api} />}
+          {activeTab === "azure-observability-report" && <AzureObservabilityReport api={api} permissions={permissions} />}
+          {activeTab === "azure-services" && <AzureServiceHub api={api} permissions={permissions} />}
+          {activeTab === "azure-readiness" && <AzureReadiness api={api} permissions={permissions} />}
+          {activeTab === "secrets" && <SecretsManagement api={api} permissions={permissions} />}
+          {activeTab === "rag-config" && <RagConfiguration api={api} permissions={permissions} />}
+          {activeTab === "communications-config" && <CommunicationsConfig api={api} permissions={permissions} />}
         </main>
       </div>
     </div>

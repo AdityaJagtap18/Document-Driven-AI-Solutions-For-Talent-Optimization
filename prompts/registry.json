@@ -6,7 +6,8 @@
       "file": "resume_chunk_summarization.v1.md",
       "source_script": "ResumeParser.py",
       "model": "gpt-3.5-turbo",
-      "status": "active"
+      "status": "active",
+      "note": "This .md file documents the DEFAULT/seed text only. ResumeParser.py no longer hardcodes this prompt -- it loads the ACTIVE version at runtime from rag_config.py's versioned Cosmos store (rag_prompt_versions), managed via the RAG Configuration Console's Prompts tab (/admin/rag-config). If an admin has activated a different draft there, the live prompt differs from this file; this file is the fallback used when nothing has ever been activated. Chunk text and the JD are sanitized (rag_config.sanitize_for_prompt()) before interpolation as of this session -- the 'no prompt-injection guarding' issue below no longer applies to this prompt."
     },
     {
       "id": "resume_merge_structured_extraction",
@@ -22,7 +23,8 @@
       "file": "resume_merge_structured_extraction.v2.md",
       "source_script": "ResumeParser.py",
       "model": "gpt-3.5-turbo",
-      "status": "active"
+      "status": "active",
+      "note": "Same dual-representation and sanitization note as resume_chunk_summarization above -- also real-time versioned via rag_config.py / the RAG Configuration Console, and chunk summaries + JD are sanitized before interpolation."
     },
     {
       "id": "interview_questions_generation",

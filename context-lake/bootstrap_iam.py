@@ -17,6 +17,11 @@ Usage:
     python bootstrap_iam.py --create-admin alice --email alice@example.com
         (prompts for a password -- never pass it as a CLI argument, that
         would leak it into shell history and process listings)
+    python bootstrap_iam.py --create-demo-personas
+        (OPT-IN -- creates one synthetic/test account per persona in
+        persona_catalogue.py, Section 8 of the CDPI Product Personas doc.
+        Never run automatically. Generated passwords are printed ONCE;
+        write them down immediately, they are never shown again.)
 """
 
 import argparse
@@ -36,6 +41,10 @@ def main():
     parser.add_argument("--create-admin", metavar="USERNAME", help="Also create an Admin account with this username.")
     parser.add_argument("--email", default="", help="Email for the new Admin account (used with --create-admin).")
     parser.add_argument("--display-name", default="", help="Display name for the new Admin account (defaults to the username).")
+    parser.add_argument(
+        "--create-demo-personas", action="store_true",
+        help="OPT-IN: also create one synthetic/test demo account per persona (see persona_catalogue.py). Never run automatically.",
+    )
     args = parser.parse_args()
 
     created_roles = repositories.ensure_default_roles()
@@ -49,6 +58,34 @@ def main():
         f"Page registry sync: {len(page_sync['new'])} new, {len(page_sync['updated'])} updated, "
         f"{len(page_sync['stale'])} stale" + (" (initial policy seed applied)" if page_sync["first_run"] else "")
     )
+
+    created_integrations = repositories.ensure_default_integration_instances()
+    if created_integrations:
+        print(f"Azure Service Hub: seeded {len(created_integrations)} default integration instance(s): {', '.join(created_integrations)}")
+    else:
+        print("Azure Service Hub: default integration instances already exist -- nothing to seed.")
+
+    seeded_prompts = repositories.ensure_default_rag_prompts()
+    if seeded_prompts:
+        print(f"RAG Configuration: seeded version 1 (active) of {len(seeded_prompts)} prompt(s): {', '.join(seeded_prompts)}")
+    else:
+        print("RAG Configuration: prompt versions already exist -- nothing to seed.")
+
+    seeded_templates = repositories.ensure_default_comms_templates()
+    if seeded_templates:
+        print(f"Communications Configuration: seeded version 1 (active) of {len(seeded_templates)} template(s): {', '.join(seeded_templates)}")
+    else:
+        print("Communications Configuration: template versions already exist -- nothing to seed.")
+
+    if args.create_demo_personas:
+        created_personas = repositories.ensure_demo_personas()
+        if created_personas:
+            print(f"\nDemo personas: created {len(created_personas)} synthetic/test account(s) -- NOT real users, "
+                  f"write these passwords down now, they will never be shown again:")
+            for p in created_personas:
+                print(f"  [{p['persona_id']}] username={p['username']!r} role={p['role_key']!r} password={p['password']!r}")
+        else:
+            print("Demo personas: all 12 demo accounts already exist -- nothing to seed.")
 
     if not args.create_admin:
         return

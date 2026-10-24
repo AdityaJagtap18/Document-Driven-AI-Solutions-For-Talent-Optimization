@@ -20629,3 +20629,157 @@ __root__
   "resume_name": "Amira_Dasgupta_resume.pdf"
 }
 [2026-10-15 08:51:58] Completed: Amira_Dasgupta_resume.pdf
+[2026-10-24 10:31:35] BE Project Resume Parsing Start
+[2026-10-24 10:31:35] Parsing started: alex_morgan_resume.pdf
+[2026-10-24 10:31:46] Semantic ranking for alex_morgan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-24 10:32:40] Context lake: wrote candidate document for alex_morgan_resume.pdf
+[2026-10-24 10:32:40] Details: {
+  "Name": "N/A",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Advanced machine learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "LLM"
+  ],
+  "Profile Summary": "Junior software engineer with experience in Python, REST API development, data processing, and basic machine-learning/LLM concepts, aligning well with AI document processing roles.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "PostgreSQL",
+        "LLM API",
+        "scikit-learn"
+      ],
+      "Impact": "Developed a prototype for extracting structured fields from unstructured text using LLMs and a baseline document classifier."
+    }
+  ],
+  "Certifications & Courses": [
+    "Introduction to Machine Learning (Synthetic Test Certificate)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "Data processing",
+    "SQL",
+    "LLM-assisted extraction"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Communication"
+  ],
+  "Industry Experience": "N/A",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and problem-solving skills, which are critical for the role.",
+  "Potential Concerns": [
+    "Limited professional experience",
+    "No demonstrated experience with Java"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of advanced machine learning expertise may limit contributions to complex LLM tasks."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundation in relevant skills with room to grow in advanced machine learning and production-grade systems.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require mentorship and training in advanced concepts and tools.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "1.0",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate is a strong fit for entry-level roles with potential for growth in AI and machine learning. Consider providing mentorship opportunities to address gaps.",
+  "Email": "cdpi.e2e.candidate@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/alex-morgan-e2e-test",
+  "resume_name": "alex_morgan_resume.pdf"
+}
+[2026-10-24 10:32:40] Completed: alex_morgan_resume.pdf
+[2026-10-24 14:01:32] BE Project Resume Parsing Start
+[2026-10-24 14:01:32] Parsing started: alex_morgan_resume.pdf
+[2026-10-24 14:01:43] Semantic ranking for alex_morgan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-24 14:02:25] Context lake: wrote candidate document for alex_morgan_resume.pdf
+[2026-10-24 14:02:25] Details: {
+  "Name": "Not Provided",
+  "JD Match": "90%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Machine learning",
+    "LLM concepts",
+    "Debugging",
+    "Problem-solving"
+  ],
+  "Profile Summary": "The candidate has a strong academic and internship background in Python programming, REST API development, data processing, and basic machine-learning/LLM concepts, aligning well with the responsibilities of the Junior Software Engineer \u2014 AI Document Processing role.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "LLM API",
+        "scikit-learn"
+      ],
+      "Impact": "Developed a prototype for resume parsing, including input validation, LLM-assisted document section classification, and data extraction, which aligns with the job's focus on AI-powered document processing."
+    }
+  ],
+  "Certifications & Courses": [
+    "Introduction to Machine Learning (synthetic/test-data credential)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL and relational database management",
+    "Data validation and cleaning",
+    "Basic machine-learning and LLM concepts",
+    "Debugging and problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates relevant technical skills and academic background, indicating strong potential to adapt to the role and company culture.",
+  "Potential Concerns": [
+    "No experience with Java, which is listed as an alternative programming language in the job description."
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags detected."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With a strong foundation in relevant skills and academic background, the candidate has significant potential to grow within the company.",
+  "Effort Needed by the Company": "Low \u2013 The candidate already possesses most of the required skills and experience, with only minor gaps to address.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "0.5-1 year (internship and academic projects)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with the job description and has potential for growth. Minor gap in Java experience, but this is not critical given their strong Python skills.",
+  "Email": "cdpi.e2e.candidate@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/alex-morgan-e2e-test",
+  "resume_name": "alex_morgan_resume.pdf"
+}
+[2026-10-24 14:02:25] Completed: alex_morgan_resume.pdf

@@ -64,3 +64,99 @@ class TestRecordLlmCall:
         observability.record_llm_call(label="still_logged_locally")
         assert log_path.exists()
         assert "still_logged_locally" in log_path.read_text(encoding="utf-8")
+
+
+class TestAppInsightsReadyRaisesLoggerLevel:
+    """Added in the Azure real-services audit pass: a REAL bug was found
+    and fixed here -- configure_azure_monitor() attaches its exporter to
+    the root logger but never raises any logger's effective level, and
+    Python's root logger defaults to WARNING. record_ai_trace()/
+    record_llm_call() both log at INFO, so every call was being silently
+    dropped by Python's own logging module before Azure Monitor's
+    handler ever saw it -- a deployment could have Application Insights
+    fully configured (SDK init succeeds) and still send ZERO real
+    telemetry. These tests pin the fix: successful configuration must
+    raise the two telemetry loggers' levels to INFO."""
+
+    def test_golden_successful_configuration_raises_logger_levels_to_info(self, monkeypatch):
+        import logging
+
+        for name in observability._TELEMETRY_LOGGER_NAMES:
+            logging.getLogger(name).setLevel(logging.WARNING)  # reset to the real default this bug exhibited
+
+        monkeypatch.setattr(observability, "_appinsights_state", None)
+        monkeypatch.setattr(observability, "get_secret", lambda name: "InstrumentationKey=fake-for-test")
+
+        class FakeConfigureModule:
+            @staticmethod
+            def configure_azure_monitor(**kwargs):
+                return None
+
+        import sys
+        monkeypatch.setitem(sys.modules, "azure.monitor.opentelemetry", FakeConfigureModule())
+
+        assert observability._appinsights_ready() is True
+        for name in observability._TELEMETRY_LOGGER_NAMES:
+            assert logging.getLogger(name).isEnabledFor(logging.INFO) is True
+
+    def test_adversarial_without_the_fix_info_calls_would_be_silently_dropped(self):
+        """Documents exactly what the bug looked like -- a logger at its
+        Python default level silently discards .info() calls before any
+        handler (including Azure Monitor's) ever runs. Uses an unrelated
+        fresh logger name (not a child of cdpi.ai_trace/
+        cdpi.llm_observability, which other tests in this class
+        intentionally mutate) so this assertion is independent of test
+        execution order."""
+        import logging
+
+        fresh_logger = logging.getLogger("some_unrelated_never_configured_logger_xyz")
+        assert fresh_logger.isEnabledFor(logging.INFO) is False  # the exact condition that silently dropped every span
+
+    def test_golden_not_configured_never_raises_logger_levels(self, monkeypatch):
+        import logging
+
+        for name in observability._TELEMETRY_LOGGER_NAMES:
+            logging.getLogger(name).setLevel(logging.WARNING)
+        monkeypatch.setattr(observability, "_appinsights_state", None)
+        monkeypatch.setattr(observability, "get_secret", lambda name: None)
+
+        assert observability._appinsights_ready() is False
+        for name in observability._TELEMETRY_LOGGER_NAMES:
+            assert logging.getLogger(name).isEnabledFor(logging.INFO) is False
+
+
+class TestRunConnectivityTest:
+    def test_golden_always_writes_to_local_log_with_a_real_correlation_id(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(observability, "TRACE_LOG_PATH", tmp_path / "ai_traces.jsonl")
+        monkeypatch.setattr(observability, "_appinsights_ready", lambda: False)
+
+        result = observability.run_connectivity_test()
+        assert result["written_to_local_log"] is True
+        assert result["correlation_id"].startswith("connectivity-test-")
+        assert result["application_insights_configured"] is False
+        content = (tmp_path / "ai_traces.jsonl").read_text(encoding="utf-8")
+        assert result["correlation_id"] in content
+
+    def test_golden_reports_handoff_when_appinsights_configured(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(observability, "TRACE_LOG_PATH", tmp_path / "ai_traces.jsonl")
+        monkeypatch.setattr(observability, "_appinsights_ready", lambda: True)
+
+        result = observability.run_connectivity_test()
+        assert result["application_insights_handed_off"] is True
+
+    def test_adversarial_never_claims_azure_ingestion_was_verified(self, tmp_path, monkeypatch):
+        """The spec's explicit requirement: initializing/handing off to
+        the SDK must never be reported as proof of real ingestion."""
+        monkeypatch.setattr(observability, "TRACE_LOG_PATH", tmp_path / "ai_traces.jsonl")
+        monkeypatch.setattr(observability, "_appinsights_ready", lambda: True)
+
+        result = observability.run_connectivity_test()
+        assert "does not confirm" in result["note"] or "does NOT confirm" in result["note"]
+
+    def test_golden_distinct_correlation_id_each_call(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(observability, "TRACE_LOG_PATH", tmp_path / "ai_traces.jsonl")
+        monkeypatch.setattr(observability, "_appinsights_ready", lambda: False)
+
+        a = observability.run_connectivity_test()
+        b = observability.run_connectivity_test()
+        assert a["correlation_id"] != b["correlation_id"]

@@ -17,6 +17,7 @@ with .content/.confidence) — not against a live call or a real document.
 """
 
 from secrets_loader import get_secret
+from observability import trace_stage
 
 
 def _require_config():
@@ -48,17 +49,18 @@ def analyze_document(file_bytes: bytes, model_id: str = "prebuilt-document") -> 
     sample documents via Document Intelligence Studio. Noted as a real
     follow-up, not attempted here (no sample documents exist in this
     repo to train against, and it can't be done blind)."""
-    endpoint, key = _require_config()
-    from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
-    from azure.core.credentials import AzureKeyCredential
+    with trace_stage("document_verification", "document_extraction", metadata={"model_id": model_id}):
+        endpoint, key = _require_config()
+        from azure.ai.documentintelligence import DocumentIntelligenceClient
+        from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+        from azure.core.credentials import AzureKeyCredential
 
-    client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
-    poller = client.begin_analyze_document(model_id, AnalyzeDocumentRequest(bytes_source=file_bytes))
-    result = poller.result()
+        client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
+        poller = client.begin_analyze_document(model_id, AnalyzeDocumentRequest(bytes_source=file_bytes))
+        result = poller.result()
 
-    fields = {}
-    for document in result.documents or []:
-        for name, field in (document.fields or {}).items():
-            fields[name] = {"value": field.content, "confidence": field.confidence}
-    return fields
+        fields = {}
+        for document in result.documents or []:
+            for name, field in (document.fields or {}).items():
+                fields[name] = {"value": field.content, "confidence": field.confidence}
+        return fields

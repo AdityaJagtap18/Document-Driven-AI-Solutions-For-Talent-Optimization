@@ -6,7 +6,7 @@
  * based on `mode` alone.
  */
 window.CDPI_CONFIG = {
-  mode: "mock", // "mock" | "real"
+  mode: "real", // "mock" | "real" -- temporarily real to show the verified Azure Readiness page live
   baseUrl: "http://localhost:7071",
   functionKey: "",
 };

@@ -2,11 +2,12 @@
 .SYNOPSIS
     Deletes the entire resource group created by deploy.ps1, then purges
     the soft-deleted Cognitive Services accounts (Document Intelligence,
-    Speech) left behind -- without the purge, redeploying later with the
-    same NamePrefix can fail because those two resource types reserve
-    their name/subdomain for a retention period after deletion. Cosmos DB
-    and Storage don't have this issue with the configuration deploy.ps1
-    uses, so nothing extra is needed for those.
+    Speech) AND the soft-deleted Key Vault left behind -- without the
+    purge, redeploying later with the same NamePrefix can fail because
+    those resource types reserve their name/subdomain for a retention
+    period after deletion. Cosmos DB and Storage don't have this issue
+    with the configuration deploy.ps1 uses, so nothing extra is needed
+    for those.
 
     *** UNTESTED. *** Same caveat as deploy.ps1 -- reviewed against the
     `az` CLI docs, never run against a real subscription.
@@ -17,9 +18,14 @@
 
 .PARAMETER Location
     Must match the region deploy.ps1 used -- needed to find the
-    soft-deleted Cognitive Services accounts to purge (they're tracked
-    per-region, not per-resource-group, since the resource group itself
-    won't exist anymore by the time this step runs).
+    soft-deleted Cognitive Services accounts and Key Vault to purge
+    (they're tracked per-region, not per-resource-group, since the
+    resource group itself won't exist anymore by the time this step runs).
+
+.PARAMETER NamePrefix
+    Must match the -NamePrefix deploy.ps1 used (default "cdpipoc") --
+    used to find only THIS project's soft-deleted Key Vault to purge,
+    not every soft-deleted vault in the subscription/region.
 
 .EXAMPLE
     ./destroy.ps1 -ResourceGroupName cdpi-poc-rg -Location eastus
@@ -29,7 +35,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ResourceGroupName,
 
-    [string]$Location = "eastus"
+    [string]$Location = "eastus",
+
+    [string]$NamePrefix = "cdpipoc"
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,4 +84,22 @@ foreach ($acct in $deletedAccounts) {
 }
 
 Write-Host ""
-Write-Host "Teardown complete -- Cosmos DB and everything else in the resource group is gone. The .env file still has the now-invalid endpoints/keys from the last deploy; they'll be overwritten the next time you run deploy.ps1." -ForegroundColor Green
+Write-Host "Purging soft-deleted Key Vault(s) matching prefix '$NamePrefix' in '$Location'..." -ForegroundColor Cyan
+
+$deletedVaults = az keyvault list-deleted --query "[?location=='$Location']" -o json | ConvertFrom-Json
+$matchingVaults = $deletedVaults | Where-Object { $_.name -like "$NamePrefix-kv-*" }
+
+foreach ($vault in $matchingVaults) {
+    Write-Host "Purging Key Vault '$($vault.name)'..." -ForegroundColor Cyan
+    try {
+        az keyvault purge --name $vault.name --location $Location
+        Write-Host "  Purged." -ForegroundColor Green
+    } catch {
+        Write-Host "  Could not purge '$($vault.name)' automatically: $_" -ForegroundColor Yellow
+        Write-Host "  If you redeploy with the same prefix and it fails on this resource, purge it manually:" -ForegroundColor Yellow
+        Write-Host "    az keyvault purge --name $($vault.name) --location $Location" -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
+Write-Host "Teardown complete -- Cosmos DB, Key Vault, and everything else in the resource group is gone. The .env file still has the now-invalid endpoints/URL from the last deploy; they'll be overwritten the next time you run deploy.ps1." -ForegroundColor Green

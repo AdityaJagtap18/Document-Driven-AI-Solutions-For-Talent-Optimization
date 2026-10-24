@@ -138,6 +138,32 @@ PERMISSIONS = {
     "screening.approve": {"label": "Approve bulk decisions", "description": "Approve or reject a recruiter's bulk-decision proposal -- the only place it actually takes effect.", "module": "Candidate Management"},
 
     "pages.manage": {"label": "Manage page access", "description": "View the page registry and configure which roles may navigate to which pages.", "module": "Page Access Management"},
+
+    "observability.read": {"label": "View AI observability", "description": "View aggregate AI Observability Center metrics (totals, rates, latency percentiles, cost breakdown).", "module": "AI Observability"},
+    "observability.traces.read": {"label": "View detailed AI traces", "description": "View individual trace/span detail, including stage-level metadata -- a stronger permission than observability.read, since trace detail is closer to raw debugging information.", "module": "AI Observability"},
+
+    "azure.read": {"label": "View Azure integrations", "description": "View the Azure service integration inventory and current cached status.", "module": "Azure Service Hub"},
+    "azure.config.read": {"label": "View Azure integration configuration", "description": "View an integration's detailed configuration, diagnostics, and health-check history (never secret values).", "module": "Azure Service Hub"},
+    "azure.manage": {"label": "Run Azure connection checks", "description": "Trigger a live connection health check against an Azure integration.", "module": "Azure Service Hub"},
+    "azure.register": {"label": "Register Azure integrations", "description": "Register a new integration instance, or remove an existing registration (never deletes the underlying Azure resource).", "module": "Azure Service Hub"},
+    "azure.config.write": {"label": "Edit Azure integration configuration", "description": "Update an integration instance's non-secret configuration.", "module": "Azure Service Hub"},
+    "azure.enable": {"label": "Enable/disable Azure integrations", "description": "Enable or disable CDPI's use of a registered integration.", "module": "Azure Service Hub"},
+    "azure.resources.discover": {"label": "Discover Azure resources", "description": "Run real Azure Resource Manager discovery for an integration that supports it.", "module": "Azure Service Hub"},
+    "azure.resources.write": {"label": "Provision/update Azure resources", "description": "Reserved for future resource lifecycle operations -- no adapter in this release implements a verified write operation.", "module": "Azure Service Hub"},
+    "azure.resources.delete": {"label": "Delete Azure resources", "description": "Reserved for future resource lifecycle operations -- no adapter in this release implements a verified delete operation.", "module": "Azure Service Hub"},
+    "secrets.read": {"label": "View secrets inventory", "description": "View which secrets this app reads, whether each currently resolves, and from Key Vault or .env -- never the secret values themselves.", "module": "Secrets Management"},
+    "secrets.write": {"label": "Set secret values", "description": "Write a secret's value to the local .env file. The value is never stored anywhere else, never returned by any API, and never shown again after submission.", "module": "Secrets Management"},
+    "rag.config.read": {"label": "View RAG configuration", "description": "View the active and draft RAG pipeline configuration (chunking, retrieval, generation) and its change history.", "module": "RAG Configuration"},
+    "rag.config.write": {"label": "Edit RAG configuration", "description": "Create or update a draft RAG configuration.", "module": "RAG Configuration"},
+    "rag.config.activate": {"label": "Activate RAG configuration", "description": "Promote a validated draft RAG configuration to active, or roll back to a prior version.", "module": "RAG Configuration"},
+    "rag.preview.run": {"label": "Run RAG retrieval preview", "description": "Run a real retrieval (and optionally generation) preview against a test query using the draft or active configuration.", "module": "RAG Configuration"},
+    "rag.prompts.manage": {"label": "Manage RAG prompt templates", "description": "Create draft prompt template versions and activate/roll back which version is live.", "module": "RAG Configuration"},
+    "comms.config.read": {"label": "View communications configuration", "description": "View the active and draft email/WhatsApp/delivery-policy configuration, the interview bot configuration, and their change history.", "module": "Communications Configuration"},
+    "comms.config.write": {"label": "Edit communications configuration", "description": "Create or update a draft communications or interview bot configuration.", "module": "Communications Configuration"},
+    "comms.config.activate": {"label": "Activate communications configuration", "description": "Promote a validated draft to active, or roll back to a prior version.", "module": "Communications Configuration"},
+    "comms.test.send": {"label": "Send test communications", "description": "Run a connection test or send a labeled test message to an explicitly chosen recipient.", "module": "Communications Configuration"},
+    "comms.templates.manage": {"label": "Manage message templates", "description": "Create draft template versions and activate/roll back which version is live.", "module": "Communications Configuration"},
+    "comms.delivery.read": {"label": "View delivery log", "description": "View real delivery/submission records for sent communications.", "module": "Communications Configuration"},
 }
 
 PERMISSION_IDS = list(PERMISSIONS.keys())
@@ -172,6 +198,11 @@ DEFAULT_ROLES = [
             "interviews.read", "interviews.manage",
             "documents.verify", "analytics.read",
             "screening.propose",
+            # Added for the Recruiter persona's (P02) required Resume
+            # Processing / Communication Delivery reports (CDPI Product
+            # Personas doc, section 8.4) -- both reports already existed
+            # before this grant, gated by these two permissions.
+            "observability.read", "comms.delivery.read",
         ],
     },
     {
@@ -189,6 +220,90 @@ DEFAULT_ROLES = [
         "description": "No administrative or recruiter permissions. Candidates use the existing anonymous email-based status check (candidates/by-email/{email}), not this permission system, to see their own application.",
         "is_system": True,
         "permission_ids": [],
+    },
+    # -----------------------------------------------------------------
+    # Persona-to-role mapping (CDPI Product Personas and Reporting
+    # Requirements, "Centralized RBAC" section): 8 of the 12 documented
+    # personas have no role yet. Every permission below already existed
+    # before this mapping -- these roles grant existing permission
+    # SUBSETS, matching each persona's described responsibilities;
+    # nothing here is a new capability. The other 4 personas already map
+    # directly: Candidate -> "candidate", Recruiter -> "recruiter",
+    # Interviewer -> "interviewer", Platform Administrator/Super Admin ->
+    # "admin" (this app has no separate Super Admin tier -- "admin" IS
+    # that persona, full permission set, see the role above).
+    # -----------------------------------------------------------------
+    {
+        "role_key": "hiring_manager",
+        "display_name": "Hiring Manager",
+        "description": "Reviews shortlists and candidate evidence for assigned vacancies, submits hiring feedback/decisions. Read-focused -- cannot change recruitment workflow, scoring, or screening decisions.",
+        "is_system": True,
+        "permission_ids": ["candidates.read", "interviews.read", "analytics.read"],
+    },
+    {
+        "role_key": "recruitment_ops_manager",
+        "display_name": "Recruitment Operations Manager",
+        "description": "Monitors pipeline throughput, recruiter workload, and interview/communication operations across the recruitment team. Broader read access than a Recruiter, plus interview-stage management, but not scoring/AI/Azure configuration.",
+        "is_system": True,
+        "permission_ids": ["candidates.read", "jds.read", "interviews.read", "interviews.manage", "analytics.read", "audit.read", "comms.delivery.read", "observability.read"],
+    },
+    {
+        "role_key": "hr_director",
+        "display_name": "HR Director / Talent Acquisition Leader",
+        "description": "Executive view of aggregate recruitment performance only -- no individual candidate records, no document access, no configuration permissions. Matches the persona's 'organization-level aggregated data' access scope.",
+        "is_system": True,
+        "permission_ids": ["analytics.read"],
+    },
+    {
+        "role_key": "recruitment_administrator",
+        "display_name": "Recruitment Administrator",
+        "description": "Maintains recruitment-specific operational settings (message templates, interview-stage configuration) -- not platform-wide user/role administration, AI configuration, or Azure infrastructure.",
+        "is_system": True,
+        "permission_ids": ["interviews.manage", "comms.config.read", "comms.templates.manage"],
+    },
+    {
+        "role_key": "ai_configuration_administrator",
+        "display_name": "AI Configuration Administrator",
+        "description": "Configures candidate-scoring-adjacent RAG settings and prompt templates -- the full rag.* permission set already built for the RAG Configuration Console. No Azure credential or platform security access.",
+        "is_system": True,
+        "permission_ids": [
+            "rag.config.read", "rag.config.write", "rag.config.activate", "rag.preview.run", "rag.prompts.manage",
+            # Added for the persona's required Score Distribution Report
+            # (CDPI Product Personas doc section 8.4, P09) -- reuses the
+            # existing Admin Reports score-distribution chart, gated the
+            # same way it already was for every other role that sees it.
+            "analytics.read",
+        ],
+    },
+    {
+        "role_key": "azure_cloud_administrator",
+        "display_name": "Azure / Cloud Administrator",
+        "description": "Configures and validates Azure service integrations -- the full azure.* permission set already built for the Azure Service Hub, plus secrets.read to check secret presence (never values). No candidate-scoring or platform-identity access.",
+        "is_system": True,
+        "permission_ids": ["azure.read", "azure.config.read", "azure.manage", "azure.register", "azure.config.write", "azure.enable", "azure.resources.discover", "secrets.read", "observability.read"],
+    },
+    {
+        "role_key": "ai_operations_mlops",
+        "display_name": "AI Operations / MLOps Engineer",
+        "description": "Monitors AI workflow reliability, latency, and cost via the AI Observability Center -- read-only, including trace-level detail. Cannot change scoring/RAG configuration or Azure resources.",
+        "is_system": True,
+        "permission_ids": ["observability.read", "observability.traces.read"],
+    },
+    {
+        "role_key": "security_compliance_auditor",
+        "display_name": "Security, Risk & Compliance Auditor",
+        "description": "Read-only access to audit evidence, secret presence (never values), and the user/role configuration being audited. Cannot modify anything it reviews -- matches the persona's explicit read-only requirement.",
+        "is_system": True,
+        "permission_ids": [
+            "audit.read", "secrets.read", "users.read", "roles.read",
+            # Added for the persona's required Configuration Change Audit
+            # / AI Governance Report (CDPI Product Personas doc section
+            # 8.4, P12) -- all three are read-only views into config
+            # history the auditor must be able to inspect without being
+            # able to CHANGE any of it (azure/rag/comms *.write/*.activate
+            # permissions are deliberately NOT granted here).
+            "rag.config.read", "azure.config.read", "comms.config.read",
+        ],
     },
 ]
 
@@ -279,6 +394,68 @@ PAGES = [
         "module": "Page Access Management", "route_type": "page", "is_protected": True,
         "required_permission": "pages.manage",
         "description": "Admin Panel: this page -- the page registry and the per-role page-access policy editor.",
+    },
+    {
+        "page_id": "ai_observability", "name": "AI Observability", "route": "ai-observability",
+        "module": "AI Observability", "route_type": "page", "is_protected": True,
+        "required_permission": "observability.read",
+        "description": "Admin Panel: LLM call metrics (tokens/cost/latency) and AI pipeline-stage traces "
+                        "(embedding generation, document extraction, etc.) -- see observability.py.",
+    },
+    {
+        "page_id": "azure_observability_report", "name": "Azure Observability Report", "route": "azure-observability-report",
+        "module": "AI Observability", "route_type": "page", "is_protected": True,
+        "required_permission": "observability.read",
+        "description": "Admin Panel: real Azure Monitor/Log Analytics telemetry query-back (request volume, latency, "
+                        "AI usage, recent errors, ingestion health) composed with the existing AI Observability Center "
+                        "and Azure Readiness data into one report -- see azure_monitor_query.py and docs/AZURE_OBSERVABILITY.md.",
+    },
+    {
+        "page_id": "azure_services", "name": "Azure Service Hub", "route": "azure-services",
+        "module": "Azure Service Hub", "route_type": "page", "is_protected": True,
+        "required_permission": "azure.read",
+        "description": "Admin Panel: the registry of Azure integrations this repo actually has code for, "
+                        "their configuration status, and live connection checks where one can be safely run "
+                        "-- see azure_integrations.py.",
+    },
+    {
+        "page_id": "secrets_management", "name": "Secrets", "route": "secrets",
+        "module": "Secrets Management", "route_type": "page", "is_protected": True,
+        "required_permission": "secrets.read",
+        "description": "Admin Panel: every secret this app actually reads (via secrets_loader.get_secret()), "
+                        "whether each currently resolves, and from Key Vault or .env -- never the values "
+                        "themselves. See secrets_registry.py.",
+    },
+    {
+        "page_id": "rag_config", "name": "RAG Configuration", "route": "rag-config",
+        "module": "RAG Configuration", "route_type": "page", "is_protected": True,
+        "required_permission": "rag.config.read",
+        "description": "Admin Panel: configure and version the resume-matching RAG pipeline's chunking, "
+                        "retrieval, generation, and prompt templates -- see rag_config.py.",
+    },
+    {
+        "page_id": "communications_config", "name": "Communications Configuration", "route": "communications-config",
+        "module": "Communications Configuration", "route_type": "page", "is_protected": True,
+        "required_permission": "comms.config.read",
+        "description": "Admin Panel: configure email/WhatsApp/SMS delivery, the interview bot, message "
+                        "templates, and delivery policies -- see comms_config.py.",
+    },
+    {
+        "page_id": "azure_readiness", "name": "Azure Readiness", "route": "azure-readiness",
+        "module": "Azure Service Hub", "route_type": "page", "is_protected": True,
+        "required_permission": "azure.config.read",
+        "description": "Admin Panel: centralized Azure integration readiness -- one composed status per "
+                        "service (NOT_CONFIGURED/AUTHENTICATION_REQUIRED/READY/etc.), Azure CLI login status, "
+                        "and the ephemeral provision-test-destroy workflow. See azure_readiness.py.",
+    },
+    {
+        "page_id": "persona_catalogue", "name": "Persona Catalogue", "route": "persona-catalogue",
+        "module": "Role & Permission Management", "route_type": "page", "is_protected": True,
+        "required_permission": "roles.read",
+        "description": "Admin Panel: the 12 representative persona configurations (CDPI Product Personas "
+                        "doc Section 8) -- each persona's role mapping, allowed pages, and report "
+                        "authorization/status, derived live from the real role and page registry, "
+                        "never a separate authorization table. See persona_catalogue.py.",
     },
     {
         "page_id": "candidate_portal", "name": "Candidate Portal", "route": "portal",

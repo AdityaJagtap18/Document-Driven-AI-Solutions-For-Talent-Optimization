@@ -559,3 +559,624 @@ def sync_pages() -> dict:
             set_page_access(policy["page_id"], policy["role_key"], policy["allowed"], actor="system:initial_seed")
 
     return {"new": new_ids, "updated": updated_ids, "stale": stale_ids, "first_run": is_first_run}
+
+
+# ---------------------------------------------------------------------------
+# Azure Service Hub: integration instances (one per adapter_type this app
+# actually uses -- see azure_integrations.ADAPTER_TYPES) and health-check
+# HISTORY (not just the latest result). Registering an instance never
+# stores a secret value -- only non-secret metadata (display name,
+# environment, and, for resource discovery, a subscription_id/
+# resource_group scope); the real credential always comes from
+# secrets_loader at check/discovery time, unchanged from before this
+# feature. See azure_integrations.py's module docstring for the full
+# security rationale.
+# ---------------------------------------------------------------------------
+def create_integration_instance(integration_id: str, adapter_type: str, display_name: str, environment: str,
+                                 config: dict, created_by: str) -> dict:
+    doc = {
+        "id": integration_id, "integration_id": integration_id, "adapter_type": adapter_type,
+        "display_name": display_name, "environment": environment, "config": config or {},
+        "config_version": 1, "enabled": False,  # never enabled at registration -- see api_blueprint.py's enable endpoint
+        "lifecycle_status": "draft",  # draft -> active (on enable) -> disabled; see the lifecycle doc comment on set_azure_integration_enabled_endpoint
+        "last_connection_outcome": None, "last_health_checked_at": None, "last_failure": None,
+        "created_by": created_by, "created_at": _now(), "updated_by": created_by, "updated_at": _now(),
+    }
+    created = get_container("integration_instances").upsert_item(doc)
+    record_integration_config_change(integration_id, "registered", created_by, {"adapter_type": adapter_type, "environment": environment, "config_version": 1})
+    return created
+
+
+def get_integration_instance(integration_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("integration_instances").read_item(item=integration_id, partition_key=integration_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def list_integration_instances() -> list:
+    container = get_container("integration_instances")
+    return list(container.query_items(query="SELECT * FROM c ORDER BY c.display_name ASC", enable_cross_partition_query=True))
+
+
+def update_integration_instance(doc: dict) -> dict:
+    """Caller passes the full document back (read, mutate, save) -- same
+    convention as update_user()/update_role()/update_page(). Does NOT
+    bump config_version/updated_at itself -- callers that change config
+    do that explicitly (see api_blueprint.py's optimistic-concurrency
+    check), so a status-only update (e.g. after a health check) doesn't
+    look like a configuration change in the audit trail."""
+    return get_container("integration_instances").upsert_item(doc)
+
+
+def record_integration_health_check(integration_id: str, result: dict) -> dict:
+    """Appends one health-check record to history (never overwritten) AND
+    updates the owning instance's cached last_connection_outcome/
+    last_health_checked_at, so the inventory list can show current status
+    without re-running a check for every row."""
+    doc = dict(result)
+    doc["id"] = str(uuid.uuid4())
+    doc["integration_id"] = integration_id
+    get_container("integration_health_checks").upsert_item(doc)
+
+    instance = get_integration_instance(integration_id)
+    if instance is not None:
+        instance["last_connection_outcome"] = result.get("outcome")
+        instance["last_health_checked_at"] = result.get("checked_at")
+        # Distinct "last failure" summary (redacted, same fields as the health-check
+        # record) for quick display without re-querying history -- cleared on a
+        # healthy outcome rather than left showing a stale failure.
+        instance["last_failure"] = None if result.get("outcome") == "healthy" else {
+            "outcome": result.get("outcome"), "error_category": result.get("error_category"),
+            "detail": result.get("detail"), "checked_at": result.get("checked_at"),
+        }
+        update_integration_instance(instance)
+    return doc
+
+
+def record_integration_config_change(integration_id: str, operation: str, actor: str, safe_summary: dict) -> dict:
+    """Appends one entry to the configuration CHANGE history (separate
+    from health-check history -- see client.py's container comment).
+    `safe_summary` must never contain a secret value or resolved
+    credential -- callers pass only non-secret field names/booleans/
+    versions, same discipline as audit_log entries elsewhere in this
+    repo. This is what powers the Configuration History tab and
+    supports rollback (restoring a prior config snapshot as a NEW
+    version, never mutating history)."""
+    doc = {
+        "id": str(uuid.uuid4()), "integration_id": integration_id, "operation": operation,
+        "actor": actor, "safe_summary": safe_summary or {}, "recorded_at": _now(),
+    }
+    return get_container("integration_config_history").upsert_item(doc)
+
+
+def list_integration_config_history(integration_id: str, limit: int = 50) -> list:
+    container = get_container("integration_config_history")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.integration_id = @iid ORDER BY c.recorded_at DESC",
+            parameters=[{"name": "@iid", "value": integration_id}],
+            partition_key=integration_id,
+        )
+    )
+    return items[:limit]
+
+
+def list_integration_health_checks(integration_id: str, limit: int = 50) -> list:
+    container = get_container("integration_health_checks")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.integration_id = @iid ORDER BY c.checked_at DESC",
+            parameters=[{"name": "@iid", "value": integration_id}],
+            partition_key=integration_id,
+        )
+    )
+    return items[:limit]
+
+
+def ensure_default_integration_instances() -> list:
+    """Seeds one pre-registered, pre-enabled IntegrationInstance per
+    ADAPTER_TYPES entry on first run -- these are the integrations this
+    app was ALREADY using (via secrets_loader/.env) before the Azure
+    Service Hub existed; seeding them as already-enabled preserves that
+    continuity instead of making every existing integration look
+    "unregistered" the moment this feature ships. Idempotent -- only
+    creates instances that don't already exist. Called once at Function
+    App / bootstrap_iam.py startup, same pattern as
+    ensure_default_roles()/sync_pages()."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from azure_integrations import ADAPTER_TYPES  # noqa: E402
+
+    created = []
+    for adapter_type, adapter in ADAPTER_TYPES.items():
+        if adapter.get("status") == "planned":
+            continue  # nothing is "already in use" for an adapter with no implementation yet
+        integration_id = adapter_type  # one default instance per adapter, same id as the type
+        if get_integration_instance(integration_id) is None:
+            doc = create_integration_instance(
+                integration_id=integration_id, adapter_type=adapter_type, display_name=adapter["name"],
+                environment="default", config={}, created_by="system:initial_seed",
+            )
+            doc["enabled"] = True
+            doc["lifecycle_status"] = "active"
+            update_integration_instance(doc)
+            created.append(integration_id)
+    return created
+
+
+# ---------------------------------------------------------------------------
+# RAG Configuration Console -- see ../rag_config.py's module docstring for
+# the full rationale. Two singleton documents in rag_configurations:
+# id="active" (what ResumeParser.py actually reads) and id="draft" (an
+# admin's in-progress edit, consumed on activation). Config CHANGE
+# history is separate, same "distinct from a test-run log" pattern as
+# integration_config_history.
+# ---------------------------------------------------------------------------
+def get_active_rag_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("rag_configurations").read_item(item="active", partition_key="active")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def get_draft_rag_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("rag_configurations").read_item(item="draft", partition_key="draft")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def save_draft_rag_config(fields: dict, actor: str) -> dict:
+    """Creates or overwrites the single draft document. `fields` is the
+    full {chunking, retrieval, generation} dict the caller wants to try
+    -- validated by the caller (rag_config.validate_config()) before this
+    is called, since this function just persists, it doesn't judge."""
+    active = get_active_rag_config()
+    doc = {
+        "id": "draft", "lifecycle_status": "draft",
+        "config_version": (active["config_version"] + 1) if active else 1,
+        "chunking": fields["chunking"], "retrieval": fields["retrieval"], "generation": fields["generation"],
+        "created_by": actor, "created_at": _now(), "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("rag_configurations").upsert_item(doc)
+    record_rag_config_change("draft_saved", actor, {"config_version": doc["config_version"]})
+    return saved
+
+
+def activate_rag_config(actor: str) -> dict:
+    """Promotes the current draft to active -- caller must have already
+    validated it (rag_config.validate_config()). The draft is deleted
+    afterward (consumed), so GET .../draft honestly reports "no pending
+    draft" until an admin starts a new edit -- never a stale draft that
+    looks unreviewed forever."""
+    draft = get_draft_rag_config()
+    if draft is None:
+        raise ValueError("No draft configuration exists to activate.")
+    active_doc = {
+        "id": "active", "lifecycle_status": "active", "config_version": draft["config_version"],
+        "chunking": draft["chunking"], "retrieval": draft["retrieval"], "generation": draft["generation"],
+        "created_by": draft["created_by"], "created_at": draft["created_at"],
+        "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("rag_configurations").upsert_item(active_doc)
+    get_container("rag_configurations").delete_item(item="draft", partition_key="draft")
+    record_rag_config_change("activated", actor, {
+        "config_version": saved["config_version"],
+        "chunking": saved["chunking"], "retrieval": saved["retrieval"], "generation": saved["generation"],
+    })
+    return saved
+
+
+def record_rag_config_change(operation: str, actor: str, safe_summary: dict) -> dict:
+    doc = {"id": str(uuid.uuid4()), "operation": operation, "actor": actor, "safe_summary": safe_summary or {}, "recorded_at": _now()}
+    return get_container("rag_config_history").upsert_item(doc)
+
+
+def list_rag_config_history(limit: int = 50) -> list:
+    container = get_container("rag_config_history")
+    items = list(container.query_items(query="SELECT * FROM c ORDER BY c.recorded_at DESC", enable_cross_partition_query=True))
+    return items[:limit]
+
+
+# ---------------------------------------------------------------------------
+# RAG prompt versions -- one container, partitioned by prompt_id, holding
+# EVERY version ever created (never deleted). Exactly one version per
+# prompt_id may have status "active" at a time; activating a new one
+# demotes the previous active version to "superseded", never deletes it.
+# ---------------------------------------------------------------------------
+def list_rag_prompt_versions(prompt_id: str) -> list:
+    container = get_container("rag_prompt_versions")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.prompt_id = @pid ORDER BY c.version DESC",
+            parameters=[{"name": "@pid", "value": prompt_id}],
+            partition_key=prompt_id,
+        )
+    )
+    return items
+
+
+def get_active_rag_prompt_version(prompt_id: str):
+    versions = list_rag_prompt_versions(prompt_id)
+    return next((v for v in versions if v["status"] == "active"), None)
+
+
+def create_rag_prompt_draft_version(prompt_id: str, template: str, actor: str) -> dict:
+    existing = list_rag_prompt_versions(prompt_id)
+    next_version = (max((v["version"] for v in existing), default=0)) + 1
+    doc = {
+        "id": f"{prompt_id}:v{next_version}", "prompt_id": prompt_id, "version": next_version,
+        "template": template, "status": "draft", "created_by": actor, "created_at": _now(),
+    }
+    saved = get_container("rag_prompt_versions").upsert_item(doc)
+    record_rag_config_change("prompt_draft_created", actor, {"prompt_id": prompt_id, "version": next_version})
+    return saved
+
+
+def activate_rag_prompt_version(prompt_id: str, version: int, actor: str) -> dict:
+    """Marks `version` active and demotes whichever version was
+    previously active (if any) to "superseded" -- never deletes a
+    version, so every prompt text that was ever live stays inspectable
+    and reusable for a future rollback."""
+    versions = list_rag_prompt_versions(prompt_id)
+    target = next((v for v in versions if v["version"] == version), None)
+    if target is None:
+        raise ValueError(f"Prompt '{prompt_id}' has no version {version}.")
+
+    container = get_container("rag_prompt_versions")
+    for v in versions:
+        if v["status"] == "active" and v["version"] != version:
+            v["status"] = "superseded"
+            container.upsert_item(v)
+    target["status"] = "active"
+    saved = container.upsert_item(target)
+    record_rag_config_change("prompt_activated", actor, {"prompt_id": prompt_id, "version": version})
+    return saved
+
+
+#  Communications Configuration Console -- see ../comms_config.py's module
+# docstring. Same Draft/Active singleton + separate change-history pattern
+# as rag_configurations/rag_config_history, duplicated here on purpose
+# (not refactored into one shared generic function) because the two
+# config shapes (comms vs. interview-bot) are deliberately independent
+# per the spec's "keep them separate" requirement -- a shared helper
+# would recouple them.
+# ---------------------------------------------------------------------------
+def get_active_comms_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("comms_configurations").read_item(item="active", partition_key="active")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def get_draft_comms_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("comms_configurations").read_item(item="draft", partition_key="draft")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def save_draft_comms_config(fields: dict, actor: str) -> dict:
+    active = get_active_comms_config()
+    doc = {
+        "id": "draft", "lifecycle_status": "draft",
+        "config_version": (active["config_version"] + 1) if active else 1,
+        "email": fields["email"], "whatsapp": fields["whatsapp"], "delivery_policies": fields["delivery_policies"],
+        "created_by": actor, "created_at": _now(), "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("comms_configurations").upsert_item(doc)
+    record_comms_config_change("draft_saved", actor, {"config_version": doc["config_version"]})
+    return saved
+
+
+def activate_comms_config(actor: str) -> dict:
+    draft = get_draft_comms_config()
+    if draft is None:
+        raise ValueError("No draft configuration exists to activate.")
+    active_doc = {
+        "id": "active", "lifecycle_status": "active", "config_version": draft["config_version"],
+        "email": draft["email"], "whatsapp": draft["whatsapp"], "delivery_policies": draft["delivery_policies"],
+        "created_by": draft["created_by"], "created_at": draft["created_at"],
+        "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("comms_configurations").upsert_item(active_doc)
+    get_container("comms_configurations").delete_item(item="draft", partition_key="draft")
+    record_comms_config_change("activated", actor, {
+        "config_version": saved["config_version"], "email": saved["email"],
+        "whatsapp": saved["whatsapp"], "delivery_policies": saved["delivery_policies"],
+    })
+    return saved
+
+
+def record_comms_config_change(operation: str, actor: str, safe_summary: dict) -> dict:
+    doc = {"id": str(uuid.uuid4()), "operation": operation, "actor": actor, "safe_summary": safe_summary or {}, "recorded_at": _now()}
+    return get_container("comms_config_history").upsert_item(doc)
+
+
+def list_comms_config_history(limit: int = 50) -> list:
+    container = get_container("comms_config_history")
+    items = list(container.query_items(query="SELECT * FROM c ORDER BY c.recorded_at DESC", enable_cross_partition_query=True))
+    return items[:limit]
+
+
+def get_active_interview_bot_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("interview_bot_configurations").read_item(item="active", partition_key="active")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def get_draft_interview_bot_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("interview_bot_configurations").read_item(item="draft", partition_key="draft")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def save_draft_interview_bot_config(fields: dict, actor: str) -> dict:
+    active = get_active_interview_bot_config()
+    doc = dict(fields)
+    doc["id"] = "draft"
+    doc["lifecycle_status"] = "draft"
+    doc["config_version"] = (active["config_version"] + 1) if active else 1
+    doc["created_by"] = actor
+    doc["created_at"] = _now()
+    doc["updated_by"] = actor
+    doc["updated_at"] = _now()
+    saved = get_container("interview_bot_configurations").upsert_item(doc)
+    record_comms_config_change("interview_bot_draft_saved", actor, {"config_version": doc["config_version"]})
+    return saved
+
+
+def activate_interview_bot_config(actor: str) -> dict:
+    draft = get_draft_interview_bot_config()
+    if draft is None:
+        raise ValueError("No draft interview bot configuration exists to activate.")
+    active_doc = dict(draft)
+    active_doc["id"] = "active"
+    active_doc["lifecycle_status"] = "active"
+    active_doc["updated_by"] = actor
+    active_doc["updated_at"] = _now()
+    saved = get_container("interview_bot_configurations").upsert_item(active_doc)
+    get_container("interview_bot_configurations").delete_item(item="draft", partition_key="draft")
+    record_comms_config_change("interview_bot_activated", actor, {"config_version": saved["config_version"]})
+    return saved
+
+
+def list_comms_template_versions(template_id: str) -> list:
+    container = get_container("comms_template_versions")
+    return list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.template_id = @tid ORDER BY c.version DESC",
+            parameters=[{"name": "@tid", "value": template_id}],
+            partition_key=template_id,
+        )
+    )
+
+
+def get_active_comms_template_version(template_id: str):
+    versions = list_comms_template_versions(template_id)
+    return next((v for v in versions if v["status"] == "active"), None)
+
+
+def create_comms_template_draft_version(template_id: str, subject: str, body: str, actor: str) -> dict:
+    existing = list_comms_template_versions(template_id)
+    next_version = (max((v["version"] for v in existing), default=0)) + 1
+    doc = {
+        "id": f"{template_id}:v{next_version}", "template_id": template_id, "version": next_version,
+        "subject": subject, "body": body, "status": "draft", "created_by": actor, "created_at": _now(),
+    }
+    saved = get_container("comms_template_versions").upsert_item(doc)
+    record_comms_config_change("template_draft_created", actor, {"template_id": template_id, "version": next_version})
+    return saved
+
+
+def activate_comms_template_version(template_id: str, version: int, actor: str) -> dict:
+    versions = list_comms_template_versions(template_id)
+    target = next((v for v in versions if v["version"] == version), None)
+    if target is None:
+        raise ValueError(f"Template '{template_id}' has no version {version}.")
+    container = get_container("comms_template_versions")
+    for v in versions:
+        if v["status"] == "active" and v["version"] != version:
+            v["status"] = "superseded"
+            container.upsert_item(v)
+    target["status"] = "active"
+    saved = container.upsert_item(target)
+    record_comms_config_change("template_activated", actor, {"template_id": template_id, "version": version})
+    return saved
+
+
+def ensure_default_comms_templates() -> list:
+    """Seeds version 1 (already active) of each comms_config.DEFAULT_TEMPLATES
+    entry from the real existing template text -- same "reuse existing
+    templates" rule as ensure_default_rag_prompts()."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from comms_config import DEFAULT_TEMPLATES  # noqa: E402
+
+    seeded = []
+    for template_id, defaults in DEFAULT_TEMPLATES.items():
+        if list_comms_template_versions(template_id):
+            continue
+        doc = create_comms_template_draft_version(template_id, defaults.get("subject", ""), defaults["body"], "system:initial_seed")
+        activate_comms_template_version(template_id, doc["version"], "system:initial_seed")
+        seeded.append(template_id)
+    return seeded
+
+
+def record_comms_delivery(entry: dict) -> dict:
+    """One document per real send ATTEMPT (never a connectivity check).
+    `entry` must include correlation_id (the candidate_id, this
+    container's partition key), channel, provider, submitted_at,
+    outcome ("submitted"/"provider_accepted"/"failed"/"status_unavailable"),
+    and a redacted provider_response snippet -- never a raw credential,
+    phone number, or email address beyond what's already elsewhere in
+    the candidate record."""
+    doc = dict(entry)
+    doc["id"] = str(uuid.uuid4())
+    return get_container("comms_delivery_log").upsert_item(doc)
+
+
+def list_comms_deliveries(correlation_id: str, limit: int = 50) -> list:
+    container = get_container("comms_delivery_log")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.correlation_id = @cid ORDER BY c.submitted_at DESC",
+            parameters=[{"name": "@cid", "value": correlation_id}],
+            partition_key=correlation_id,
+        )
+    )
+    return items[:limit]
+
+
+def list_all_comms_deliveries(limit: int = 500) -> list:
+    """Cross-partition read across every candidate's delivery records --
+    unlike list_comms_deliveries() above, scoped to one correlation_id.
+    Backs the Communication Delivery Report (aggregate, not per-
+    candidate). Same query-shape as list_all_audit_log()."""
+    container = get_container("comms_delivery_log")
+    items = list(
+        container.query_items(
+            query="SELECT * FROM c ORDER BY c.submitted_at DESC",
+            enable_cross_partition_query=True,
+        )
+    )
+    return items[:limit]
+
+
+def has_recent_delivery(correlation_id: str, channel: str, workflow: str, within_minutes: int) -> bool:
+    """Duplicate-send protection: True if a delivery for this
+    (candidate, channel, workflow) was already attempted within the
+    last `within_minutes` -- checked by callers BEFORE sending, not
+    enforced here (this is a read-only query, sending is the caller's
+    decision)."""
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=within_minutes)).isoformat()
+    deliveries = list_comms_deliveries(correlation_id, limit=50)
+    return any(
+        d.get("channel") == channel and d.get("workflow") == workflow and d.get("submitted_at", "") >= cutoff
+        for d in deliveries
+    )
+
+
+def ensure_default_rag_prompts() -> list:
+    """Seeds version 1 of each PROMPT_DEFAULTS entry, already ACTIVE, from
+    the exact template text ResumeParser.py has always hardcoded (rag_
+    config.py's DEFAULT_*_TEMPLATE constants) -- "reuse existing prompt
+    templates" per the spec, not a blank slate. Idempotent -- only seeds
+    a prompt_id that has no versions yet. Called once at bootstrap, same
+    pattern as ensure_default_integration_instances()."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from rag_config import PROMPT_DEFAULTS  # noqa: E402
+
+    seeded = []
+    for prompt_id, defaults in PROMPT_DEFAULTS.items():
+        if list_rag_prompt_versions(prompt_id):
+            continue
+        doc = create_rag_prompt_draft_version(prompt_id, defaults["template"], "system:initial_seed")
+        activate_rag_prompt_version(prompt_id, doc["version"], "system:initial_seed")
+        seeded.append(prompt_id)
+    return seeded
+
+
+def ensure_demo_personas() -> list:
+    """OPT-IN ONLY -- unlike every ensure_default_*() above, this is never
+    called automatically at bootstrap (see bootstrap_iam.py's
+    --create-demo-personas flag, the only caller). Creates one account per
+    persona_catalogue.PERSONAS entry (persona_catalogue.py, CDPI Product
+    Personas doc Section 8) with a random generated password, so these
+    demo accounts are never usable until whoever ran the flag retrieves
+    the printed passwords. Each account is explicitly marked is_demo_persona
+    so they remain visibly distinguishable from real user accounts created
+    through the normal user-management flow (POST /admin/users) -- the
+    spec's explicit "must not be treated as real users" requirement.
+    Idempotent -- a persona whose demo username already exists is skipped,
+    never recreated or password-reset.
+
+    Returns a list of {"username", "password", "role_key", "persona_id"}
+    for accounts actually created this call -- the only moment a plaintext
+    password is available; callers must print/relay it immediately, it is
+    never stored or retrievable again (same one-time-reveal convention as
+    secrets_registry.update_secret_value)."""
+    import secrets as _secrets
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from auth import hash_password  # noqa: E402
+    import persona_catalogue  # noqa: E402
+
+    created = []
+    for persona in persona_catalogue.PERSONAS:
+        username = f"demo_{persona['role_key']}"
+        if get_user_by_username(username) is not None:
+            continue
+        password = _secrets.token_urlsafe(16)
+        doc = {
+            "id": str(uuid.uuid4()),
+            "username": username,
+            "password_hash": hash_password(password),
+            "display_name": persona["demo_display_name"],
+            "email": f"demo+{persona['role_key']}@example.invalid",
+            "role_keys": [persona["role_key"]],
+            "status": "active",
+            "is_demo_persona": True,
+            "created_at": _now(),
+            "created_by": "bootstrap_iam.py:--create-demo-personas",
+            "updated_at": _now(),
+        }
+        get_container("users").upsert_item(doc)
+        created.append({
+            "username": username, "password": password,
+            "role_key": persona["role_key"], "persona_id": persona["persona_id"],
+        })
+    return created
+
+
+# ---------------------------------------------------------------------------
+# Ephemeral Azure integration test runs (ephemeral_test_runner.py). One
+# document per run, covering its full lifecycle -- see client.py's
+# container comment. Never deleted, including after a run's resources are
+# cleaned up, so "was this ever actually verified end-to-end against real
+# Azure" stays answerable from history.
+# ---------------------------------------------------------------------------
+def create_ephemeral_test_run(doc: dict) -> dict:
+    doc = dict(doc)
+    doc.setdefault("created_at", _now())
+    doc["updated_at"] = _now()
+    return get_container("ephemeral_test_runs").upsert_item(doc)
+
+
+def get_ephemeral_test_run(run_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("ephemeral_test_runs").read_item(item=run_id, partition_key=run_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def update_ephemeral_test_run(doc: dict) -> dict:
+    doc["updated_at"] = _now()
+    return get_container("ephemeral_test_runs").upsert_item(doc)
+
+
+def list_ephemeral_test_runs(limit: int = 50) -> list:
+    container = get_container("ephemeral_test_runs")
+    items = list(
+        container.query_items(query="SELECT * FROM c ORDER BY c.created_at DESC", enable_cross_partition_query=True)
+    )
+    return items[:limit]

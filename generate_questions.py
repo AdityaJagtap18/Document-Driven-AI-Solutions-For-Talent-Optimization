@@ -6,17 +6,17 @@ import json
 import shutil
 from pathlib import Path
 from PyPDF2 import PdfReader
-from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 
-from llm_utils import call_with_retry
+from llm_utils import call_with_retry, get_chat_llm, using_azure_openai
 from secrets_loader import get_secret
 
 # === Config ===
-_openai_key = get_secret("OPENAI_API_KEY")
-if not _openai_key:
-    raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example) or configure AZURE_KEY_VAULT_URL.")
-os.environ["OPENAI_API_KEY"] = _openai_key
+if not using_azure_openai():
+    _openai_key = get_secret("OPENAI_API_KEY")
+    if not _openai_key:
+        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example), configure AZURE_KEY_VAULT_URL, or set AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT to use Azure OpenAI instead.")
+    os.environ["OPENAI_API_KEY"] = _openai_key
 parsed_folder = Path("ParsedReadyForQuestions")
 output_folder = Path("OutputResume_Folder")
 interview_data_root = Path("InterviewData")
@@ -71,7 +71,7 @@ Return the questions in a clean numbered list format.
 
     try:
         print("Sending request to OpenAI...")
-        llm = ChatOpenAI(temperature=0.7, max_tokens=800, model="gpt-3.5-turbo")
+        llm = get_chat_llm(temperature=0.7, max_tokens=800, model="gpt-3.5-turbo")
         response = call_with_retry(
             llm, [HumanMessage(content=prompt)],
             on_retry=lambda attempt, e: print(f"Retry {attempt} for {resume_name}: {e}"),

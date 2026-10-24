@@ -1,0 +1,29 @@
+Junior Software Engineer -- AI Document Processing Job Description
+
+Job Title: Junior Software Engineer — AI Document Processing
+Location: Remote
+Job Type: Full-time
+
+About the Role:
+We are seeking a Junior Software Engineer to help build and maintain our AI-powered document
+processing pipeline. You will work on resume/document ingestion, REST API development, and
+LLM-assisted extraction and classification features.
+
+Responsibilities:
+- Build and maintain REST API endpoints in Python.
+- Write and optimize SQL queries against relational databases.
+- Process, validate, and clean structured and unstructured data.
+- Work with basic machine-learning and LLM concepts to extract structured data from documents.
+- Collaborate with the team on debugging and problem-solving for production issues.
+
+Required Skills & Qualifications:
+- Programming experience in Python or Java.
+- REST API development experience.
+- SQL and relational database experience.
+- Experience with data processing and validation.
+- Basic machine-learning or LLM concepts.
+- Strong problem-solving and communication skills.
+- Relevant educational background (Computer Science or related) or equivalent project experience.
+
+This is a synthetic test job description, created for an internal CDPI end-to-end pipeline
+verification run. It is not a real job posting.

@@ -340,6 +340,7 @@ class TestReviewCandidate:
         monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Name": "Priya", "Phone": "15551234567"})
         monkeypatch.setattr(repositories, "upsert_candidate", lambda c: None)
         monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+        monkeypatch.setattr(repositories, "has_recent_delivery", lambda *a, **k: False)
 
         sent = {}
 
@@ -370,6 +371,7 @@ class TestReviewCandidate:
         monkeypatch.setattr(repositories, "get_candidate", lambda cid: {"candidate_id": cid, "Phone": "15551234567"})
         monkeypatch.setattr(repositories, "upsert_candidate", lambda c: None)
         monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
+        monkeypatch.setattr(repositories, "has_recent_delivery", lambda *a, **k: False)
 
         import whatsapp_client
 

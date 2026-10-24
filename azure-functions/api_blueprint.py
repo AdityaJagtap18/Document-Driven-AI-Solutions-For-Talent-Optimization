@@ -30,6 +30,7 @@ to real Entra ID auth is explicit follow-up work, not done here.
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import azure.functions as func
@@ -39,6 +40,20 @@ sys.path.insert(0, str(_repo_root))
 sys.path.insert(0, str(_repo_root / "context-lake"))
 import repositories  # noqa: E402
 import auth as auth_module  # noqa: E402
+import observability  # noqa: E402
+import azure_integrations  # noqa: E402
+import secrets_registry  # noqa: E402
+import rag_config  # noqa: E402
+import rag_preview  # noqa: E402
+import comms_config  # noqa: E402
+import email_adapter  # noqa: E402
+import model_pricing  # noqa: E402
+import persona_catalogue  # noqa: E402
+import azure_readiness  # noqa: E402
+import llm_utils  # noqa: E402
+import az_cli  # noqa: E402
+import ephemeral_test_runner  # noqa: E402
+import secrets_loader  # noqa: E402
 
 bp = func.Blueprint()
 
@@ -553,20 +568,53 @@ def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
 
 def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
+    """Sends the real WhatsApp status-update template, gated by three
+    real checks the Communications Configuration Console now controls:
+    (1) the channel's `enabled` flag (comms_config.get_comms_runtime_config()
+    -- fails soft to "enabled" if unconfigured, today's behavior);
+    (2) duplicate-send protection, so a retried request within the
+    configured window doesn't re-notify a candidate who was already
+    notified; (3) every attempt (sent or failed) is recorded to the real
+    delivery log, not just returned as a string to this call's own
+    caller."""
+    import whatsapp_client
+
     phone = candidate.get("Phone")
+    candidate_id = candidate.get("candidate_id") or candidate.get("id")
+    workflow = "candidate_decision_notification"
     if not phone:
         return "skipped: no phone number on file"
-    try:
-        import whatsapp_client
 
-        status_text = "moved forward" if decision == "approve" else "not moving forward at this time"
-        whatsapp_client.send_whatsapp_template(
+    runtime_cfg = comms_config.get_comms_runtime_config()
+    if not runtime_cfg["whatsapp"].get("enabled", True):
+        return "skipped: WhatsApp channel is disabled in Communications Configuration"
+
+    window = runtime_cfg["delivery_policies"].get("duplicate_send_window_minutes", 60)
+    try:
+        if candidate_id and repositories.has_recent_delivery(candidate_id, "whatsapp", workflow, window):
+            return "skipped: a notification for this candidate was already sent within the duplicate-send window"
+    except Exception:
+        pass  # dedup check is best-effort -- never blocks a real notification if Cosmos is unavailable
+
+    status_text = "moved forward" if decision == "approve" else "not moving forward at this time"
+    submitted_at = datetime.now(timezone.utc).isoformat()
+    try:
+        response = whatsapp_client.send_whatsapp_template(
             phone, "application_status_update",
             parameters=[candidate.get("Name", "Candidate"), status_text],
         )
-        return "sent"
+        outcome, detail, result = "provider_accepted", "Meta Graph API accepted the message.", "sent"
     except Exception as e:
-        return f"failed: {e}"
+        outcome, detail, result = "failed", azure_integrations.redact_secret(str(e)), f"failed: {e}"
+
+    try:
+        repositories.record_comms_delivery({
+            "correlation_id": candidate_id or "_unknown", "channel": "whatsapp", "provider": "meta_graph_api",
+            "workflow": workflow, "submitted_at": submitted_at, "outcome": outcome, "detail": detail,
+        })
+    except Exception:
+        pass  # delivery logging is best-effort -- never blocks or fails the real send
+    return result
 
 
 @bp.route(route="bulk-decisions", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
@@ -1042,6 +1090,93 @@ def executive_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     })
 
 
+@bp.route(route="manage/reports/resume-processing", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def resume_processing_report_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Resume Processing Report (CDPI Product Personas & Reporting doc,
+    Phase 1 #5) -- built from the REAL document_extraction stage spans
+    already recorded in logs/ai_traces.jsonl by the AI Observability
+    Center, not a separately-maintained processing counter (this app's
+    "avoid duplicate reporting logic" requirement). Distinguishes
+    succeeded from failed extraction attempts, with real failure detail
+    (never fabricated). There is no queue/backlog concept in this repo's
+    batch-script pipeline (ResumeParser.py processes a folder, it
+    doesn't dequeue work) -- `pending_queue_depth` is honestly null,
+    not invented."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    records = _read_jsonl(observability.TRACE_LOG_PATH)
+    extraction_spans = [r for r in records if r.get("stage") == "document_extraction"]
+    failed = [r for r in extraction_spans if r.get("status") == "failed"]
+    succeeded = sum(1 for r in extraction_spans if r.get("status") == "succeeded")
+    return _json_response({
+        "total_processing_attempts": len(extraction_spans),
+        "succeeded": succeeded,
+        "failed_count": len(failed),
+        "failure_rate": round(len(failed) / len(extraction_spans), 4) if extraction_spans else None,
+        "recent_failures": [
+            {"correlation_id": r.get("correlation_id"), "error": r.get("error"), "logged_at": r.get("logged_at")}
+            for r in failed[-20:]
+        ],
+        "pending_queue_depth": None,
+        "data_source": "logs/ai_traces.jsonl (document_extraction stage spans, AI Observability Center)",
+    })
+
+
+@bp.route(route="manage/reports/communication-delivery", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def communication_delivery_report_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Communication Delivery Report (CDPI Product Personas & Reporting
+    doc, Phase 1 #6) -- real delivery records from comms_delivery_log
+    (see _notify_candidate_whatsapp above), never fabricated statistics.
+    Only WhatsApp notifications (the candidate-decision notification
+    workflow) are logged anywhere in this repo today -- email has NO
+    delivery logging at all yet, not the legacy invite/report scripts,
+    not even admin-triggered test sends -- a real, stated gap, not a
+    zero-volume coincidence."""
+    auth_result = require_permission(req, "comms.delivery.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        deliveries = repositories.list_all_comms_deliveries(limit=500)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    by_channel = {}
+    for d in deliveries:
+        channel = d.get("channel", "unknown")
+        stats = by_channel.setdefault(channel, {"submitted": 0, "provider_accepted": 0, "failed": 0})
+        stats["submitted"] += 1
+        if d.get("outcome") == "provider_accepted":
+            stats["provider_accepted"] += 1
+        elif d.get("outcome") == "failed":
+            stats["failed"] += 1
+
+    return _json_response({
+        "count": len(deliveries), "by_channel": by_channel, "recent": deliveries[:50],
+        "note": "Only WhatsApp notifications are logged here -- email delivery logging does not exist yet anywhere in this repo (see this endpoint's docstring).",
+    })
+
+
+@bp.route(route="manage/personas", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def persona_catalogue_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The 12-persona representative-configuration catalogue (CDPI Product
+    Personas doc, Section 8). Gated by roles.read -- the same permission
+    that already gates viewing what any role grants, since this endpoint
+    is a read-only view DERIVED from auth.DEFAULT_ROLES/PAGES, not a
+    separate authorization surface (see persona_catalogue.py's docstring).
+    Returns persona_catalogue.validate_persona_catalogue()'s result too,
+    so a future permission-grant drift (a role losing a permission an
+    'available' report depends on) is visible here rather than silently
+    breaking."""
+    auth_result = require_permission(req, "roles.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    return _json_response({
+        "personas": persona_catalogue.describe_all_personas(),
+        "validation_problems": persona_catalogue.validate_persona_catalogue(),
+    })
+
+
 @bp.route(route="audit-log", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_audit_log_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Applicant Pipeline view (Phase 6+): the raw audit_log, optionally
@@ -1065,6 +1200,47 @@ def list_audit_log_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"count": len(entries), "entries": entries})
 
 
+def _read_jsonl(path) -> list:
+    """Shared by observability_summary_endpoint and the AI Observability
+    Center endpoints below -- one place that reads a JSON-lines log file,
+    skipping blank/corrupt lines, instead of each endpoint re-implementing
+    the same loop (this feature's "avoid duplicate implementations"
+    requirement)."""
+    if not path.exists():
+        return []
+    records = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return records
+
+
+def _llm_observability_summary() -> dict:
+    records = _read_jsonl(observability.LOG_PATH)
+    total_calls = len(records)
+    total_tokens = 0
+    total_cost = 0.0
+    by_label = {}
+    for record in records:
+        total_tokens += record.get("total_tokens") or 0
+        total_cost += record.get("cost_usd") or 0.0
+        label = record.get("label", "unknown")
+        label_stats = by_label.setdefault(label, {"calls": 0, "tokens": 0, "cost_usd": 0.0})
+        label_stats["calls"] += 1
+        label_stats["tokens"] += record.get("total_tokens") or 0
+        label_stats["cost_usd"] += record.get("cost_usd") or 0.0
+    return {
+        "total_calls": total_calls, "total_tokens": total_tokens,
+        "total_cost_usd": round(total_cost, 6), "by_label": by_label,
+    }
+
+
 @bp.route(route="observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard's cost/token usage view. Doesn't touch
@@ -1073,41 +1249,7 @@ def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     auth_result = require_permission(req, "analytics.read")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from observability import LOG_PATH
-
-    if not LOG_PATH.exists():
-        return _json_response({"total_calls": 0, "total_tokens": 0, "total_cost_usd": 0.0, "by_label": {}})
-
-    total_calls = 0
-    total_tokens = 0
-    total_cost = 0.0
-    by_label = {}
-
-    with open(LOG_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            total_calls += 1
-            total_tokens += record.get("total_tokens") or 0
-            total_cost += record.get("cost_usd") or 0.0
-            label = record.get("label", "unknown")
-            label_stats = by_label.setdefault(label, {"calls": 0, "tokens": 0, "cost_usd": 0.0})
-            label_stats["calls"] += 1
-            label_stats["tokens"] += record.get("total_tokens") or 0
-            label_stats["cost_usd"] += record.get("cost_usd") or 0.0
-
-    return _json_response({
-        "total_calls": total_calls,
-        "total_tokens": total_tokens,
-        "total_cost_usd": round(total_cost, 6),
-        "by_label": by_label,
-    })
+    return _json_response(_llm_observability_summary())
 
 
 # ---------------------------------------------------------------------------
@@ -1132,7 +1274,7 @@ def _audit_admin_action(action: str, actor: dict, **fields) -> None:
         pass
 
 
-@bp.route(route="admin/permissions", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/permissions", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_permissions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """The full permission catalog, grouped by module -- powers the Roles
     & Permissions admin page's checkbox grid. Requires roles.read, same
@@ -1144,7 +1286,7 @@ def list_permissions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"permissions": auth_module.PERMISSIONS})
 
 
-@bp.route(route="admin/roles", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/roles", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     auth_result = require_permission(req, "roles.read")
     if isinstance(auth_result, func.HttpResponse):
@@ -1156,7 +1298,7 @@ def list_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"count": len(roles), "roles": roles})
 
 
-@bp.route(route="admin/roles", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/roles", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def create_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Create a new CUSTOM role. Body: {"role_key": "hiring_manager",
     "display_name": "Hiring Manager", "description": "...",
@@ -1198,7 +1340,7 @@ def create_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(doc, status_code=201)
 
 
-@bp.route(route="admin/roles/{role_key}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/roles/{role_key}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def update_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Edit a role's permission grants. Body: {"display_name": "..."
     (optional), "description": "..." (optional), "permission_ids": [...] (optional)}.
@@ -1251,7 +1393,7 @@ def update_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(doc)
 
 
-@bp.route(route="admin/users", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_users_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     auth_result = require_permission(req, "users.read")
     if isinstance(auth_result, func.HttpResponse):
@@ -1263,7 +1405,7 @@ def list_users_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"count": len(users), "users": [_safe_user(u) for u in users]})
 
 
-@bp.route(route="admin/users/{user_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users/{user_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def get_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     auth_result = require_permission(req, "users.read")
     if isinstance(auth_result, func.HttpResponse):
@@ -1278,7 +1420,7 @@ def get_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(_safe_user(user))
 
 
-@bp.route(route="admin/users", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def create_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Create a new user account. Body: {"username": "...", "password": "...",
     "display_name": "...", "email": "...", "role_keys": ["recruiter"]}.
@@ -1338,7 +1480,7 @@ def create_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(_safe_user(user), status_code=201)
 
 
-@bp.route(route="admin/users/{user_id}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users/{user_id}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def update_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Edit a user's profile and/or reset their password. Body (all
     optional): {"display_name": "...", "email": "...", "password": "..."}.
@@ -1379,7 +1521,7 @@ def update_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(_safe_user(updated))
 
 
-@bp.route(route="admin/users/{user_id}/status", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users/{user_id}/status", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def set_user_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Enable/disable a user account. Body: {"status": "active"|"disabled"}.
     Requires users.disable.
@@ -1436,7 +1578,7 @@ def set_user_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(_safe_user(updated))
 
 
-@bp.route(route="admin/users/{user_id}/roles", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/users/{user_id}/roles", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def set_user_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Replace a user's role assignments. Body: {"role_keys": ["recruiter", "interviewer"]}.
     Requires roles.assign.
@@ -1530,7 +1672,7 @@ def _page_with_summary(page: dict, policies_by_page: dict) -> dict:
     return dict(page, roles_granted=granted, roles_granted_count=len(granted))
 
 
-@bp.route(route="admin/pages", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/pages", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Page & Access Management table. Optional query filters:
     ?module=..., ?discovery_status=discovered|configured|stale,
@@ -1566,7 +1708,7 @@ def list_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"count": len(result), "pages": result})
 
 
-@bp.route(route="admin/pages/sync", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/pages/sync", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def sync_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Reconciles the code-defined PAGES catalog against the persisted
     registry -- see repositories.sync_pages()'s docstring. Not something a
@@ -1595,7 +1737,7 @@ def sync_pages_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(result)
 
 
-@bp.route(route="admin/pages/{page_id}/access", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/pages/{page_id}/access", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def get_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Page metadata plus the full role x allowed access matrix (every
     role in the system, not just roles with an explicit policy -- a role
@@ -1622,7 +1764,7 @@ def get_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"page": page, "access": matrix})
 
 
-@bp.route(route="admin/pages/{page_id}/access", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+@bp.route(route="manage/pages/{page_id}/access", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
 def set_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Grant/revoke page access per role. Body: {"policies": [{"role_key":
     "recruiter", "allowed": true}, ...]} -- a batch of one or more
@@ -1675,3 +1817,2203 @@ def set_page_access_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
     _audit_admin_action("page_access_changed", actor, page_id=page_id, policies=policies)
     return get_page_access_endpoint(req)
+
+
+# ---------------------------------------------------------------------------
+# AI Observability Center (/admin/ai-observability*). Requires
+# observability.read, same require_permission() gate as everything else.
+# Reads only local JSONL logs (logs/llm_observability.jsonl,
+# logs/ai_traces.jsonl, via observability.py) -- no Cosmos DB involved, so
+# this works with zero Azure resources provisioned, and the pipeline that
+# WRITES these logs (observability.record_llm_call/record_ai_trace, called
+# directly from llm_utils.py/embeddings.py/document_intelligence_client.py)
+# runs completely independently of whether anyone ever opens this admin
+# page -- per this feature's "keep the observability pipeline independent
+# of the [admin] UI" requirement.
+# ---------------------------------------------------------------------------
+def _ai_trace_summary(records: list) -> dict:
+    by_workflow = {}
+    for r in records:
+        stats = by_workflow.setdefault(r.get("workflow", "unknown"), {
+            "total": 0, "succeeded": 0, "failed": 0, "started": 0, "total_duration_ms": 0.0,
+        })
+        stats["total"] += 1
+        status = r.get("status")
+        if status in ("succeeded", "failed", "started"):
+            stats[status] += 1
+        stats["total_duration_ms"] += r.get("duration_ms") or 0
+
+    for stats in by_workflow.values():
+        completed = stats["succeeded"] + stats["failed"]
+        stats["avg_duration_ms"] = round(stats["total_duration_ms"] / completed, 1) if completed else None
+        del stats["total_duration_ms"]
+
+    distinct_traces = len(set(r.get("trace_id") for r in records if r.get("trace_id")))
+    return {"total_spans": len(records), "distinct_traces": distinct_traces, "by_workflow": by_workflow}
+
+
+# Minimum data points required before a percentile is reported -- below
+# this, a percentile is statistically meaningless noise, not a real
+# figure. See _percentile()'s docstring.
+_MIN_SAMPLE_FOR_PERCENTILE = 5
+
+
+def _percentile(values: list, p: float):
+    """Nearest-rank percentile over `values` (0 < p < 100). Returns None
+    if fewer than _MIN_SAMPLE_FOR_PERCENTILE data points exist -- the
+    caller must show an explicit "insufficient sample" state instead of
+    this, never fabricate a number from too little data (Phase 3/4
+    requirement)."""
+    clean = sorted(v for v in values if v is not None)
+    if len(clean) < _MIN_SAMPLE_FOR_PERCENTILE:
+        return None
+    k = max(0, min(len(clean) - 1, int(round((p / 100.0) * (len(clean) - 1)))))
+    return round(clean[k], 1)
+
+
+def _latency_stats(durations: list) -> dict:
+    clean = [d for d in durations if d is not None]
+    avg = round(sum(clean) / len(clean), 1) if clean else None
+    return {
+        "sample_count": len(clean),
+        "avg_ms": avg,
+        "p50_ms": _percentile(clean, 50),
+        "p95_ms": _percentile(clean, 95),
+        "p99_ms": _percentile(clean, 99),
+        "insufficient_sample": len(clean) < _MIN_SAMPLE_FOR_PERCENTILE,
+    }
+
+
+# The full stage list this feature's spec names, for "instrumentation
+# coverage" -- which of these this repo actually has code for and
+# traces, vs which don't exist in this architecture at all (see
+# docs/AI_OBSERVABILITY_AZURE_HUB.md's investigation notes). Stages this
+# repo genuinely doesn't have (e.g. "vector indexing" as a distinct
+# service, "safety checks" as a separate pass) are listed as
+# not_applicable, not silently omitted -- so "coverage" never looks
+# artificially low against stages that were never real to begin with.
+_DOCUMENTED_STAGES = [
+    "document_extraction", "chunking", "embedding_generation", "retrieval_ranking",
+    "resume_chunk_summarization", "resume_merge_structured_extraction",
+    "output_parsing_validation", "persistence", "document_extraction",
+]
+_STAGES_NOT_APPLICABLE_TO_THIS_REPO = [
+    "vector_indexing (no separate indexing service -- LocalVectorStore.add() is part of the embedding step)",
+    "safety_checks (no content-safety/moderation pass exists anywhere in this repo)",
+    "citation_grounding_checks (no RAG citation mechanism exists -- resume scoring doesn't cite retrieved chunks)",
+]
+
+
+def _instrumentation_coverage(observed_stages: set) -> dict:
+    documented = sorted(set(_DOCUMENTED_STAGES))
+    covered = sorted(s for s in documented if s in observed_stages)
+    missing = sorted(s for s in documented if s not in observed_stages)
+    return {
+        "documented_stage_count": len(documented),
+        "covered_stage_count": len(covered),
+        "coverage_pct": round(100.0 * len(covered) / len(documented), 1) if documented else None,
+        "covered_stages": covered,
+        "uninstrumented_stages": missing,
+        "not_applicable_to_this_repo": _STAGES_NOT_APPLICABLE_TO_THIS_REPO,
+    }
+
+
+def _cost_breakdown(records: list) -> dict:
+    """Real cost, grouped by workflow and by model -- every figure traces
+    back to a cost_source tag (langchain_openai_callback or
+    documented_estimate, see observability.py/model_pricing.py), never a
+    number with no documented origin. A span with no cost_usd (e.g. a
+    non-LLM stage, or a model this repo has no price for) is excluded
+    from the total, not treated as $0."""
+    by_workflow = {}
+    by_model = {}
+    total_cost = 0.0
+    priced_count = 0
+    for r in records:
+        meta = r.get("metadata") or {}
+        cost = meta.get("cost_usd")
+        if cost is None:
+            continue
+        priced_count += 1
+        total_cost += cost
+        wf = r.get("workflow", "unknown")
+        by_workflow[wf] = round(by_workflow.get(wf, 0.0) + cost, 8)
+        model = meta.get("model", "unknown")
+        by_model[model] = round(by_model.get(model, 0.0) + cost, 8)
+    return {
+        "total_cost_usd": round(total_cost, 6),
+        "priced_span_count": priced_count,
+        "by_workflow": by_workflow,
+        "by_model": by_model,
+        "pricing_version": model_pricing.PRICING_VERSION,
+        "pricing_source": model_pricing.PRICING_SOURCE,
+        "pricing_last_updated": model_pricing.PRICING_LAST_UPDATED,
+    }
+
+
+def _group_spans_into_traces(spans: list) -> list:
+    """Groups AI trace spans by trace_id into trace summaries -- there is
+    no separate persisted "AITrace" document anywhere (see observability.py's
+    module docstring for why); a trace is this computed view over its
+    spans, always consistent with the span data by construction."""
+    by_trace = {}
+    for span in spans:
+        tid = span.get("trace_id")
+        if not tid:
+            continue
+        by_trace.setdefault(tid, []).append(span)
+
+    summaries = []
+    for trace_id, trace_spans in by_trace.items():
+        trace_spans_sorted = sorted(trace_spans, key=lambda s: s.get("logged_at") or "")
+        statuses = {s.get("status") for s in trace_spans}
+        overall_status = "failed" if "failed" in statuses else ("started" if "started" in statuses else "succeeded")
+        durations = [s.get("duration_ms") for s in trace_spans if s.get("duration_ms") is not None]
+        costs = [(s.get("metadata") or {}).get("cost_usd") for s in trace_spans]
+        costs = [c for c in costs if c is not None]
+        correlation_ids = {s.get("correlation_id") for s in trace_spans if s.get("correlation_id")}
+        workflows = {s.get("workflow") for s in trace_spans if s.get("workflow")}
+        summaries.append({
+            "trace_id": trace_id,
+            "correlation_id": next(iter(correlation_ids), None),
+            "workflow": next(iter(workflows), "unknown") if len(workflows) == 1 else "mixed",
+            "status": overall_status,
+            "span_count": len(trace_spans),
+            "stages": [s.get("stage") for s in trace_spans_sorted],
+            "started_at": trace_spans_sorted[0].get("logged_at") if trace_spans_sorted else None,
+            "ended_at": trace_spans_sorted[-1].get("logged_at") if trace_spans_sorted else None,
+            "total_duration_ms": round(sum(durations), 1) if durations else None,
+            "total_cost_usd": round(sum(costs), 8) if costs else None,
+            "has_error": "failed" in statuses,
+        })
+    return summaries
+
+
+@bp.route(route="manage/ai-observability/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def ai_observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Unified view: existing per-label LLM call metrics (tokens/cost,
+    reused from observability_summary_endpoint's logic, not duplicated)
+    PLUS the new AI pipeline-stage trace summary (embedding generation,
+    document extraction, etc. -- stages that had zero observability
+    before this feature) PLUS latency percentiles, cost breakdown by
+    workflow/model, and instrumentation coverage. Never fabricates data
+    -- an empty/missing log file returns real zeros, and a percentile
+    with too little sample data is explicitly marked unavailable rather
+    than computed from noise."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+
+    llm_summary = _llm_observability_summary()
+    trace_records = _read_jsonl(observability.TRACE_LOG_PATH)
+    trace_summary = _ai_trace_summary(trace_records)
+    traces = _group_spans_into_traces(trace_records)
+
+    span_durations = [r.get("duration_ms") for r in trace_records]
+    trace_durations = [t["total_duration_ms"] for t in traces]
+    observed_stages = {r.get("stage") for r in trace_records if r.get("stage")}
+    failed_traces = sum(1 for t in traces if t["has_error"])
+
+    return _json_response({
+        "llm_calls": llm_summary,
+        "ai_traces": trace_summary,
+        "requests": {
+            "total": len(traces),
+            "failed": failed_traces,
+            "succeeded": len(traces) - failed_traces,
+            "failure_rate": round(failed_traces / len(traces), 4) if traces else None,
+        },
+        "span_latency": _latency_stats(span_durations),
+        "trace_latency": _latency_stats(trace_durations),
+        "cost": _cost_breakdown(trace_records),
+        "instrumentation_coverage": _instrumentation_coverage(observed_stages),
+        "recent_traces": sorted(traces, key=lambda t: t.get("started_at") or "", reverse=True)[:50],
+    })
+
+
+@bp.route(route="manage/ai-observability/traces", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_ai_traces_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Trace Explorer list -- TRACE summaries (one row per end-to-end
+    workflow run, grouped from its spans by trace_id -- see
+    _group_spans_into_traces()), not raw spans. Filters: ?workflow=,
+    ?status=, ?correlation_id= (substring match -- the safe identifier a
+    user would actually search by, e.g. a candidate_id), ?trace_id=
+    (exact). Paginated via ?limit=/?offset= (default 50/0, limit capped
+    at 200) and sortable via ?sort_by=started_at|total_duration_ms and
+    ?order=asc|desc (default started_at desc -- most recent first)."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+
+    workflow = req.params.get("workflow")
+    status = req.params.get("status")
+    correlation_id = req.params.get("correlation_id")
+    trace_id_filter = req.params.get("trace_id")
+    sort_by = req.params.get("sort_by", "started_at")
+    order = req.params.get("order", "desc")
+    if sort_by not in ("started_at", "total_duration_ms"):
+        return _error_response("'sort_by' must be 'started_at' or 'total_duration_ms'.", status_code=400)
+    if order not in ("asc", "desc"):
+        return _error_response("'order' must be 'asc' or 'desc'.", status_code=400)
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+        offset = max(int(req.params.get("offset", 0)), 0)
+    except ValueError:
+        return _error_response("'limit' and 'offset' must be integers.", status_code=400)
+
+    trace_records = _read_jsonl(observability.TRACE_LOG_PATH)
+    traces = _group_spans_into_traces(trace_records)
+
+    if workflow:
+        traces = [t for t in traces if t["workflow"] == workflow]
+    if status:
+        traces = [t for t in traces if t["status"] == status]
+    if correlation_id:
+        traces = [t for t in traces if t["correlation_id"] and correlation_id in t["correlation_id"]]
+    if trace_id_filter:
+        traces = [t for t in traces if t["trace_id"] == trace_id_filter]
+
+    traces.sort(key=lambda t: (t.get(sort_by) if t.get(sort_by) is not None else ""), reverse=(order == "desc"))
+    total_count = len(traces)
+    page = traces[offset: offset + limit]
+
+    return _json_response({"count": total_count, "limit": limit, "offset": offset, "traces": page})
+
+
+@bp.route(route="manage/ai-observability/traces/{trace_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_ai_trace_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Full span-by-span detail for ONE trace -- requires the stronger
+    observability.traces.read (trace detail includes stage-level
+    metadata, closer to raw debugging information than the aggregate
+    summary/list views). Spans are ordered by logged_at (execution
+    order) and each carries parent_span_id for hierarchy, so the
+    frontend can render a stage-by-stage timeline distinguishing
+    succeeded/failed/started spans -- there is no "skipped" or
+    "missing instrumentation" span representation today since every
+    stage that runs is unconditionally traced (no conditional
+    instrumentation gaps exist in the wired call sites yet)."""
+    auth_result = require_permission(req, "observability.traces.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+
+    trace_id = req.route_params.get("trace_id")
+    trace_records = _read_jsonl(observability.TRACE_LOG_PATH)
+    spans = sorted([r for r in trace_records if r.get("trace_id") == trace_id], key=lambda r: r.get("logged_at") or "")
+    if not spans:
+        return _error_response(f"No spans found for trace '{trace_id}'.", status_code=404)
+
+    summary = _group_spans_into_traces(spans)[0]
+    return _json_response({"trace": summary, "spans": spans})
+
+
+# ---------------------------------------------------------------------------
+# Azure Observability Report (/manage/observability-report*) -- the one
+# genuinely new piece of observability work in this repo: everything above
+# (ai-observability/*, azure-readiness/*) only ever reads LOCAL data
+# (JSONL files, or a live az CLI/SDK call at click-time). Nothing before
+# this queried Azure Monitor/Log Analytics for already-ingested telemetry.
+# azure_monitor_query.py is the real KQL query layer; this section is thin
+# HTTP wiring plus a short in-process TTL cache so a dashboard with several
+# charts doesn't fire a fresh Log Analytics query per chart per page load.
+# Deliberately reuses rather than re-implements: Azure per-service health
+# is the existing azure_readiness endpoints, AI cost/token/trace detail is
+# the existing ai-observability endpoints, Azure resource cost is the
+# existing azure-readiness/cost-usage endpoint -- this page's own unique
+# surface is real Azure-ingested telemetry (request volume, latency,
+# AI usage, recent errors, ingestion health), not a re-skin of those.
+# ---------------------------------------------------------------------------
+import azure_monitor_query  # noqa: E402
+
+_observability_report_cache = {}  # (query_name, hours) -> (monotonic_expiry, result)
+_OBSERVABILITY_REPORT_CACHE_TTL_SECONDS = 60
+
+
+def _cached_query(query_name: str, hours: float, fn):
+    import time as _time
+    key = (query_name, hours)
+    cached = _observability_report_cache.get(key)
+    now = _time.monotonic()
+    if cached and cached[0] > now:
+        return cached[1]
+    result = fn()
+    _observability_report_cache[key] = (now + _OBSERVABILITY_REPORT_CACHE_TTL_SECONDS, result)
+    return result
+
+
+def _parse_hours_param(req: func.HttpRequest, default: float = 24.0, maximum: float = 168.0):
+    raw = req.params.get("hours")
+    if raw is None:
+        return default, None
+    try:
+        hours = float(raw)
+    except ValueError:
+        return None, "'hours' must be a number."
+    if hours <= 0 or hours > maximum:
+        return None, f"'hours' must be between 0 (exclusive) and {maximum}."
+    return hours, None
+
+
+@bp.route(route="manage/observability-report/summary", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def observability_report_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Executive KPI rollup for the Azure Observability Report page.
+    Composes: real Azure Monitor ingestion health + request/latency KPIs
+    (azure_monitor_query.py, cached), plus the existing local LLM/trace
+    summary (reused, not recomputed) -- so a reader can see both "what the
+    app itself recorded" and "what Azure Monitor actually ingested" as two
+    explicitly separate, separately-labeled views, never merged into one
+    number. `overall_status` is derived from real ingestion + connectivity
+    evidence only -- it is never set to a healthy-sounding value just
+    because this endpoint itself returned 200."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    hours, err = _parse_hours_param(req)
+    if err:
+        return _error_response(err, status_code=400)
+
+    telemetry_health = _cached_query("telemetry_health", 0, azure_monitor_query.get_telemetry_health)
+    request_volume = _cached_query("request_volume", hours, lambda: azure_monitor_query.get_request_volume(hours=hours))
+    latency = _cached_query("latency", hours, lambda: azure_monitor_query.get_latency_percentiles(hours=hours))
+    ai_usage = _cached_query("ai_usage", hours, lambda: azure_monitor_query.get_ai_usage(hours=hours))
+
+    local_llm_summary = _llm_observability_summary()
+    trace_records = _read_jsonl(observability.TRACE_LOG_PATH)
+    local_trace_summary = _ai_trace_summary(trace_records)
+
+    total_requests = sum(b["total"] for b in request_volume.get("buckets", [])) if request_volume["available"] else None
+    succeeded = sum(b["succeeded"] for b in request_volume.get("buckets", [])) if request_volume["available"] else None
+    failed = sum(b["failed"] for b in request_volume.get("buckets", [])) if request_volume["available"] else None
+
+    if not azure_monitor_query.is_configured():
+        overall_status = "NOT_CONFIGURED"
+    elif not telemetry_health.get("azure_configured"):
+        overall_status = "UNKNOWN"
+    elif not telemetry_health.get("ingestion_confirmed"):
+        overall_status = "CONFIGURED_NO_INGESTION"
+    elif failed and total_requests and failed / total_requests > 0.1:
+        overall_status = "DEGRADED"
+    else:
+        overall_status = "HEALTHY"
+
+    return _json_response({
+        "reporting_period_hours": hours,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "overall_status": overall_status,
+        "telemetry_health": telemetry_health,
+        "azure_telemetry": {
+            "configured": azure_monitor_query.is_configured(),
+            "total_requests": total_requests,
+            "succeeded_requests": succeeded,
+            "failed_requests": failed,
+            "success_rate": round(succeeded / total_requests, 4) if (total_requests and succeeded is not None) else None,
+            "failure_rate": round(failed / total_requests, 4) if (total_requests and failed is not None) else None,
+            "latency": latency,
+            "ai_requests": sum(m["calls"] for m in ai_usage.get("by_model", [])) if ai_usage["available"] else None,
+            "ai_total_tokens": sum(m["total_tokens"] or 0 for m in ai_usage.get("by_model", [])) if ai_usage["available"] else None,
+            "ai_total_cost_usd": round(sum(m["total_cost_usd"] or 0 for m in ai_usage.get("by_model", [])), 6) if ai_usage["available"] else None,
+            "unavailable_reason": None if request_volume["available"] else request_volume["reason"],
+        },
+        "local_observability": {
+            "llm_calls": local_llm_summary,
+            "ai_traces": local_trace_summary,
+            "note": "Sourced from this process's local JSONL logs -- always available regardless of Azure Monitor configuration, not the same data source as azure_telemetry above.",
+        },
+    })
+
+
+@bp.route(route="manage/observability-report/telemetry", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def observability_report_telemetry_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Chart data for the report page: real Azure Monitor request-volume
+    buckets, AI usage by model, and recent errors, all over ?hours=
+    (default 24, max 168). Each section is independently
+    available/unavailable -- a failure in one (e.g. a malformed query)
+    never blanks out the others."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    hours, err = _parse_hours_param(req)
+    if err:
+        return _error_response(err, status_code=400)
+    limit = req.params.get("error_limit", "20")
+    try:
+        error_limit = min(max(int(limit), 1), 100)
+    except ValueError:
+        return _error_response("'error_limit' must be an integer.", status_code=400)
+
+    return _json_response({
+        "reporting_period_hours": hours,
+        "request_volume": _cached_query("request_volume", hours, lambda: azure_monitor_query.get_request_volume(hours=hours)),
+        "ai_usage": _cached_query("ai_usage", hours, lambda: azure_monitor_query.get_ai_usage(hours=hours)),
+        "recent_errors": _cached_query(f"recent_errors_{error_limit}", hours,
+                                         lambda: azure_monitor_query.get_recent_errors(hours=hours, limit=error_limit)),
+    })
+
+
+@bp.route(route="manage/observability-report/export", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def observability_report_export_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """CSV export of the request-volume time series -- same permission as
+    the rest of this report (observability.read); no additional data is
+    exposed beyond what the page itself already shows. Never includes
+    secrets, connection strings, or candidate PII -- this endpoint's data
+    is infra/AI-operations telemetry only."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    hours, err = _parse_hours_param(req)
+    if err:
+        return _error_response(err, status_code=400)
+
+    result = _cached_query("request_volume", hours, lambda: azure_monitor_query.get_request_volume(hours=hours))
+    import csv
+    import io
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["timestamp", "total", "succeeded", "failed"])
+    if result["available"]:
+        for b in result["buckets"]:
+            writer.writerow([b["timestamp"], b["total"], b["succeeded"], b["failed"]])
+    return func.HttpResponse(
+        buf.getvalue(),
+        status_code=200 if result["available"] else 503,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=observability_request_volume.csv"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Azure Service Hub (/admin/azure-services*) -- an adapter registry
+# (azure_integrations.ADAPTER_TYPES) plus persisted, administrator-
+# registered INSTANCES of those adapters (repositories.py's
+# integration_instances/integration_health_checks). Three distinct
+# permission-gated actions, not one: viewing the inventory (azure.read),
+# viewing an instance's detailed config/diagnostics (azure.config.read),
+# and the write actions (azure.register/azure.config.write/azure.enable/
+# azure.manage/azure.resources.discover) -- least privilege, not one
+# blanket "admin" gate. Removing a registration (DELETE) only ever
+# deletes the CDPI-side record -- see that endpoint's docstring for why
+# it can never touch the real Azure resource.
+# ---------------------------------------------------------------------------
+_azure_check_last_run = {}  # (actor_id, integration_id) -> monotonic seconds, per-process only
+_AZURE_CHECK_MIN_INTERVAL_SECONDS = 10
+
+
+def _rate_limited(key, min_interval_seconds, store=None) -> bool:
+    """Returns True if `key` was already used within the last
+    min_interval_seconds (i.e. the caller should be refused), False and
+    records `key` as used-now otherwise. In-memory, per Functions-host
+    process -- a real limitation under multi-instance scale-out (each
+    instance has its own counter), documented rather than solved with a
+    distributed store this feature doesn't need yet. `store` defaults to
+    _azure_check_last_run (this helper's original caller) -- pass a
+    DIFFERENT dict for an unrelated rate limit (e.g. _rag_preview_last_run)
+    so the two never share state and one feature's calls can't trip the
+    other's limiter."""
+    import time as _time
+
+    if store is None:
+        store = _azure_check_last_run
+    now = _time.monotonic()
+    last = store.get(key)
+    if last is not None and (now - last) < min_interval_seconds:
+        return True
+    store[key] = now
+    return False
+
+
+@bp.route(route="manage/azure-service-adapters", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_azure_adapters_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The adapter TYPE registry -- what CDPI could register an instance
+    of, independent of what's actually registered today. Powers the "Add
+    Integration" wizard's service-type picker.
+
+    Deliberately NOT nested under manage/azure-services/* (it was
+    manage/azure-services/adapters until this fix): a real, reproduced bug
+    found live in the browser -- Azure Functions Core Tools' local Python
+    v2 HTTP routing does not reliably prefer this literal route over the
+    sibling manage/azure-services/{integration_id} route, so a request to
+    .../adapters was being matched to the dynamic route with
+    integration_id="adapters" and 404ing with "Integration 'adapters' not
+    found." Moving this one static segment out from under the
+    parameterized route's prefix sidesteps the ambiguity entirely rather
+    than depending on the router's (here, unreliable) specificity
+    ordering."""
+    auth_result = require_permission(req, "azure.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    return _json_response({"count": len(azure_integrations.ADAPTER_TYPES), "adapters": list(azure_integrations.ADAPTER_TYPES.values())})
+
+
+@bp.route(route="manage/azure-services", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_azure_integrations_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Registered integration INSTANCES with their CACHED status (the
+    result of their most recent health check, if any) -- no network
+    calls here, so this is always fast; use POST .../check for an actual
+    live connectivity check, which updates that cache."""
+    auth_result = require_permission(req, "azure.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        instances = repositories.list_integration_instances()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    result = []
+    for instance in instances:
+        adapter = azure_integrations.get_adapter(instance["adapter_type"]) or {}
+        presence = azure_integrations.secret_presence(instance["adapter_type"])
+        result.append({
+            "integration_id": instance["id"], "adapter_type": instance["adapter_type"],
+            "display_name": instance["display_name"], "environment": instance["environment"],
+            "category": adapter.get("category"), "enabled": instance["enabled"],
+            "configured": all(presence.values()) if presence else False,
+            "last_connection_outcome": instance.get("last_connection_outcome"),
+            "last_health_checked_at": instance.get("last_health_checked_at"),
+            "resource_discovery_supported": adapter.get("capabilities", {}).get("resource_discovery", False),
+        })
+    return _json_response({"count": len(result), "integrations": result})
+
+
+@bp.route(route="manage/azure-services/validate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def validate_azure_integration_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Validates a prospective adapter_type's configuration (secret
+    presence) BEFORE registering -- step 7-9 of the spec's Add
+    Integration workflow (validate, then test connectivity, then review
+    the result, before registration)."""
+    auth_result = require_permission(req, "azure.register")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    adapter_type = body.get("adapter_type")
+    if not azure_integrations.get_adapter(adapter_type):
+        return _error_response(f"Unknown adapter type '{adapter_type}'.", status_code=400)
+
+    errors = azure_integrations.validate_config(adapter_type)
+    return _json_response({"adapter_type": adapter_type, "valid": not errors, "errors": errors})
+
+
+@bp.route(route="manage/azure-services", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def register_azure_integration_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Registers a new integration instance. Body: {"integration_id": "...",
+    "adapter_type": "...", "display_name": "...", "environment": "...",
+    "config": {...} (optional, non-secret fields only -- e.g.
+    subscription_id/resource_group for resource discovery; see
+    azure_integrations.py's module docstring for why secret VALUES are
+    never accepted here)}.
+
+    Duplicate integration_id -> 409. A new registration is ALWAYS created
+    disabled -- "enable it only after required validation succeeds" is
+    enforced by the separate PUT .../enabled endpoint refusing to enable
+    an instance that has never recorded a successful health check."""
+    auth_result = require_permission(req, "azure.register")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    integration_id = (body.get("integration_id") or "").strip()
+    adapter_type = body.get("adapter_type")
+    display_name = (body.get("display_name") or "").strip()
+    environment = (body.get("environment") or "").strip()
+    config = body.get("config") or {}
+
+    if not integration_id or not display_name or not environment:
+        return _error_response("'integration_id', 'display_name', and 'environment' are required.", status_code=400)
+    if not azure_integrations.get_adapter(adapter_type):
+        return _error_response(f"Unknown adapter type '{adapter_type}'.", status_code=400)
+    if azure_integrations.is_planned(adapter_type):
+        return _error_response(
+            f"'{azure_integrations.get_adapter(adapter_type)['name']}' is planned but not implemented in this "
+            "repository -- there is no code path to register or configure it yet.", status_code=400,
+        )
+    if not isinstance(config, dict):
+        return _error_response("'config' must be an object.", status_code=400)
+    secret_keys_in_config = [f["key"] for f in azure_integrations.get_adapter(adapter_type)["config_schema"] if f["secret"] and f["key"] in config]
+    if secret_keys_in_config:
+        return _error_response(
+            f"Secret field(s) {secret_keys_in_config} cannot be submitted through this API -- configure them via "
+            "your .env file or Key Vault (see secrets_loader.py).", status_code=400,
+        )
+
+    try:
+        if repositories.get_integration_instance(integration_id) is not None:
+            return _error_response(f"Integration '{integration_id}' is already registered.", status_code=409)
+        instance = repositories.create_integration_instance(integration_id, adapter_type, display_name, environment, config, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("integration_registered", actor, integration_id=integration_id, adapter_type=adapter_type)
+    return _json_response(instance, status_code=201)
+
+
+@bp.route(route="manage/azure-services/{integration_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_azure_integration_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Full detail: overview (instance + adapter metadata), configuration
+    (non-secret fields + secret PRESENCE only, never values), and recent
+    diagnostics (last 10 health checks) -- requires the stronger
+    azure.config.read, not just azure.read."""
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+        if instance is None:
+            return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+        history = repositories.list_integration_health_checks(integration_id, limit=10)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    adapter = azure_integrations.get_adapter(instance["adapter_type"]) or {}
+    presence = azure_integrations.secret_presence(instance["adapter_type"])
+    return _json_response({
+        "instance": instance, "adapter": adapter, "secrets_configured": presence,
+        "recent_health_checks": history,
+    })
+
+
+@bp.route(route="manage/azure-services/{integration_id}", methods=["DELETE"], auth_level=func.AuthLevel.FUNCTION)
+def remove_azure_integration_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Removes the CDPI-side REGISTRATION only -- this can NEVER delete,
+    stop, or otherwise touch the real Azure resource (there is no
+    resource-delete operation implemented anywhere in this module, see
+    azure_integrations.py's docstring). Three distinct concepts the spec
+    requires never be conflated: (1) this endpoint, removing CDPI's
+    record of the integration; (2) PUT .../enabled, disabling CDPI's USE
+    of it without forgetting it; (3) actually deleting the Azure
+    resource, which this codebase has no code path for at all."""
+    auth_result = require_permission(req, "azure.register")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+        if instance is None:
+            return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+        repositories.get_container("integration_instances").delete_item(item=integration_id, partition_key=integration_id)
+        repositories.record_integration_config_change(integration_id, "registration_removed", actor["username"], {"adapter_type": instance["adapter_type"]})
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action(
+        "integration_registration_removed", actor, integration_id=integration_id,
+        note="Removed CDPI's registration only -- the underlying Azure resource, if any, was not touched.",
+    )
+    return _json_response({"integration_id": integration_id, "status": "registration_removed"})
+
+
+@bp.route(route="manage/azure-services/{integration_id}/config", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def update_azure_integration_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Updates an instance's non-secret config. Body: {"config": {...},
+    "expected_version": N}. `expected_version` must match the instance's
+    CURRENT config_version or this returns 409 -- optimistic concurrency,
+    so a stale edit from a second admin tab can't silently clobber a
+    more recent change (the spec's explicit "do not overwrite existing
+    working configuration without an explicit administrative action,"
+    enforced structurally, not just by convention)."""
+    auth_result = require_permission(req, "azure.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    config = body.get("config")
+    expected_version = body.get("expected_version")
+    if not isinstance(config, dict):
+        return _error_response("'config' must be an object.", status_code=400)
+    if expected_version is None:
+        return _error_response("'expected_version' is required (optimistic concurrency -- read the current instance first).", status_code=400)
+
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+    if instance["config_version"] != expected_version:
+        return _error_response(
+            f"Configuration has changed since you last read it (current version {instance['config_version']}, "
+            f"expected {expected_version}) -- reload and reapply your change.", status_code=409,
+        )
+
+    secret_keys_in_config = [f["key"] for f in azure_integrations.get_adapter(instance["adapter_type"])["config_schema"] if f["secret"] and f["key"] in config]
+    if secret_keys_in_config:
+        return _error_response(f"Secret field(s) {secret_keys_in_config} cannot be submitted through this API.", status_code=400)
+
+    instance["config"] = config
+    instance["config_version"] = expected_version + 1
+    instance["updated_by"] = actor["username"]
+    # A config change invalidates any prior "healthy" verdict -- the last check
+    # was against the OLD config, so it can't vouch for the new one. Force a
+    # fresh connection check before this can be (re-)enabled -- the spec's
+    # "revalidate restored/changed configuration before activation," enforced
+    # structurally via the existing enable-requires-healthy-check gate.
+    instance["last_connection_outcome"] = None
+    instance["last_health_checked_at"] = None
+    instance["last_failure"] = None
+    if instance.get("enabled"):
+        instance["enabled"] = False
+        instance["lifecycle_status"] = "draft"
+    try:
+        updated = repositories.update_integration_instance(instance)
+        repositories.record_integration_config_change(
+            integration_id, "config_updated", actor["username"],
+            {"config": config, "config_version": instance["config_version"]},
+        )
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("integration_config_updated", actor, integration_id=integration_id, new_config_version=instance["config_version"])
+    return _json_response(updated)
+
+
+@bp.route(route="manage/azure-services/{integration_id}/enabled", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def set_azure_integration_enabled_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Enables/disables CDPI's USE of a registered integration -- does
+    NOT remove its registration (see DELETE .../{integration_id}) and
+    does NOT touch the real Azure resource either way. Body:
+    {"enabled": true|false}. Enabling requires the instance's last
+    recorded health check to have outcome "healthy" -- "enable only
+    after required validation succeeds," enforced here, not left to the
+    frontend to remember to check first."""
+    auth_result = require_permission(req, "azure.enable")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        return _error_response("'enabled' must be a boolean.", status_code=400)
+
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+
+    if enabled and instance.get("last_connection_outcome") != "healthy":
+        return _error_response(
+            "Can't enable this integration -- it has no recorded successful ('healthy') connection check yet. "
+            "Run POST .../check first.", status_code=409,
+        )
+
+    instance["enabled"] = enabled
+    instance["lifecycle_status"] = "active" if enabled else "disabled"
+    instance["updated_by"] = actor["username"]
+    try:
+        updated = repositories.update_integration_instance(instance)
+        repositories.record_integration_config_change(
+            integration_id, "activated" if enabled else "deactivated", actor["username"],
+            {"config_version": instance["config_version"]},
+        )
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("integration_enabled_changed", actor, integration_id=integration_id, enabled=enabled)
+    return _json_response(updated)
+
+
+@bp.route(route="manage/azure-services/{integration_id}/check", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def check_azure_integration_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Runs a real connection check (see azure_integrations.check_connection's
+    docstring for exactly what "real" means per adapter type), persists
+    it to health-check HISTORY (not just overwriting the last result),
+    updates the instance's cached status, and audit-logs the outcome.
+    Rate-limited per (actor, integration) -- see _rate_limited() above."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+
+    if _rate_limited((actor["id"], integration_id), _AZURE_CHECK_MIN_INTERVAL_SECONDS):
+        return _error_response(
+            f"Checked too recently -- wait at least {_AZURE_CHECK_MIN_INTERVAL_SECONDS}s between checks of the same integration.",
+            status_code=429,
+        )
+
+    # Correlated with the AI Observability Center (reusing its existing
+    # trace/span telemetry, not a second logging system) -- metadata is
+    # populated with the real outcome AFTER the check runs, by mutating
+    # the same dict trace_stage() already holds a reference to, so this
+    # is one write, not two (same pattern as embeddings.py's cost
+    # tracking). The span itself "succeeds" whenever the check RAN to
+    # completion -- whether the connection it found was healthy is a
+    # property of the metadata, not the span status, so an "unhealthy"
+    # outcome is never misreported as a failed trace.
+    trace_metadata = {"integration_id": integration_id, "adapter_type": instance["adapter_type"], "config_version": instance.get("config_version")}
+    with observability.trace_stage("azure_config", "connection_check", metadata=trace_metadata, correlation_id=integration_id):
+        result = azure_integrations.check_connection(instance["adapter_type"])
+        result["integration_id"] = integration_id
+        trace_metadata["outcome"] = result["outcome"]
+        trace_metadata["error_category"] = result.get("error_category")
+    try:
+        saved = repositories.record_integration_health_check(integration_id, result)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("integration_connection_checked", actor, integration_id=integration_id, outcome=result["outcome"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/azure-services/{integration_id}/health-history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_azure_integration_health_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Paginated (newest-first, ?limit= default 50 max 200) health-check
+    history for one integration -- the diagnostics tab's "connection-test
+    history" requirement."""
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+
+    try:
+        if repositories.get_integration_instance(integration_id) is None:
+            return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+        history = repositories.list_integration_health_checks(integration_id, limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "checks": history})
+
+
+@bp.route(route="manage/azure-services/{integration_id}/discover-resources", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def discover_azure_resources_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real Azure Resource Manager discovery, scoped to the instance's
+    stored subscription_id/resource_group config -- see
+    azure_integrations.discover_resources()'s docstring for exactly when
+    this is supported vs. returns a clear "not supported"/"missing scope"
+    error rather than a fabricated or misleadingly-empty list."""
+    auth_result = require_permission(req, "azure.resources.discover")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+
+    config = instance.get("config") or {}
+    trace_metadata = {"integration_id": integration_id, "adapter_type": instance["adapter_type"]}
+    with observability.trace_stage("azure_config", "resource_discovery", metadata=trace_metadata, correlation_id=integration_id):
+        result = azure_integrations.discover_resources(
+            instance["adapter_type"], config.get("subscription_id"), config.get("resource_group"),
+        )
+        trace_metadata["supported"] = result["supported"]
+        trace_metadata["resource_count"] = len(result["resources"])
+    _audit_admin_action(
+        "integration_resources_discovered", actor, integration_id=integration_id,
+        resource_count=len(result["resources"]), supported=result["supported"],
+    )
+    return _json_response(result)
+
+
+@bp.route(route="manage/azure-services/{integration_id}/config-history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_azure_integration_config_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Paginated (newest-first) CONFIGURATION change history -- distinct
+    from health-check history (GET .../health-history): this is "what
+    was changed, by whom, when" (register/config_updated/activated/
+    deactivated/registration_removed/rolled_back), not "did a live
+    connection succeed." Entries' safe_summary never contains a secret
+    value -- register/config_updated entries include the full `config`
+    dict, which is already secret-free by construction (the register/
+    update endpoints reject any secret field in that payload)."""
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+
+    try:
+        if repositories.get_integration_instance(integration_id) is None:
+            return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+        history = repositories.list_integration_config_history(integration_id, limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
+
+
+@bp.route(route="manage/azure-services/{integration_id}/config-history/{history_id}/rollback", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def rollback_azure_integration_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Restores a prior configuration snapshot from history as a NEW
+    config_version (history itself is never mutated or deleted -- a
+    rollback is just another forward-moving change, auditable the same
+    way). Only entries with operation "config_updated" or "registered"
+    carry a restorable `config` snapshot. Same as any other config
+    change, this forces revalidation: last_connection_outcome is reset
+    and the integration is disabled if it was enabled -- the spec's
+    explicit "revalidate restored configuration before activation,"
+    never assuming an old config is still safe to trust."""
+    auth_result = require_permission(req, "azure.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+    history_id = req.route_params.get("history_id")
+
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+        if instance is None:
+            return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+        history = repositories.list_integration_config_history(integration_id, limit=200)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    entry = next((h for h in history if h["id"] == history_id), None)
+    if entry is None:
+        return _error_response(f"Config history entry '{history_id}' not found for this integration.", status_code=404)
+    if entry["operation"] not in ("registered", "config_updated") or "config" not in entry["safe_summary"]:
+        return _error_response("This history entry has no configuration snapshot to roll back to.", status_code=400)
+
+    instance["config"] = entry["safe_summary"]["config"]
+    instance["config_version"] += 1
+    instance["last_connection_outcome"] = None
+    instance["last_health_checked_at"] = None
+    instance["last_failure"] = None
+    if instance.get("enabled"):
+        instance["enabled"] = False
+        instance["lifecycle_status"] = "draft"
+    instance["updated_by"] = actor["username"]
+    try:
+        updated = repositories.update_integration_instance(instance)
+        repositories.record_integration_config_change(
+            integration_id, "rolled_back", actor["username"],
+            {"rolled_back_to_history_id": history_id, "config": instance["config"], "config_version": instance["config_version"]},
+        )
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("integration_config_rolled_back", actor, integration_id=integration_id, rolled_back_to_history_id=history_id, new_config_version=instance["config_version"])
+    return _json_response(updated)
+
+
+# ---------------------------------------------------------------------------
+# Azure Integration Readiness (/admin/azure-readiness). A composed VIEW
+# over the real data the Azure Service Hub already produces --
+# azure_integrations.validate_config()/check_connection() and
+# az_cli.get_account_status() -- classified into the one-status-per-
+# service vocabulary azure_readiness.py documents (NOT_CONFIGURED,
+# AUTHENTICATION_REQUIRED, READY, etc.). This endpoint set never
+# duplicates a check: GET reads the SAME cached last_connection_outcome
+# the Azure Service Hub list endpoint already shows; POST .../validate
+# runs the exact same azure_integrations.check_connection() the existing
+# .../check endpoint runs (same rate-limit store, so hammering either
+# endpoint name for the same integration is throttled together).
+# Running a readiness scan NEVER creates an Azure resource -- see the
+# separate ephemeral-tests endpoints below for the only workflow in this
+# app that provisions real infrastructure, and even that requires
+# explicit human approval at each step.
+# ---------------------------------------------------------------------------
+def _check_result_from_instance(instance: dict):
+    """Reconstructs the last azure_integrations.check_connection()-shaped
+    result from an instance's cached last_connection_outcome/last_failure
+    fields (repositories.record_integration_health_check()) -- so GET
+    doesn't need to re-run a check or re-read full history just to
+    classify readiness. None if no check has ever been recorded."""
+    outcome = instance.get("last_connection_outcome")
+    if outcome is None:
+        return None
+    if outcome == "healthy":
+        return {"outcome": "healthy", "error_category": None, "detail": "Live connection check succeeded.", "checked_at": instance.get("last_health_checked_at")}
+    failure = instance.get("last_failure") or {}
+    return {
+        "outcome": outcome, "error_category": failure.get("error_category"),
+        "detail": failure.get("detail"), "checked_at": instance.get("last_health_checked_at"),
+    }
+
+
+def _readiness_record(instance: dict, az_account_status: dict) -> dict:
+    return azure_readiness.readiness_for_instance(
+        instance, latest_check=_check_result_from_instance(instance), az_account_status=az_account_status,
+    )
+
+
+@bp.route(route="manage/azure-readiness", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_list_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Every registered integration's readiness, computed from already-
+    cached data -- does not run a live check (see POST .../validate for
+    that). Includes the az CLI account status once at the top level
+    (not a service, but the shared auth context several integrations'
+    readiness depends on) and also the 'not yet registered' adapters
+    this repo has code for but no admin has registered an instance of,
+    so NOT_INTEGRATED/NOT_CONFIGURED services aren't silently omitted."""
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        instances = repositories.list_integration_instances()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    az_status = az_cli.get_account_status()
+    services = [_readiness_record(i, az_status) for i in instances]
+
+    registered_types = {i["adapter_type"] for i in instances}
+    for adapter_type, adapter in azure_integrations.ADAPTER_TYPES.items():
+        if adapter_type in registered_types:
+            continue
+        verdict = azure_readiness.compute_readiness(adapter_type, check_result=None, az_authenticated=az_status.get("authenticated"))
+        services.append({
+            "integration_id": None, "adapter_type": adapter_type, "service_name": adapter["name"],
+            "status": verdict["status"], "status_definition": azure_readiness.STATUS_DEFINITIONS[verdict["status"]],
+            "reason": verdict["reason"] if verdict["status"] != "UNKNOWN" else "No instance of this integration is registered yet.",
+            "environment": None, "display_name": None, "enabled": False, "missing_configuration": [],
+            "last_validated_at": None, "last_successful_validation_at": None, "resource_identifiers": {},
+            "validated_against": "config_only",
+            "recommended_next_action": "Register an instance from the Azure Service Hub console." if not azure_integrations.is_planned(adapter_type) else azure_readiness.recommend_next_action(verdict["status"], adapter_type),
+        })
+
+    return _json_response({
+        "count": len(services), "services": services,
+        "azure_cli": az_status,
+    })
+
+
+@bp.route(route="manage/azure-readiness/cli-status", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_cli_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real Azure CLI installation + `az login` session detection (see
+    az_cli.py) -- never a stored/assumed value, re-runs 'az account show'
+    on every call. Read-only -- never attempts to run 'az login' itself."""
+    auth_result = require_permission(req, "azure.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    return _json_response({
+        "cli": az_cli.check_az_installed(),
+        "account": az_cli.get_account_status(),
+        "subscriptions": az_cli.list_subscriptions(),
+    })
+
+
+@bp.route(route="manage/azure-readiness/cost-usage", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_cost_usage_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real resource list + real month-to-date cost for AZURE_RESOURCE_GROUP
+    (see az_cli.py's list_resource_group_resources/get_cost_summary) --
+    never a fabricated total. If AZURE_RESOURCE_GROUP isn't configured, or
+    `az` isn't authenticated, returns an honest "unavailable" shape rather
+    than a 500 or a placeholder number."""
+    auth_result = require_permission(req, "azure.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    resource_group = secrets_loader.get_secret("AZURE_RESOURCE_GROUP")
+    if not resource_group:
+        return _json_response({
+            "configured": False,
+            "resources": {"resources": [], "detail": "AZURE_RESOURCE_GROUP is not set."},
+            "cost": {"available": False, "currency": None, "total": None, "by_resource": [],
+                      "detail": "AZURE_RESOURCE_GROUP is not set."},
+        })
+    return _json_response({
+        "configured": True,
+        "resource_group": resource_group,
+        "resources": az_cli.list_resource_group_resources(resource_group),
+        "cost": az_cli.get_cost_summary(resource_group),
+    })
+
+
+@bp.route(route="manage/azure-readiness/{integration_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_detail_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    integration_id = req.route_params.get("integration_id")
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+    return _json_response(_readiness_record(instance, az_cli.get_account_status()))
+
+
+@bp.route(route="manage/azure-readiness/{integration_id}/validate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_validate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Runs the SAME real check as POST .../azure-services/{id}/check
+    (azure_integrations.check_connection -- never a second, parallel
+    verification mechanism), persists it to the same health-check
+    history, and returns the resulting readiness classification. Shares
+    that endpoint's rate-limit store/interval on purpose."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    integration_id = req.route_params.get("integration_id")
+
+    try:
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if instance is None:
+        return _error_response(f"Integration '{integration_id}' not found.", status_code=404)
+
+    if _rate_limited((actor["id"], integration_id), _AZURE_CHECK_MIN_INTERVAL_SECONDS):
+        return _error_response(
+            f"Checked too recently -- wait at least {_AZURE_CHECK_MIN_INTERVAL_SECONDS}s between checks of the same integration.",
+            status_code=429,
+        )
+
+    result = azure_integrations.check_connection(instance["adapter_type"])
+    result["integration_id"] = integration_id
+    try:
+        repositories.record_integration_health_check(integration_id, result)
+        instance = repositories.get_integration_instance(integration_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("azure_readiness_validated", actor, integration_id=integration_id, outcome=result["outcome"])
+    return _json_response(_readiness_record(instance, az_cli.get_account_status()))
+
+
+@bp.route(route="manage/azure-readiness/validate-all", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def azure_readiness_validate_all_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Runs a real check for every registered, non-planned instance.
+    An individual instance still rate-limited from a recent check is
+    skipped (not errored) -- its result reflects the cached state, same
+    data GET .../azure-readiness already returns for it."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        instances = repositories.list_integration_instances()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    az_status = az_cli.get_account_status()
+    results = []
+    for instance in instances:
+        if azure_integrations.is_planned(instance["adapter_type"]):
+            results.append(_readiness_record(instance, az_status))
+            continue
+        if _rate_limited((actor["id"], instance["id"]), _AZURE_CHECK_MIN_INTERVAL_SECONDS):
+            results.append(dict(_readiness_record(instance, az_status), skipped_rate_limited=True))
+            continue
+        result = azure_integrations.check_connection(instance["adapter_type"])
+        result["integration_id"] = instance["id"]
+        try:
+            repositories.record_integration_health_check(instance["id"], result)
+            instance = repositories.get_integration_instance(instance["id"])
+        except Exception as e:
+            return _cosmos_unavailable_response(e)
+        results.append(_readiness_record(instance, az_status))
+
+    _audit_admin_action("azure_readiness_validated_all", actor, count=len(results))
+    return _json_response({"count": len(results), "services": results})
+
+
+# ---------------------------------------------------------------------------
+# Ephemeral Azure Testing (Mode C: provision -> test -> destroy). The ONLY
+# endpoints in this app that can create or delete real Azure
+# infrastructure -- see ephemeral_test_runner.py's module docstring for
+# the full safety model (dedicated resource group per run, explicit
+# approval gate, ownership-tag-checked cleanup, never auto-run as part of
+# an ordinary readiness scan). Gated by azure.manage (the same permission
+# that already gates "run a live connection check" -- provisioning a
+# throwaway test resource is the same trust tier).
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/azure-readiness/application-insights/test-telemetry", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def application_insights_test_telemetry_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Explicit, admin-triggered real test operation
+    (observability.run_connectivity_test()) -- emits one real span
+    through the app's own normal telemetry path and reports a
+    correlation_id an admin can search for in Application Insights to
+    verify actual ingestion (this process can confirm the span was
+    handed to the exporter, never that Azure finished ingesting it --
+    see that function's docstring)."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    result = observability.run_connectivity_test()
+    _audit_admin_action("application_insights_test_telemetry", actor, correlation_id=result["correlation_id"], appinsights_configured=result["application_insights_configured"])
+    return _json_response(result)
+
+
+@bp.route(route="manage/azure-readiness/azure-ai-foundry/test-request", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def azure_ai_foundry_test_request_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Explicit, admin-triggered real verification of Azure OpenAI chat +
+    embedding requests (llm_utils.run_azure_openai_test_request()) --
+    NEVER part of any automatic readiness scan, since it is a real
+    billable Azure call. Gated by azure.manage, same trust tier as
+    running a live connection check or provisioning an ephemeral test
+    resource."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+
+    with observability.trace_stage("azure_ai_foundry", "test_request", metadata={}, correlation_id=None):
+        result = llm_utils.run_azure_openai_test_request()
+
+    _audit_admin_action(
+        "azure_ai_foundry_test_request", actor, configured=result["configured"],
+        chat_outcome=(result["chat"] or {}).get("outcome"), embedding_outcome=(result["embedding"] or {}).get("outcome"),
+    )
+    return _json_response(result)
+
+
+@bp.route(route="manage/azure-readiness/ephemeral-tests", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_ephemeral_test_runs_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "azure.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+    try:
+        runs = repositories.list_ephemeral_test_runs(limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({
+        "count": len(runs), "runs": runs,
+        "allowed_resource_plans": ephemeral_test_runner.ALLOWED_RESOURCE_PLANS,
+    })
+
+
+@bp.route(route="manage/azure-readiness/ephemeral-tests/plan", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def plan_ephemeral_test_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Generates a proposed resource plan -- pure local computation, NO
+    Azure CLI call and NO resource creation. The admin reviews this
+    (resource types, region, estimated cost, generated resource-group
+    name) before ever approving it."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    resource_plan_id = body.get("resource_plan_id")
+    region = body.get("region")
+    if not resource_plan_id or not region:
+        return _error_response("'resource_plan_id' and 'region' are required.", status_code=400)
+
+    try:
+        plan = ephemeral_test_runner.generate_plan(resource_plan_id, region, actor["username"])
+    except ValueError as e:
+        return _error_response(str(e), status_code=400)
+
+    try:
+        saved = repositories.create_ephemeral_test_run(plan)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("ephemeral_test_plan_generated", actor, run_id=plan["run_id"], resource_plan_id=resource_plan_id, region=region)
+    return _json_response(saved, status_code=201)
+
+
+@bp.route(route="manage/azure-readiness/ephemeral-tests/{runId}/approve", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def approve_ephemeral_test_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Explicit human approval -- required before execute will provision
+    anything (see ephemeral_test_runner.execute_run's approved check)."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    run_id = req.route_params.get("runId")
+    try:
+        run = repositories.get_ephemeral_test_run(run_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if run is None:
+        return _error_response(f"Test run '{run_id}' not found.", status_code=404)
+    if run["status"] != "AWAITING_APPROVAL":
+        return _error_response(f"Run is in status '{run['status']}', not AWAITING_APPROVAL.", status_code=400)
+
+    run["approved"] = True
+    run["approved_by"] = actor["username"]
+    try:
+        saved = repositories.update_ephemeral_test_run(run)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("ephemeral_test_approved", actor, run_id=run_id)
+    return _json_response(saved)
+
+
+@bp.route(route="manage/azure-readiness/ephemeral-tests/{runId}/execute", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def execute_ephemeral_test_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Provisions the approved plan's resources (a fresh resource group
+    only) and runs its one functional test. Requires prior approval --
+    see ephemeral_test_runner.execute_run()'s docstring for the full,
+    honestly-fail-closed step sequence (az CLI auth check first, then
+    resource-group-collision check, then the actual deployment)."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    run_id = req.route_params.get("runId")
+    try:
+        run = repositories.get_ephemeral_test_run(run_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if run is None:
+        return _error_response(f"Test run '{run_id}' not found.", status_code=404)
+
+    with observability.trace_stage("azure_ephemeral_test", "execute", metadata={"run_id": run_id}, correlation_id=run_id):
+        run = ephemeral_test_runner.execute_run(run, actor["username"])
+
+    try:
+        saved = repositories.update_ephemeral_test_run(run)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("ephemeral_test_executed", actor, run_id=run_id, status=run["status"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/azure-readiness/ephemeral-tests/{runId}/cleanup", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def cleanup_ephemeral_test_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Deletes ONLY this run's own resource group (ownership-tag-checked
+    first -- see ephemeral_test_runner.cleanup_run()). Safe to call
+    multiple times: CLEANUP_IN_PROGRESS means call it again to keep
+    polling, CLEANUP_VERIFIED means it's confirmed gone, CLEANUP_FAILED
+    means a remaining resource needs manual attention (reported, never
+    hidden)."""
+    auth_result = require_permission(req, "azure.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    run_id = req.route_params.get("runId")
+    try:
+        run = repositories.get_ephemeral_test_run(run_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if run is None:
+        return _error_response(f"Test run '{run_id}' not found.", status_code=404)
+
+    run = ephemeral_test_runner.cleanup_run(run, actor["username"])
+    try:
+        saved = repositories.update_ephemeral_test_run(run)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("ephemeral_test_cleanup", actor, run_id=run_id, cleanup_status=run.get("cleanup_status"))
+    return _json_response(saved)
+
+
+# ---------------------------------------------------------------------------
+# Secrets Management (/admin/secrets). A read-only inventory of every
+# secret this app actually reads (secrets_registry.SECRET_DEFINITIONS,
+# verified against real get_secret()/_require_secrets() call sites, not
+# invented) -- presence and source (Key Vault vs .env) only, NEVER a
+# value. There is no write endpoint here on purpose: setting a secret's
+# VALUE happens outside this app, via your .env file or Key Vault
+# directly (see secrets_loader.py) -- the same rule azure_integrations.py
+# already enforces for Azure integration config.
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/secrets", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_secrets_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Every secret this app reads, whether it currently resolves, and
+    from where -- never the value. `vault_configured` reflects whether
+    AZURE_KEY_VAULT_URL is set at all (independent of any individual
+    secret's resolution), so the UI can distinguish "Key Vault isn't set
+    up" from "this one secret just isn't there."""
+    auth_result = require_permission(req, "secrets.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    import os
+    secrets = secrets_registry.list_secret_status()
+    return _json_response({
+        "count": len(secrets), "vault_configured": bool(os.environ.get("AZURE_KEY_VAULT_URL")),
+        "secrets": secrets,
+    })
+
+
+@bp.route(route="manage/secrets/{key}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def set_secret_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Writes ONE secret's value to the repo's .env file (secrets_registry.
+    update_secret_value() -> secrets_loader.set_env_secret()) -- the ONLY
+    write path offered anywhere in this app's secret handling, and the
+    ONLY place a raw credential value is ever accepted through an API.
+    `key` must be one of secrets_registry.SECRET_KEYS (never an
+    arbitrary environment variable name). The value is NEVER echoed
+    back, logged, or included in the audit record -- only the key name
+    and the resulting presence/source are."""
+    auth_result = require_permission(req, "secrets.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    key = req.route_params.get("key")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    value = body.get("value")
+    if not value or not isinstance(value, str):
+        return _error_response("'value' is required and must be a non-empty string.", status_code=400)
+
+    try:
+        updated = secrets_registry.update_secret_value(key, value)
+    except ValueError as e:
+        return _error_response(str(e), status_code=400)
+    _audit_admin_action("secret_value_set", actor, key=key)
+    return _json_response(updated)
+
+
+# ---------------------------------------------------------------------------
+# RAG Configuration Console (/admin/rag-config*). See rag_config.py's
+# module docstring for the full architecture rationale: a real, versioned
+# config for the resume-matching RAG pipeline (ResumeParser.py), reusing
+# the same Draft -> Validate -> Activate -> Rollback lifecycle already
+# built for Azure integrations, plus REAL retrieval/generation preview
+# against the actual on-disk semantic index (rag_preview.py) -- never a
+# simulated result.
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/rag-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Active config, pending draft (if any), and the REAL knowledge-
+    source status (configured/connected/indexed/retrievable -- never
+    collapsed into one status, same rule as the Azure Service Hub)."""
+    auth_result = require_permission(req, "rag.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        active = repositories.get_active_rag_config()
+        draft = repositories.get_draft_rag_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    source_status = rag_preview.get_source_status()
+    return _json_response({
+        "active": active or dict(rag_config.DEFAULT_CONFIG, id="active", config_version=0, note="Never activated -- ResumeParser.py is running on its built-in hardcoded defaults."),
+        "draft": draft, "source_status": source_status,
+    })
+
+
+@bp.route(route="manage/rag-config/validate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def validate_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "rag.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    errors = rag_config.validate_config(body)
+    return _json_response({"valid": not errors, "errors": errors})
+
+
+@bp.route(route="manage/rag-config/draft", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def save_rag_config_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Body: {chunking: {...}, retrieval: {...}, generation: {...}} -- the
+    full shape (see rag_config.DEFAULT_CONFIG). Rejected with field-level
+    errors if out of the validated ranges; a rejected draft NEVER
+    overwrites the active configuration."""
+    auth_result = require_permission(req, "rag.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    for section in ("chunking", "retrieval", "generation"):
+        if section not in body or not isinstance(body[section], dict):
+            return _error_response(f"'{section}' is required and must be an object.", status_code=400)
+
+    errors = rag_config.validate_config(body)
+    if errors:
+        return _error_response("Invalid configuration: " + " ".join(errors), status_code=400)
+
+    try:
+        saved = repositories.save_draft_rag_config(body, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("rag_config_draft_saved", actor, config_version=saved["config_version"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/rag-config/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Re-validates the current draft (defense in depth -- never trusts
+    that a previously-saved draft is still valid against the latest
+    rules) before promoting it. The draft is consumed (deleted) on
+    success.
+
+    If the draft's chunking.max_chars differs from the currently active
+    configuration, this is a REINDEXING-IMPACT change -- existing
+    embeddings/index entries were built against the OLD chunk
+    boundaries and do not reflect the new ones until resumes are
+    reprocessed (this endpoint never reprocesses anything itself; see
+    rag_config.chunking_changed()'s docstring). Activation is refused
+    with 409 unless the request body explicitly sets
+    "acknowledge_reindex_impact": true -- the spec's "require explicit
+    confirmation for changes that trigger reindexing," enforced
+    structurally rather than left to a UI dialog alone."""
+    auth_result = require_permission(req, "rag.config.activate")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json() if req.get_body() else {}
+    except ValueError:
+        body = {}
+    acknowledge_reindex_impact = bool((body or {}).get("acknowledge_reindex_impact", False))
+
+    try:
+        draft = repositories.get_draft_rag_config()
+        active = repositories.get_active_rag_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if draft is None:
+        return _error_response("No draft configuration exists to activate.", status_code=404)
+    errors = rag_config.validate_config(draft)
+    if errors:
+        return _error_response("Cannot activate an invalid draft: " + " ".join(errors), status_code=400)
+
+    if rag_config.chunking_changed(draft, active or rag_config.DEFAULT_CONFIG) and not acknowledge_reindex_impact:
+        return _error_response(
+            "This draft changes chunking.max_chars, which does not retroactively apply to resumes already "
+            "indexed -- their embeddings were built against the old chunk boundaries and will not reflect "
+            "this change until those resumes are reprocessed (re-run ResumeParser.py; this console does not "
+            "do that automatically). Resend with {\"acknowledge_reindex_impact\": true} to activate anyway.",
+            status_code=409,
+        )
+
+    try:
+        activated = repositories.activate_rag_config(actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action(
+        "rag_config_activated", actor, config_version=activated["config_version"],
+        reindex_impact_acknowledged=acknowledge_reindex_impact,
+    )
+    return _json_response(activated)
+
+
+@bp.route(route="manage/rag-config/history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_rag_config_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "rag.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+    try:
+        history = repositories.list_rag_config_history(limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
+
+
+@bp.route(route="manage/rag-config/rollback/{history_id}", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def rollback_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Restores a prior ACTIVATED configuration snapshot as a NEW draft
+    -- never activates it directly, so an admin must explicitly re-
+    activate (and the pipeline re-validates) rather than a rollback
+    silently going live. History itself is never mutated."""
+    auth_result = require_permission(req, "rag.config.activate")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    history_id = req.route_params.get("history_id")
+    try:
+        history = repositories.list_rag_config_history(limit=200)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    entry = next((h for h in history if h["id"] == history_id), None)
+    if entry is None or entry["operation"] != "activated":
+        return _error_response("No activated configuration snapshot found for that history entry.", status_code=404)
+
+    try:
+        saved = repositories.save_draft_rag_config({
+            "chunking": entry["safe_summary"]["chunking"], "retrieval": entry["safe_summary"]["retrieval"],
+            "generation": entry["safe_summary"]["generation"],
+        }, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("rag_config_rolled_back_to_draft", actor, rolled_back_to_history_id=history_id, new_draft_version=saved["config_version"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/rag-config/prompts", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_rag_prompts_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Every real prompt this RAG pipeline uses, with every version ever
+    created -- see rag_config.PROMPT_IDS for exactly which two (verified
+    against ResumeParser.py's real call sites, not the full prompts/
+    registry.json, most of which belongs to other, non-RAG workflows
+    like interview scoring)."""
+    auth_result = require_permission(req, "rag.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        prompts = {pid: repositories.list_rag_prompt_versions(pid) for pid in rag_config.PROMPT_IDS}
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"prompts": prompts})
+
+
+@bp.route(route="manage/rag-config/prompts/{prompt_id}/draft", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def create_rag_prompt_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Body: {"template": "..."}. Validates that every input variable the
+    prompt actually needs (rag_config.PROMPT_DEFAULTS[prompt_id]
+    ['input_variables']) still appears as a {placeholder} -- a draft
+    missing one would silently break at runtime (str.format KeyError)
+    the first time it's used, so this is checked up front instead."""
+    auth_result = require_permission(req, "rag.prompts.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    prompt_id = req.route_params.get("prompt_id")
+    if prompt_id not in rag_config.PROMPT_IDS:
+        return _error_response(f"Unknown prompt_id '{prompt_id}'.", status_code=404)
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    template = body.get("template")
+    if not template or not isinstance(template, str):
+        return _error_response("'template' is required and must be a non-empty string.", status_code=400)
+
+    missing_vars = [v for v in rag_config.PROMPT_DEFAULTS[prompt_id]["input_variables"] if "{" + v + "}" not in template]
+    if missing_vars:
+        return _error_response(f"Template is missing required placeholder(s): {missing_vars}.", status_code=400)
+
+    try:
+        saved = repositories.create_rag_prompt_draft_version(prompt_id, template, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("rag_prompt_draft_created", actor, prompt_id=prompt_id, version=saved["version"])
+    return _json_response(saved, status_code=201)
+
+
+@bp.route(route="manage/rag-config/prompts/{prompt_id}/versions/{version}/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_rag_prompt_version_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "rag.prompts.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    prompt_id = req.route_params.get("prompt_id")
+    if prompt_id not in rag_config.PROMPT_IDS:
+        return _error_response(f"Unknown prompt_id '{prompt_id}'.", status_code=404)
+    try:
+        version = int(req.route_params.get("version"))
+    except (TypeError, ValueError):
+        return _error_response("'version' must be an integer.", status_code=400)
+
+    try:
+        saved = repositories.activate_rag_prompt_version(prompt_id, version, actor["username"])
+    except ValueError as e:
+        return _error_response(str(e), status_code=404)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("rag_prompt_version_activated", actor, prompt_id=prompt_id, version=version)
+    return _json_response(saved)
+
+
+_rag_preview_last_run = {}  # actor_id -> monotonic seconds, per-process only
+_RAG_PREVIEW_MIN_INTERVAL_SECONDS = 5
+
+
+@bp.route(route="manage/rag-config/preview", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def preview_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Runs REAL retrieval (and, if requested, real generation -- genuine
+    LLM calls, real cost, capped at rag_preview.MAX_GENERATION_PREVIEW_CHUNKS)
+    against the actual on-disk semantic index, using either the pending
+    draft's parameters or the active configuration's -- never a
+    simulated result. Body: {"jd_text": "...", "use": "draft"|"active"
+    (default "active"), "top_k": optional override, "include_generation":
+    bool (default false, since it makes real billable LLM calls),
+    "compare": bool (default false) -- when true, runs retrieval against
+    BOTH the active and draft configurations' retrieval parameters and
+    returns both (compare never runs generation, to avoid doubling LLM
+    cost on one preview click), so an admin can see exactly how a draft
+    change would shift results before activating it.
+    Rate-limited per actor since generation previews cost real money."""
+    auth_result = require_permission(req, "rag.preview.run")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    jd_text = (body.get("jd_text") or "").strip()
+    if not jd_text:
+        return _error_response("'jd_text' is required.", status_code=400)
+    use = body.get("use", "active")
+    include_generation = bool(body.get("include_generation", False))
+    compare = bool(body.get("compare", False))
+
+    if _rate_limited(actor["id"], _RAG_PREVIEW_MIN_INTERVAL_SECONDS, store=_rag_preview_last_run):
+        return _error_response(f"Previewed too recently -- wait at least {_RAG_PREVIEW_MIN_INTERVAL_SECONDS}s between previews.", status_code=429)
+
+    try:
+        active_config = repositories.get_active_rag_config() or rag_config.DEFAULT_CONFIG
+        draft_config = repositories.get_draft_rag_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    if compare:
+        try:
+            active_retrieval = active_config.get("retrieval", rag_config.DEFAULT_CONFIG["retrieval"])
+            compare_result = {"active": rag_preview.run_retrieval_preview(jd_text, active_retrieval.get("top_k", 5), active_retrieval.get("similarity_threshold", 0.0)), "draft": None}
+            if draft_config is not None:
+                draft_retrieval = draft_config.get("retrieval", rag_config.DEFAULT_CONFIG["retrieval"])
+                compare_result["draft"] = rag_preview.run_retrieval_preview(jd_text, draft_retrieval.get("top_k", 5), draft_retrieval.get("similarity_threshold", 0.0))
+        except FileNotFoundError as e:
+            return _error_response(str(e), status_code=409)
+        except Exception as e:
+            return _error_response(f"Retrieval preview failed: {e}", status_code=502)
+        _audit_admin_action("rag_config_previewed", actor, compare=True, had_draft=draft_config is not None)
+        return _json_response({"compare": compare_result, "retrieval": None, "generation": None})
+
+    source_config = (draft_config if use == "draft" else active_config) or rag_config.DEFAULT_CONFIG
+    retrieval_cfg = source_config.get("retrieval", rag_config.DEFAULT_CONFIG["retrieval"])
+    top_k = int(body.get("top_k") or retrieval_cfg.get("top_k", 5))
+    similarity_threshold = float(retrieval_cfg.get("similarity_threshold", 0.0))
+
+    try:
+        retrieval_result = rag_preview.run_retrieval_preview(jd_text, top_k, similarity_threshold)
+    except FileNotFoundError as e:
+        return _error_response(str(e), status_code=409)
+    except Exception as e:
+        return _error_response(f"Retrieval preview failed: {e}", status_code=502)
+
+    result = {"retrieval": retrieval_result, "generation": None, "compare": None}
+    if include_generation and not retrieval_result["insufficient_evidence"]:
+        try:
+            chunk_prompt = rag_config.get_active_prompt_template("resume_chunk_summarization")
+            merge_prompt = rag_config.get_active_prompt_template("resume_merge_structured_extraction")
+            generation_cfg = source_config.get("generation", rag_config.DEFAULT_CONFIG["generation"])
+            result["generation"] = rag_preview.run_generation_preview(
+                jd_text, retrieval_result["chunks"], chunk_prompt, merge_prompt, generation_cfg,
+            )
+        except Exception as e:
+            result["generation"] = {"error": f"Generation preview failed: {e}"}
+    elif include_generation and retrieval_result["insufficient_evidence"]:
+        result["generation"] = {"error": "Skipped -- no retrieved evidence passed the similarity threshold."}
+
+    _audit_admin_action(
+        "rag_config_previewed", actor, use=use, top_k=top_k, chunks_retrieved=len(retrieval_result["chunks"]),
+        included_generation=include_generation,
+    )
+    return _json_response(result)
+
+
+# ---------------------------------------------------------------------------
+# Communications Configuration Console (/admin/communications-config*).
+# See comms_config.py's module docstring for the full architecture
+# rationale: a real channel-adapter registry (email/whatsapp supported,
+# sms honestly labeled absent), the same Draft -> Validate -> Activate ->
+# Rollback lifecycle already built twice this session, a SEPARATE
+# lifecycle for the interview bot (per the spec's "keep them separate"),
+# versioned message templates seeded from real existing templates, and a
+# real delivery log + duplicate-send protection wired into the actual
+# WhatsApp notification call site (_notify_candidate_whatsapp above).
+# ---------------------------------------------------------------------------
+_comms_test_last_run = {}  # actor_id -> monotonic seconds, per-process only
+_COMMS_TEST_MIN_INTERVAL_SECONDS = 10
+
+
+@bp.route(route="manage/communications-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_comms_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        active = repositories.get_active_comms_config()
+        draft = repositories.get_draft_comms_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({
+        "active": active or dict(comms_config.DEFAULT_COMMS_CONFIG, id="active", config_version=0, note="Never activated -- real send paths use their built-in defaults."),
+        "draft": draft, "channels": list(comms_config.CHANNELS.values()),
+    })
+
+
+@bp.route(route="manage/communications-config/validate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def validate_comms_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    errors = comms_config.validate_comms_config(body)
+    return _json_response({"valid": not errors, "errors": errors})
+
+
+@bp.route(route="manage/communications-config/draft", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def save_comms_config_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    for section in ("email", "whatsapp", "delivery_policies"):
+        if section not in body or not isinstance(body[section], dict):
+            return _error_response(f"'{section}' is required and must be an object.", status_code=400)
+
+    errors = comms_config.validate_comms_config(body)
+    if errors:
+        return _error_response("Invalid configuration: " + " ".join(errors), status_code=400)
+
+    try:
+        saved = repositories.save_draft_comms_config(body, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("comms_config_draft_saved", actor, config_version=saved["config_version"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/communications-config/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_comms_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.activate")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        draft = repositories.get_draft_comms_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if draft is None:
+        return _error_response("No draft configuration exists to activate.", status_code=404)
+    errors = comms_config.validate_comms_config(draft)
+    if errors:
+        return _error_response("Cannot activate an invalid draft: " + " ".join(errors), status_code=400)
+
+    try:
+        activated = repositories.activate_comms_config(actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("comms_config_activated", actor, config_version=activated["config_version"])
+    return _json_response(activated)
+
+
+@bp.route(route="manage/communications-config/history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_comms_config_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+    try:
+        history = repositories.list_comms_config_history(limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
+
+
+@bp.route(route="manage/communications-config/rollback/{history_id}", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def rollback_comms_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Restores a prior ACTIVATED snapshot as a NEW draft -- never
+    activates it directly, same pattern as the Azure/RAG consoles."""
+    auth_result = require_permission(req, "comms.config.activate")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    history_id = req.route_params.get("history_id")
+    try:
+        history = repositories.list_comms_config_history(limit=200)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    entry = next((h for h in history if h["id"] == history_id and h["operation"] == "activated"), None)
+    if entry is None:
+        return _error_response("No activated configuration snapshot found for that history entry.", status_code=404)
+
+    try:
+        saved = repositories.save_draft_comms_config({
+            "email": entry["safe_summary"]["email"], "whatsapp": entry["safe_summary"]["whatsapp"],
+            "delivery_policies": entry["safe_summary"]["delivery_policies"],
+        }, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("comms_config_rolled_back_to_draft", actor, rolled_back_to_history_id=history_id, new_draft_version=saved["config_version"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/communications-config/interview-bot", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_interview_bot_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        active = repositories.get_active_interview_bot_config()
+        draft = repositories.get_draft_interview_bot_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({
+        "active": active or dict(comms_config.DEFAULT_INTERVIEW_BOT_CONFIG, id="active", config_version=0, note="Never activated -- voicebot/voice_bot.py is running on its built-in hardcoded defaults."),
+        "draft": draft,
+    })
+
+
+@bp.route(route="manage/communications-config/interview-bot/draft", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def save_interview_bot_config_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Only exposes the real tunable fields (model/temperature/max_tokens/
+    warmup_question_count/language) -- never arbitrary system-prompt
+    text or code, per the spec's explicit "do not expose unrestricted
+    system-prompt modification" rule."""
+    auth_result = require_permission(req, "comms.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    fields = {k: body.get(k, v) for k, v in comms_config.DEFAULT_INTERVIEW_BOT_CONFIG.items()}
+    errors = comms_config.validate_interview_bot_config(fields)
+    if errors:
+        return _error_response("Invalid configuration: " + " ".join(errors), status_code=400)
+
+    try:
+        saved = repositories.save_draft_interview_bot_config(fields, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("interview_bot_config_draft_saved", actor, config_version=saved["config_version"])
+    return _json_response(saved)
+
+
+@bp.route(route="manage/communications-config/interview-bot/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_interview_bot_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.activate")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        draft = repositories.get_draft_interview_bot_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if draft is None:
+        return _error_response("No draft interview bot configuration exists to activate.", status_code=404)
+    errors = comms_config.validate_interview_bot_config(draft)
+    if errors:
+        return _error_response("Cannot activate an invalid draft: " + " ".join(errors), status_code=400)
+
+    try:
+        activated = repositories.activate_interview_bot_config(actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("interview_bot_config_activated", actor, config_version=activated["config_version"])
+    return _json_response(activated)
+
+
+@bp.route(route="manage/communications-config/templates", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_comms_templates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        templates = {tid: repositories.list_comms_template_versions(tid) for tid in comms_config.TEMPLATE_IDS}
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"templates": templates})
+
+
+@bp.route(route="manage/communications-config/templates/{template_id}/draft", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def create_comms_template_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.templates.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    template_id = req.route_params.get("template_id")
+    defaults = comms_config.DEFAULT_TEMPLATES.get(template_id)
+    if defaults is None:
+        return _error_response(f"Unknown template_id '{template_id}'.", status_code=404)
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    body_text = body.get("body")
+    subject = body.get("subject", "")
+    if not body_text or not isinstance(body_text, str):
+        return _error_response("'body' is required and must be a non-empty string.", status_code=400)
+
+    missing_vars = [v for v in defaults["input_variables"] if "{" + v + "}" not in body_text]
+    if missing_vars:
+        return _error_response(f"Template body is missing required placeholder(s): {missing_vars}.", status_code=400)
+
+    try:
+        saved = repositories.create_comms_template_draft_version(template_id, subject, body_text, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("comms_template_draft_created", actor, template_id=template_id, version=saved["version"])
+    return _json_response(saved, status_code=201)
+
+
+@bp.route(route="manage/communications-config/templates/{template_id}/versions/{version}/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_comms_template_version_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.templates.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    template_id = req.route_params.get("template_id")
+    if template_id not in comms_config.TEMPLATE_IDS:
+        return _error_response(f"Unknown template_id '{template_id}'.", status_code=404)
+    try:
+        version = int(req.route_params.get("version"))
+    except (TypeError, ValueError):
+        return _error_response("'version' must be an integer.", status_code=400)
+
+    try:
+        saved = repositories.activate_comms_template_version(template_id, version, actor["username"])
+    except ValueError as e:
+        return _error_response(str(e), status_code=404)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    _audit_admin_action("comms_template_version_activated", actor, template_id=template_id, version=version)
+    return _json_response(saved)
+
+
+@bp.route(route="manage/communications-config/templates/{template_id}/preview", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def preview_comms_template_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Renders the ACTIVE template version against clearly-labeled
+    SYNTHETIC example data (comms_config.TEMPLATE_PREVIEW_EXAMPLE_DATA)
+    -- never a real candidate's name, email, phone, or interview
+    details, per the spec's explicit "do not expose real candidate
+    personal information in template previews" rule."""
+    auth_result = require_permission(req, "comms.config.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    template_id = req.route_params.get("template_id")
+    try:
+        template = comms_config.get_active_template(template_id)
+    except ValueError as e:
+        return _error_response(str(e), status_code=404)
+    try:
+        rendered_subject = template.get("subject", "").format(**comms_config.TEMPLATE_PREVIEW_EXAMPLE_DATA)
+        rendered_body = template["body"].format(**comms_config.TEMPLATE_PREVIEW_EXAMPLE_DATA)
+    except KeyError as e:
+        return _error_response(f"Template references placeholder {e} which isn't available to this workflow.", status_code=400)
+    return _json_response({
+        "template_id": template_id, "version": template["version"], "is_synthetic_example_data": True,
+        "rendered_subject": rendered_subject, "rendered_body": rendered_body,
+    })
+
+
+@bp.route(route="manage/communications-config/email/test-connectivity", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def test_email_connectivity_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "comms.test.send")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    if _rate_limited(actor["id"], _COMMS_TEST_MIN_INTERVAL_SECONDS, store=_comms_test_last_run):
+        return _error_response(f"Tested too recently -- wait at least {_COMMS_TEST_MIN_INTERVAL_SECONDS}s between tests.", status_code=429)
+    result = email_adapter.test_connectivity()
+    _audit_admin_action("comms_email_connectivity_tested", actor, outcome=result["outcome"])
+    return _json_response(result)
+
+
+@bp.route(route="manage/communications-config/email/test-send", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def send_test_email_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Sends ONE real email to an EXPLICITLY chosen recipient -- requires
+    both "to" and "confirm": true in the body; refuses otherwise. The
+    subject/body are always prefixed/labeled as a test, regardless of
+    what the caller passes, so a test message can never be mistaken for
+    a real notification by whoever receives it."""
+    auth_result = require_permission(req, "comms.test.send")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    to_address = (body.get("to") or "").strip()
+    if not to_address:
+        return _error_response("'to' (an explicit recipient email address) is required.", status_code=400)
+    if body.get("confirm") is not True:
+        return _error_response("'confirm': true is required to send a test email.", status_code=400)
+
+    if _rate_limited(actor["id"], _COMMS_TEST_MIN_INTERVAL_SECONDS, store=_comms_test_last_run):
+        return _error_response(f"Tested too recently -- wait at least {_COMMS_TEST_MIN_INTERVAL_SECONDS}s between tests.", status_code=429)
+
+    subject = f"[CDPI TEST MESSAGE] {body.get('subject') or 'Communications Configuration test'}"
+    message_body = (
+        "This is a TEST message sent from the CDPI Communications Configuration console by "
+        f"{actor['username']}. It does not represent a real candidate notification.\n\n"
+        f"{body.get('body') or ''}"
+    )
+    try:
+        result = email_adapter.send_email(to_address, subject, message_body)
+    except Exception as e:
+        _audit_admin_action("comms_email_test_sent", actor, to=to_address, outcome="failed")
+        return _error_response(f"Test email failed to send: {e}", status_code=502)
+    _audit_admin_action("comms_email_test_sent", actor, to=to_address, outcome="sent")
+    return _json_response(dict(result, is_test_message=True))
+
+
+@bp.route(route="manage/communications-config/whatsapp/test-connectivity", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def test_whatsapp_connectivity_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """A real Graph API metadata lookup -- never a message send (WhatsApp
+    has no safe test-message path, see comms_config.CHANNELS["whatsapp"]'s
+    capabilities)."""
+    auth_result = require_permission(req, "comms.test.send")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    if _rate_limited(actor["id"], _COMMS_TEST_MIN_INTERVAL_SECONDS, store=_comms_test_last_run):
+        return _error_response(f"Tested too recently -- wait at least {_COMMS_TEST_MIN_INTERVAL_SECONDS}s between tests.", status_code=429)
+    import whatsapp_client
+
+    result = whatsapp_client.check_connection()
+    _audit_admin_action("comms_whatsapp_connectivity_tested", actor, outcome=result["outcome"])
+    return _json_response(result)
+
+
+@bp.route(route="manage/communications-config/delivery-log", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_comms_delivery_log_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real delivery records for one candidate (correlation_id) -- never
+    fabricated statistics. Distinguishes "message submitted"/"provider
+    accepted"/"failed" (see _notify_candidate_whatsapp above) -- this
+    repo has no delivery-status WEBHOOK wired up anywhere, so "delivered"
+    (confirmed received) vs. "provider accepted" (Meta/SMTP took the
+    request) are never conflated; nothing here claims the stronger
+    status without real evidence for it."""
+    auth_result = require_permission(req, "comms.delivery.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    correlation_id = req.params.get("correlation_id")
+    if not correlation_id:
+        return _error_response("'correlation_id' query parameter is required.", status_code=400)
+    try:
+        limit = min(int(req.params.get("limit", 50)), 200)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+    try:
+        deliveries = repositories.list_comms_deliveries(correlation_id, limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(deliveries), "deliveries": deliveries})

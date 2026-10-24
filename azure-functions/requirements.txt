@@ -4,10 +4,15 @@ python-dotenv
 requests
 bcrypt
 PyJWT
-# only needed once Key Vault is provisioned (secrets_loader.py, imported via repositories.py/client.py):
-# azure-identity
-# azure-keyvault-secrets
-# only needed once Application Insights is configured (observability.py, imported by the blob trigger):
-# azure-monitor-opentelemetry
+# Key Vault (secrets_loader.py, via repositories.py/client.py) and Application
+# Insights (observability.py) -- always installed, see requirements.txt's
+# matching comment for why (both previously referenced a package that wasn't
+# actually installed, found in the Azure real-services audit).
+azure-identity
+azure-keyvault-secrets
+azure-monitor-opentelemetry
+azure-monitor-query
 # only needed once Azure AI Document Intelligence is provisioned (document_intelligence_client.py):
 # azure-ai-documentintelligence
+# only needed for Azure Service Hub's resource discovery (azure_integrations.py):
+# azure-mgmt-resource

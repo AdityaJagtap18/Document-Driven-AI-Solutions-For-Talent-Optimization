@@ -480,3 +480,12 @@ body {
 .role-permission-editor { padding: 16px 4px; display: flex; flex-direction: column; gap: 16px; }
 .permission-module-group { display: flex; flex-direction: column; gap: 6px; }
 .permission-module-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); font-weight: 700; margin-bottom: 2px; }
+
+/* AI Observability Center / Azure Service Hub (AIObservabilityCenter.jsx, AzureServiceHub.jsx) */
+.subsection-heading { font-size: 1rem; font-weight: 700; margin: 24px 0 10px; }
+.integration-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.integration-card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.integration-card-name { font-weight: 700; }
+.integration-card-category { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); font-weight: 700; }
+.integration-card-secrets { display: flex; flex-wrap: wrap; gap: 6px; }
+.integration-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 14px; }

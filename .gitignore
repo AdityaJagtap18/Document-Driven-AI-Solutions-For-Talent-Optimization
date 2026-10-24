@@ -27,6 +27,7 @@ semantic-library/index/
 frontend/src/data/candidates.json
 
 logs/llm_observability.jsonl
+logs/ai_traces.jsonl
 
 azure-functions/local.settings.json
 
@@ -38,3 +39,13 @@ build/
 dist/
 *.egg-info/
 
+.audit_admin_password.tmp
+
+# Runtime pipeline artifacts (file_watcher.py/ResumeParser.py/generate_questions.py
+# intermediate and output folders, rotating log snapshots) -- not source, not
+# meant to be committed; see Resume_Parsed_CSVs/ for the one data output this
+# repo does intentionally track.
+logs/log_*.txt
+InterviewData/
+OutputResume_Folder/
+ParsedReadyForQuestions/

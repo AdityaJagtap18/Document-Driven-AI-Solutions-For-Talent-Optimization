@@ -48,6 +48,78 @@ COSMOS_CONTAINERS = {
     # (upsert-to-update, no duplicate-policy risk). Partition key /id for
     # the same "read as a whole set" reason as pages above.
     "page_access_policies": "/id",
+    # AI Observability Center: one document per trace SPAN (one pipeline
+    # stage -- document extraction, chunking, embedding generation, an
+    # LLM call, etc.), written by observability.record_ai_trace() on a
+    # best-effort basis (see that function's docstring -- fails soft,
+    # the always-written local logs/ai_traces.jsonl is unaffected if
+    # Cosmos isn't configured). Partition key /trace_id so every span of
+    # one end-to-end workflow run is in the same partition -- the
+    # trace explorer's "get all spans for this trace" read is then a
+    # cheap single-partition query, not a cross-partition fan-out.
+    "ai_trace_spans": "/trace_id",
+    # Azure Service Hub: registered integration instances (one per
+    # adapter_type the app actually uses -- see azure_integrations.py's
+    # ADAPTER_TYPES). Partition key /id since instances are listed as a
+    # whole small set, not scoped to any other entity.
+    "integration_instances": "/id",
+    # Health-check HISTORY (not just the latest result) -- one document
+    # per check run. Partition key /integration_id so "this integration's
+    # check history" is a cheap single-partition query.
+    "integration_health_checks": "/integration_id",
+    # Configuration CHANGE history -- distinct from health-check history
+    # above (that's "did a live connection succeed"; this is "what was
+    # the config and who changed it"). One document per register/
+    # config-update/enable/disable/remove, with a safe (never secret-
+    # bearing) summary of what changed -- see repositories.py's
+    # record_integration_config_change(). Partition key /integration_id
+    # for the same single-partition-read reason as health checks.
+    "integration_config_history": "/integration_id",
+    # RAG Configuration Console: ONE singleton document per lifecycle
+    # state ("active", and "draft" once an admin starts editing) for the
+    # resume-matching RAG pipeline's tunable parameters (chunking.
+    # max_chars, retrieval.top_k/similarity_threshold, generation
+    # model/temperature/max_tokens) -- see rag_config.py. Partition key
+    # /id since there are only ever these 1-2 documents.
+    "rag_configurations": "/id",
+    # Configuration change history for the above -- same "distinct from
+    # a connectivity/test-run log" pattern as integration_config_history.
+    # Partition key /id (there's one RAG pipeline, so no natural
+    # per-entity partition -- read as a whole small set, newest first).
+    "rag_config_history": "/id",
+    # Versioned prompt templates for the two real, hardcoded-until-now
+    # prompts in ResumeParser.py (resume_chunk_summarization,
+    # resume_merge_structured_extraction) -- see rag_config.py's
+    # docstring for why these seed from the existing prompts/*.md files
+    # rather than inventing new text. Partition key /prompt_id so "every
+    # version of this prompt" is a cheap single-partition query.
+    "rag_prompt_versions": "/prompt_id",
+    # Communications Configuration Console -- see comms_config.py's module
+    # docstring. "comms_configurations" holds the email/WhatsApp/delivery-
+    # policy singleton ("active"/"draft"); "interview_bot_configurations"
+    # is a SEPARATE singleton for the voice interview bot, kept apart per
+    # the spec's explicit "keep bot config separate from communication
+    # configuration." Both /id partitioned (1-2 docs each, read as a set).
+    "comms_configurations": "/id",
+    "comms_config_history": "/id",
+    "interview_bot_configurations": "/id",
+    # Versioned message templates -- partitioned by /template_id so "every
+    # version of this template" is a cheap single-partition query, same
+    # pattern as rag_prompt_versions.
+    "comms_template_versions": "/template_id",
+    # Real delivery log -- one document per actual send attempt (not a
+    # connectivity check). Partition key /correlation_id (the candidate_id)
+    # so "this candidate's delivery history" is a cheap single-partition
+    # query, and so duplicate-send protection can query it directly.
+    "comms_delivery_log": "/correlation_id",
+    # Ephemeral Azure integration test-run lifecycle records (Mode C of
+    # the Azure Readiness dashboard's provision-test-destroy workflow --
+    # see ephemeral_test_runner.py). One document per run, covering its
+    # full PLANNED -> ... -> CLEANUP_VERIFIED/CLEANUP_FAILED lifecycle --
+    # never deleted even after cleanup, so a past run's outcome (and
+    # whether cleanup actually succeeded) stays auditable. Partition key
+    # /id since runs are listed/searched as a whole small set.
+    "ephemeral_test_runs": "/id",
 }
 
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]

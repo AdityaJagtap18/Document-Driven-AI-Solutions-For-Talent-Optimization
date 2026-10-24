@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import os
 import shutil
+import sys
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -20,16 +21,27 @@ os.makedirs(archive_folder, exist_ok=True)
 os.makedirs(meeting_invite_dir, exist_ok=True)
 
 # === Load Configs ===
+# SMTP credentials now resolve via email_adapter.py (secrets_loader.py
+# first -- .env/Key Vault -- falling back to this file's own
+# smtp_email/smtp_password/smtp_server/smtp_port fields if unset) --
+# see email_adapter.py's docstring. talent_acquisition_email isn't a
+# secret, so it's still read directly from this file.
+sys.path.insert(0, os.path.dirname(current_dir))
+from email_adapter import resolve_smtp_config  # noqa: E402
+
 with open(config_path) as f:
     email_config = json.load(f)
 
 with open(template_path) as f:
     template = json.load(f)
 
-smtp_email = email_config["smtp_email"]
-smtp_password = email_config["smtp_password"]
-smtp_server = email_config["smtp_server"]
-smtp_port = email_config["smtp_port"]
+_smtp = resolve_smtp_config()
+if _smtp["missing"]:
+    raise RuntimeError(f"Missing SMTP configuration: {', '.join(_smtp['missing'])}. Add SMTP_EMAIL/SMTP_PASSWORD/SMTP_SERVER/SMTP_PORT to your .env file or Key Vault, or fill in {config_path}.")
+smtp_email = _smtp["email"]
+smtp_password = _smtp["password"]
+smtp_server = _smtp["server"]
+smtp_port = _smtp["port"]
 noreply_email = "noreply.cidp.in@gmail.com"
 ta_email = email_config["talent_acquisition_email"]
 

@@ -14,9 +14,23 @@ langchain-community
 requests
 bcrypt
 PyJWT
-# only needed once Application Insights / Key Vault are provisioned (observability.py, secrets_loader.py):
-# azure-monitor-opentelemetry
-# azure-identity
-# azure-keyvault-secrets
+# Key Vault (secrets_loader.py) and Application Insights (observability.py) --
+# both features degrade gracefully to .env/local-only when unconfigured, but
+# previously claimed support for Key Vault without this package actually
+# installed, which made every Key Vault lookup fail with ModuleNotFoundError
+# even when AZURE_KEY_VAULT_URL was set correctly (found and fixed in the
+# Azure real-services audit, see docs/AZURE_REAL_SERVICES_AUDIT.md). Always
+# installed now so the feature is real the moment it's configured, not a
+# second install step away from working.
+azure-monitor-opentelemetry
+azure-monitor-query
+azure-identity
+azure-keyvault-secrets
+# Azure OpenAI (llm_utils.py, semantic-library/embeddings.py) -- same package
+# as plain OpenAI (`openai`, already required above); AzureOpenAI/AzureChatOpenAI
+# classes are part of it, no separate install.
 # only needed once Azure AI Document Intelligence is provisioned (document_intelligence_client.py):
 # azure-ai-documentintelligence
+# only needed for Azure Service Hub's resource discovery (azure_integrations.py) -- requires a real
+# Azure subscription + credentials to do anything; without it, discovery just reports "not configured":
+# azure-mgmt-resource

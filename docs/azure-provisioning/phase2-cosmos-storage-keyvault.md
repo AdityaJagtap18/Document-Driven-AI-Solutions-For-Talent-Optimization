@@ -1,5 +1,13 @@
 # Phase 2 Provisioning: Cosmos DB + Storage + Key Vault
 
+**There is now a fully automated path that provisions this (and Document
+Intelligence, Speech, Application Insights, and a Function App) in one
+command, with Key Vault wired up end to end via RBAC and managed
+identity: `infra/deploy.ps1` (see `infra/README.md`).** The manual steps
+below still work and remain useful if you want just these 3 resources,
+want to understand exactly what gets created, or don't have the Azure
+CLI installed.
+
 You need to create 3 Azure resources before the code changes in this phase can actually connect to anything real. Two paths below — pick one. Both produce the same result.
 
 ## Option A: Azure Portal (click-through, ~15 minutes)

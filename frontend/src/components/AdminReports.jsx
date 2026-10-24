@@ -120,6 +120,9 @@ function avg(nums) {
 
 function AdminReports(props) {
   var api = props.api;
+  var permissions = props.permissions || [];
+  var canViewResumeProcessing = permissions.indexOf("observability.read") !== -1;
+  var canViewCommsDelivery = permissions.indexOf("comms.delivery.read") !== -1;
   var state = React.useState({ loading: true, error: null, candidates: [], observability: null });
   var data = state[0];
   var setData = state[1];
@@ -265,6 +268,99 @@ function AdminReports(props) {
         <ChartCard title="Avg Score by Dimension — Fast-Track vs Rejected"><ChartCanvas config={radarConfig} /></ChartCard>
         <ChartCard title="LLM Tokens Used by Call Type"><ChartCanvas config={tokensConfig} /></ChartCard>
       </div>
+
+      {canViewResumeProcessing && <ResumeProcessingReportCard api={api} />}
+      {canViewCommsDelivery && <CommunicationDeliveryReportCard api={api} />}
     </div>
+  );
+}
+
+/** CDPI Product Personas & Reporting doc, Phase 1 #5 -- real
+ * document_extraction outcomes from the AI Observability trace log, not
+ * a separately-maintained counter. Shown only to roles holding
+ * observability.read (ai_operations_mlops, admin). */
+function ResumeProcessingReportCard(props) {
+  var api = props.api;
+  var state = React.useState({ loading: true, error: null, data: null });
+  var data = state[0];
+  var setData = state[1];
+
+  React.useEffect(function () {
+    api.resumeProcessingReport()
+      .then(function (result) { setData({ loading: false, error: null, data: result }); })
+      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
+  }, []);
+
+  if (data.loading) return null;
+  if (data.error) return <div className="banner-error-inline">Resume Processing Report: {data.error}</div>;
+
+  return (
+    <React.Fragment>
+      <h3 className="subsection-heading">Resume Processing Report</h3>
+      <p className="muted">Source: {data.data.data_source}</p>
+      <div className="integration-card-secrets">
+        <span className="badge badge-neutral">{data.data.total_processing_attempts} attempts</span>
+        <span className="badge badge-good">{data.data.succeeded} succeeded</span>
+        <span className={"badge " + (data.data.failed_count ? "badge-bad" : "badge-neutral")}>{data.data.failed_count} failed</span>
+        <span className="badge badge-neutral">
+          {data.data.failure_rate === null ? "failure rate: n/a (no attempts)" : "failure rate: " + (data.data.failure_rate * 100).toFixed(1) + "%"}
+        </span>
+      </div>
+      <p className="muted">Pending/queued: not applicable -- this repo's batch pipeline has no queue/backlog concept.</p>
+      {!!data.data.recent_failures.length && (
+        <div className="table-card">
+          <table className="candidate-table">
+            <thead><tr><th>Candidate</th><th>Error</th><th>When</th></tr></thead>
+            <tbody>
+              {data.data.recent_failures.map(function (f, i) {
+                return <tr key={i}><td>{f.correlation_id || "—"}</td><td>{f.error}</td><td>{f.logged_at ? new Date(f.logged_at).toLocaleString() : "—"}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+/** CDPI Product Personas & Reporting doc, Phase 1 #6 -- real delivery
+ * records from comms_delivery_log. Shown only to roles holding
+ * comms.delivery.read (recruitment_ops_manager-equivalent, admin). */
+function CommunicationDeliveryReportCard(props) {
+  var api = props.api;
+  var state = React.useState({ loading: true, error: null, data: null });
+  var data = state[0];
+  var setData = state[1];
+
+  React.useEffect(function () {
+    api.communicationDeliveryReport()
+      .then(function (result) { setData({ loading: false, error: null, data: result }); })
+      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
+  }, []);
+
+  if (data.loading) return null;
+  if (data.error) return <div className="banner-error-inline">Communication Delivery Report: {data.error}</div>;
+
+  var channels = Object.keys(data.data.by_channel);
+
+  return (
+    <React.Fragment>
+      <h3 className="subsection-heading">Communication Delivery Report</h3>
+      <p className="muted">{data.data.note}</p>
+      {!channels.length && <p className="muted">No delivery records yet.</p>}
+      {!!channels.length && (
+        <div className="table-card">
+          <table className="candidate-table">
+            <thead><tr><th>Channel</th><th>Submitted</th><th>Provider accepted</th><th>Failed</th></tr></thead>
+            <tbody>
+              {channels.map(function (ch) {
+                var s = data.data.by_channel[ch];
+                return <tr key={ch}><td>{ch}</td><td>{s.submitted}</td><td>{s.provider_accepted}</td><td>{s.failed}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </React.Fragment>
   );
 }

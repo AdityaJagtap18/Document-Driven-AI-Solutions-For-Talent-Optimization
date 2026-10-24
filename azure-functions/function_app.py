@@ -85,5 +85,36 @@ def resume_blob_trigger(myblob: func.InputStream):
             logging.error(f"ResumeParser.py failed for {filename}: {result.stderr[-2000:]}")
         else:
             logging.info(f"ResumeParser.py completed for {filename}")
+            _apply_realtime_tier(filename)
     except subprocess.TimeoutExpired:
         logging.error(f"ResumeParser.py timed out (600s) for {filename}")
+
+
+def _apply_realtime_tier(filename: str):
+    """Real-time absolute-threshold tiering (realtime_tiering.py) for the
+    one candidate ResumeParser.py just persisted -- NOT the same algorithm
+    as ResumeMEtrics.py's batch relative-rank tiering (see that module's
+    docstring for why a single-candidate real-time path can't reuse the
+    batch percentile cutoffs). Fails soft: a Cosmos/import error here logs
+    and returns rather than crashing the trigger -- ResumeParser.py's own
+    write already succeeded, so the candidate record exists either way,
+    just without a tier if this step fails."""
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(0, str(REPO_ROOT / "context-lake"))
+    try:
+        from candidate_id import candidate_id_for
+        from realtime_tiering import compute_realtime_tier
+        from repositories import get_candidate, upsert_candidate
+
+        candidate_id = candidate_id_for(filename)
+        candidate = get_candidate(candidate_id)
+        if candidate is None:
+            logging.warning(f"Real-time tiering skipped for {filename}: candidate {candidate_id} not found in Cosmos yet.")
+            return
+        candidate.update(compute_realtime_tier(candidate))
+        upsert_candidate(candidate)
+        logging.info(f"Real-time tier for {filename}: {candidate['ranking_tier']} (score={candidate['realtime_score']})")
+    except Exception as e:
+        logging.error(f"Real-time tiering failed for {filename}: {e}")
