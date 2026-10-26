@@ -14,8 +14,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install test dependencies
-        run: pip install -r requirements-test.txt
+      - name: Install app + test dependencies
+        # Real, pre-existing CI bug this fixes: only requirements-test.txt
+        # (numpy/pytest/pytest-cov) was ever installed here, so every real
+        # import this app's own code needs (azure.functions, azure.cosmos,
+        # langchain, bcrypt, PyJWT, ...) was missing -- conftest.py's own
+        # `import azure.functions as func` failed before a single test
+        # could even collect, on every push since this workflow was added.
+        run: pip install -r requirements.txt -r azure-functions/requirements.txt -r requirements-test.txt
 
       - name: Syntax-check every Python file
         run: |
