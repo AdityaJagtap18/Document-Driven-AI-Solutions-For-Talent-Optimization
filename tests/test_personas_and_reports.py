@@ -180,9 +180,14 @@ class TestPersonaCatalogue:
         assert "recruiter_reports" not in allowed  # no screening.propose
 
     def test_golden_candidate_is_self_scoped_only(self):
+        """candidate's one permission, jds.read.public, is deliberately
+        separate from jds.read (used by the staff Job Descriptions page)
+        so it grants the Application Form's JD dropdown data without also
+        opening any staff page -- allowed_pages() below is still just the
+        one, candidate-only page."""
         persona = persona_catalogue.PERSONAS_BY_ID["P01"]
         role = next(r for r in auth.DEFAULT_ROLES if r["role_key"] == "candidate")
-        assert role["permission_ids"] == []
+        assert role["permission_ids"] == ["jds.read.public"]
         assert persona_catalogue.allowed_pages(persona) == ["candidate_portal"]
 
     def test_golden_describe_persona_records_all_section_8_5_fields(self):

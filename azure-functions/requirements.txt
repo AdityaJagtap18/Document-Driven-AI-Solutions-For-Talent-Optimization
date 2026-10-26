@@ -1,5 +1,12 @@
 azure-functions
 azure-cosmos
+# context-lake/client.py's get_blob_service_client() (used by
+# submit_application_endpoint's real resume upload) imports
+# azure.storage.blob directly -- found missing from this file while
+# building the Hostinger deployment's own requirements.txt; a real,
+# pre-existing gap (only worked in dev because it happened to already be
+# installed in that venv), not introduced by that work.
+azure-storage-blob
 python-dotenv
 requests
 bcrypt

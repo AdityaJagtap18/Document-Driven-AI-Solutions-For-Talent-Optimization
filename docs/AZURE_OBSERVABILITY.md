@@ -12,6 +12,80 @@ per-service Azure connectivity, document/resume processing, external
 integration delivery, local LLM/trace detail — reuses an existing real
 endpoint rather than re-implementing it (see "Service inventory" below).
 
+## Snapshot persistence architecture (observability_snapshots.py)
+
+A later "Unified Full-Stack Observability" spec asked for 18 categories
+(infrastructure CPU/memory/disk, frontend RUM, container health, synthetic
+probes, etc.) plus a snapshot-persist-and-serve architecture. Per an
+explicit scoping decision, the **18-category expansion was not attempted**
+beyond what already existed (most of those categories have no real data
+source in this repo — this runs as a local `func start` process, not a
+deployed/containerized service, and no frontend error/performance
+instrumentation exists). What **was** added for real is the one
+genuinely valuable, generally-applicable piece: **persisting every refresh
+as a snapshot instead of querying Azure Monitor/local sources on every
+page load.**
+
+### Core principle
+
+1. Opening the dashboard calls `GET /manage/observability/snapshot` —
+   a pure Cosmos DB read (`observability_snapshots` container). **This
+   never calls a real source** (Azure Monitor, az CLI, local JSONL logs).
+2. Only an explicit **"Refresh All"** click calls
+   `POST /manage/observability/refresh`, which collects from every real
+   source (`observability_snapshots.all_sources()`) and persists one
+   snapshot document plus one `observability_refresh_results` row per
+   source.
+3. A source that throws an exception during collection is recorded as
+   `status: "failed"` with its real error, and the snapshot **keeps the
+   previous successful result** for that source (`last_known_good`) — a
+   bad refresh never erases good data. A source whose own function
+   returns a real `"available": false` result (e.g.
+   `azure_monitor_query.py`'s functions never raise on failure, by
+   design) is still `status: "success"` at the collection level, since
+   the collection itself didn't crash — the frontend separately surfaces
+   that the *data* is unavailable. This is a deliberate two-layer
+   distinction: "did the collection attempt complete" vs. "was the
+   underlying telemetry actually obtainable."
+4. The dashboard's "Showing data collected `<timestamp>` (N succeeded, N
+   failed, N not configured)" banner and the **Refresh history** panel
+   (`GET /manage/observability/refresh-history`) are both sourced from
+   real persisted documents, not frontend memory — they survive a page
+   reload or backend restart.
+
+### Real sources collected per refresh
+
+`azure_telemetry_health`, `azure_request_volume`, `azure_latency`,
+`azure_ai_usage`, `azure_recent_errors` (all via `azure_monitor_query.py`),
+`service_health` (via `azure_readiness.py`/`az_cli.py`), `local_ai_traces`
+and `local_llm_calls` (local JSONL logs), `document_processing` and
+`comms_delivery` (existing report endpoints' underlying data, reused).
+
+### Verified real end-to-end (this session)
+
+Ran a real refresh directly against the provisioned environment: all 9
+sources completed collection (`succeeded_count: 9, failed_count: 0`).
+Five of the nine (the real Azure Monitor query-back sources) honestly
+reported `"available": false` with the real, specific error (`az` CLI's
+Temporary Access Pass had expired mid-collection) — confirmed this was
+surfaced accurately on the dashboard (KPIs show `—`, not a fabricated
+`0`; "Last successful Azure telemetry ingestion: none confirmed" with the
+real error text) rather than silently treated as a pass. Confirmed via
+network inspection that loading the dashboard fires exactly one request
+(`GET .../snapshot`) and zero live Azure/local-source queries.
+
+### Explicitly NOT implemented (stated, not silently skipped)
+
+Infrastructure CPU/memory/disk/network metrics (no real source — this is
+a local dev process), frontend real-user monitoring (no instrumentation
+exists), container health/restarts (not containerized here), synthetic/
+external uptime probing (would need a separately-hosted prober), VM/host
+availability beyond what `az_cli.py` already reports for Azure resources
+themselves, and full W3C-traceparent distributed tracing across a service
+mesh (there is no service mesh — this repo's existing `trace_id`/
+`span_id` model is a single-process correlation scheme, not propagated
+cross-service).
+
 ## Scope note: adapted from a generic spec
 
 A later request for this feature described a configurable, drag-and-drop

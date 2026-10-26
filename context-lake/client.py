@@ -8,6 +8,36 @@ from secrets_loader import get_secret  # noqa: E402
 
 COSMOS_CONTAINERS = {
     "candidates": "/candidate_id",
+    # Unified Observability: one document per completed refresh run
+    # (observability_snapshots.py) -- the full collected snapshot across
+    # every real source (Azure Monitor, Azure Readiness, local AI traces,
+    # resume-processing/comms reports), persisted so the dashboard reads
+    # from here by default instead of re-querying Azure on every page
+    # load. Partition key /id since only the single latest snapshot is
+    # normally read, plus history is listed as a whole set.
+    "observability_snapshots": "/id",
+    # One row per (refresh_run, source) collection attempt -- the
+    # persistent refresh-history table (status, duration, error) a
+    # snapshot document's own per-source results are rolled up from.
+    # Partition key /refresh_run_id so "all source results for this one
+    # refresh" is a cheap single-partition query.
+    "observability_refresh_results": "/refresh_run_id",
+    # Job Description Management: the canonical JD record (status, fields,
+    # approval metadata) -- see jd_management.py and
+    # context-lake/schema/jd.schema.json. Separate from (and the source of
+    # truth for) jd_folder/*.txt, which jd_manager.py's existing resume-
+    # scoring pipeline reads -- only PUBLISHED JDs are synced there (see
+    # jd_management.publish_jd()), so draft/pending JDs never affect
+    # candidate matching. Partition key /id since JDs are listed/filtered
+    # by status as a whole set, not scoped to any other entity.
+    "jds": "/id",
+    # Business audit trail for JD lifecycle events (create/update/submit/
+    # approve/reject/publish/archive) -- distinct from ai_trace_spans
+    # below (that's AI-pipeline performance telemetry; this is "who did
+    # what to this JD and when"), mirroring audit_log's candidate-keyed
+    # pattern but keyed by /jd_id since there's no candidate_id on a JD
+    # lifecycle event.
+    "jd_audit_log": "/jd_id",
     "interview_transcripts": "/candidate_id",
     "scoring_history": "/candidate_id",
     "audit_log": "/candidate_id",
@@ -120,6 +150,30 @@ COSMOS_CONTAINERS = {
     # whether cleanup actually succeeded) stays auditable. Partition key
     # /id since runs are listed/searched as a whole small set.
     "ephemeral_test_runs": "/id",
+    # F-02 (Tokenomics calculator, minimal slice): the real budget/alert
+    # configuration -- same Draft -> Activate -> History lifecycle already
+    # proven for rag_configurations/comms_configurations, not a new
+    # pattern. Partition key /id since there's only ever "active"/"draft"
+    # documents, same as rag_configurations.
+    "tokenomics_config": "/id",
+    "tokenomics_config_history": "/id",
+    # F-03 (candidate feedback, minimal slice): one feedback-request/
+    # submission document per candidate (id = candidate_id), kept
+    # entirely separate from "candidates"/"scoring_history" so
+    # experience feedback can never influence hiring evaluation scores
+    # -- see candidate_feedback.py's module docstring. Partition key
+    # /candidate_id matches the other candidate-keyed containers
+    # (interview_transcripts, scoring_history, audit_log).
+    "candidate_feedback": "/candidate_id",
+    # F-17 (model routing, minimal slice): a single "active" document
+    # mapping label -> model override for the 6 real LLM call sites that
+    # have no admin-configurable model today -- see model_routing.py's
+    # module docstring. No Draft/Activate staging (unlike rag_configurations)
+    # -- a routing-rule change is low-risk and instantly reversible by
+    # resaving, not worth the extra staging ceremony. Partition key /id
+    # since there's only ever the one "active" document.
+    "model_routing_config": "/id",
+    "model_routing_config_history": "/id",
 }
 
 BLOB_CONTAINERS = ["raw-resumes", "parsed-resumes"]

@@ -92,8 +92,9 @@ import sys
 import pandas as pd
 from pathlib import Path
 from PyPDF2 import PdfReader
-from resume_text_utils import extract_name_from_filename, extract_contact_details
-from llm_utils import call_with_retry, get_chat_llm
+from resume_text_utils import extract_name_from_filename, extract_contact_details, is_placeholder_name
+from realtime_tiering import compute_realtime_tier
+from llm_utils import cached_call_with_retry, get_chat_llm
 import observability
 
 # === Semantic search wiring (semantic-library/) ===
@@ -240,10 +241,11 @@ def summarize_pdf(pdf_path, jd, jd_vector, semantic_store, trace_id, correlation
     llm = get_chat_llm(temperature=gen_cfg["temperature"], max_tokens=gen_cfg["max_tokens"], model=gen_cfg["model"])
     for chunk in chunks:
         prompt = CHUNK_SUMMARIZATION_PROMPT["template"].format(text=sanitize_for_prompt(chunk), jd=sanitized_jd)
-        partial_summary = call_with_retry(
+        partial_summary = cached_call_with_retry(
             llm.predict, prompt,
             on_retry=lambda attempt, e: write_log(f"Retry {attempt} for chunk summarization on {pdf_path.name}: {e}"),
             label="resume_chunk_summarization", model=gen_cfg["model"],
+            temperature=gen_cfg["temperature"], max_tokens=gen_cfg["max_tokens"],
             trace_id=trace_id, correlation_id=correlation_id,
             prompt_version=str(CHUNK_SUMMARIZATION_PROMPT["version"]), workflow="resume_parsing",
         )
@@ -260,10 +262,11 @@ def summarize_pdf(pdf_path, jd, jd_vector, semantic_store, trace_id, correlation
         temperature=merge_cfg["temperature"], max_tokens=merge_cfg["max_tokens"], model=merge_cfg["model"],
         model_kwargs={"response_format": {"type": "json_object"}},
     )
-    final_response = call_with_retry(
+    final_response = cached_call_with_retry(
         llm_merge.predict, merge_prompt,
         on_retry=lambda attempt, e: write_log(f"Retry {attempt} for merge step on {pdf_path.name}: {e}"),
         label="resume_merge_structured_extraction", model=merge_cfg["model"],
+        temperature=merge_cfg["temperature"], max_tokens=merge_cfg["max_tokens"],
         trace_id=trace_id, correlation_id=correlation_id,
         prompt_version=str(MERGE_EXTRACTION_PROMPT["version"]), workflow="resume_parsing",
     )
@@ -282,7 +285,7 @@ def summarize_pdf(pdf_path, jd, jd_vector, semantic_store, trace_id, correlation
             gpt_name = structured_data.get("Name", "").strip()
             fallback_name = extract_name_from_filename(pdf_path.name)
 
-            if not gpt_name or "candidate" in gpt_name.lower() or gpt_name.startswith("<"):
+            if not gpt_name or "candidate" in gpt_name.lower() or gpt_name.startswith("<") or is_placeholder_name(gpt_name):
                 print(f"[Fallback] Using filename-based name: {fallback_name}")
                 structured_data["Name"] = fallback_name
 
@@ -347,6 +350,18 @@ for pdf_path in pdf_paths:
                 lake_doc = dict(parsed_data)
                 lake_doc["candidate_id"] = resume_correlation_id
                 lake_doc["source_blob_path"] = f"raw-resumes/{filename}"
+                # REAL BUG FIX: every candidate must get a real ranking_tier
+                # the moment their record is first written -- not left as
+                # None until a SEPARATE post-processing step (function_app.py's
+                # resume_blob_trigger -> _apply_realtime_tier) happens to run
+                # successfully afterward. That separate step is real but
+                # fragile under the documented concurrent-upload race
+                # condition (see function_app.py's own docstring) and never
+                # runs at all for this script's own standalone/CLI/batch
+                # path -- both of which left real candidates stuck with no
+                # recommendation at all. compute_realtime_tier() never
+                # raises, so this never blocks a real write.
+                lake_doc.update(compute_realtime_tier(lake_doc))
                 upsert_candidate(lake_doc)
             write_log(f"Context lake: wrote candidate document for {filename}")
         except Exception as e:
@@ -360,8 +375,20 @@ for pdf_path in pdf_paths:
 
     
     
-    shutil.move(str(pdf_path), str(parsed_folder / filename))
-    print(f"Moved {filename} to ParsedReadyForQuestions\n")
+    # REAL BUG FIX: this was previously unguarded, so a move failure for
+    # ONE file (e.g. a concurrent run -- see function_app.py's own
+    # documented concurrent-upload race condition -- already moved this
+    # exact file a moment earlier) raised all the way out of the script,
+    # aborting processing for every OTHER resume still left in this run's
+    # loop. A candidate whose real LLM scoring already succeeded and was
+    # already written to Cosmos (see the try/except above) must not be
+    # thrown away by an unrelated file-move error for a DIFFERENT
+    # resume -- this failure is now scoped to just this one resume.
+    try:
+        shutil.move(str(pdf_path), str(parsed_folder / filename))
+        print(f"Moved {filename} to ParsedReadyForQuestions\n")
+    except (FileNotFoundError, shutil.Error) as e:
+        write_log(f"Move to ParsedReadyForQuestions skipped for {filename} (already moved by a concurrent run, or otherwise missing): {e}")
 
     
 

@@ -12,9 +12,16 @@
 function RoleManagement(props) {
   var api = props.api;
 
-  var state = React.useState({ loading: true, error: null, roles: [], permissions: {} });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("role_management", function () {
+    return Promise.all([api.listRoles(), api.listPermissions()])
+      .then(function (results) { return { roles: results[0].roles, permissions: results[1].permissions }; });
+  });
+  var data = {
+    loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error,
+    roles: (snapshot.state.data && snapshot.state.data.roles) || [],
+    permissions: (snapshot.state.data && snapshot.state.data.permissions) || {},
+  };
+  var load = snapshot.refresh;
   var expandedState = React.useState(null);
   var expanded = expandedState[0];
   var setExpanded = expandedState[1];
@@ -24,19 +31,6 @@ function RoleManagement(props) {
   var errorMsg = React.useState(null);
   var error = errorMsg[0];
   var setError = errorMsg[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    return Promise.all([api.listRoles(), api.listPermissions()])
-      .then(function (results) {
-        setData({ loading: false, error: null, roles: results[0].roles, permissions: results[1].permissions });
-      })
-      .catch(function (err) {
-        setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); });
-      });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   var modules = {};
   Object.keys(data.permissions).forEach(function (pid) {
@@ -54,8 +48,9 @@ function RoleManagement(props) {
       </p>
 
       <div className="toolbar">
-        <button className="btn" onClick={load}>Refresh</button>
+        <button className="btn" onClick={load} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
         <button className="btn btn-primary" onClick={function () { setCreateOpen(true); }}>+ New Custom Role</button>
+        <span className="muted">Snapshot from {snapshot.state.lastUpdated ? new Date(snapshot.state.lastUpdated).toLocaleString() : "just now"}</span>
       </div>
 
       {error && <div className="banner banner-error">{error}</div>}

@@ -48,6 +48,11 @@
       "enum": ["Recommended for Fast-Track", "To be Considered", "Rejected"],
       "description": "Output of ResumeMEtrics.py classify_candidate(); populated after scoring, not at parse time."
     },
-    "normalized_weighted_score": { "type": "number" }
+    "normalized_weighted_score": { "type": "number" },
+
+    "assigned_interviewer_usernames": {
+      "type": "array", "items": { "type": "string" },
+      "description": "Record-level access scope for the 'interviewer' role (auth.py's interviews.assign permission, set via PUT /candidates/{id}/assign-interviewer) -- a username in this list may read this candidate's record/interview transcripts; one who is NOT in it, and holds no broader role, is denied (see api_blueprint.py's _interviewer_may_access()). Absent/empty on legacy candidates -- treated as 'no interviewer assigned yet', not a schema violation."
+    }
   }
 }

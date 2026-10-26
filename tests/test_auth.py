@@ -120,9 +120,15 @@ class TestPermissionCatalog:
 
     def test_golden_candidate_role_has_no_admin_or_recruiter_permissions(self):
         """Explicit spec requirement: never make Candidate a role that can
-        access recruiter or administrative interfaces."""
+        access recruiter or administrative interfaces. The ONLY permission
+        this role holds is jds.read.public (the narrow, candidate-safe
+        permission so the real self-service Application Form can list open
+        roles -- see that role's own description; deliberately NOT the
+        broader jds.read, which also gates the staff Job Descriptions
+        management page) -- everything recruiter/admin-facing stays
+        off-limits."""
         candidate = next(r for r in auth.DEFAULT_ROLES if r["role_key"] == "candidate")
-        assert candidate["permission_ids"] == []
+        assert candidate["permission_ids"] == ["jds.read.public"]
 
     def test_golden_every_permission_has_a_module_label(self):
         for pid, meta in auth.PERMISSIONS.items():

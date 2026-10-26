@@ -9,8 +9,8 @@
     },
     {
       "name": "functions",
-      "runtimeExecutable": "func",
-      "runtimeArgs": ["start", "--port", "7071"],
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd", "/d", "azure-functions", "&&", "func", "start", "--port", "7071"],
       "port": 7071
     }
   ]

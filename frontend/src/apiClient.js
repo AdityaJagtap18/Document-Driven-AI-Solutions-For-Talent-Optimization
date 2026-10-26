@@ -156,6 +156,11 @@ window.CDPI_REAL_API = {
   getCandidateInterviews: function (candidateId) {
     return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/interviews");
   },
+  assignInterviewer: function (candidateId, usernames) {
+    return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/assign-interviewer", {
+      method: "PUT", body: JSON.stringify({ usernames: usernames }),
+    });
+  },
   getCandidateByEmail: function (email) {
     return cdpiRequest("/api/candidates/by-email/" + encodeURIComponent(email));
   },
@@ -170,6 +175,51 @@ window.CDPI_REAL_API = {
   },
   aiObservabilitySummary: function () {
     return cdpiRequest("/api/manage/ai-observability/summary");
+  },
+  // F-02 (Tokenomics calculator, minimal slice): real monthly budget
+  // config (Draft -> Activate -> History, same pattern as rag-config
+  // above) + a real-time, period-scoped usage/budget status check.
+  getTokenomicsConfig: function () {
+    return cdpiRequest("/api/manage/tokenomics-config");
+  },
+  saveTokenomicsConfigDraft: function (config) {
+    return cdpiRequest("/api/manage/tokenomics-config", { method: "PUT", body: JSON.stringify(config) });
+  },
+  activateTokenomicsConfig: function () {
+    return cdpiRequest("/api/manage/tokenomics-config/activate", { method: "POST" });
+  },
+  getTokenomicsConfigHistory: function () {
+    return cdpiRequest("/api/manage/tokenomics-config/history");
+  },
+  getTokenomicsStatus: function () {
+    return cdpiRequest("/api/manage/tokenomics/status");
+  },
+  // F-03 (candidate feedback, minimal slice): staff-facing dashboard
+  // read. Submission itself is candidate-facing (no real candidate
+  // login in this app -- see candidate_feedback.py) and has no UI here.
+  listCandidateFeedback: function (jdId) {
+    return cdpiRequest("/api/manage/candidate-feedback" + (jdId ? "?jd_id=" + encodeURIComponent(jdId) : ""));
+  },
+  // F-18 (LLM caching, minimal slice): real stats on the local
+  // exact-match response cache wrapped around ResumeParser.py's two
+  // cacheable call sites -- see llm_cache.py.
+  getLlmCacheStats: function () {
+    return cdpiRequest("/api/manage/llm-cache/stats");
+  },
+  clearLlmCache: function () {
+    return cdpiRequest("/api/manage/llm-cache/clear", { method: "POST" });
+  },
+  // F-17 (model routing, minimal slice): admin-configurable model
+  // override for the 6 real LLM call sites that had no admin control
+  // before this feature -- see model_routing.py.
+  getModelRoutingConfig: function () {
+    return cdpiRequest("/api/manage/model-routing-config");
+  },
+  saveModelRoutingConfig: function (routes) {
+    return cdpiRequest("/api/manage/model-routing-config", { method: "PUT", body: JSON.stringify({ routes: routes }) });
+  },
+  getModelRoutingConfigHistory: function () {
+    return cdpiRequest("/api/manage/model-routing-config/history");
   },
   listAiTraces: function (filters) {
     filters = filters || {};
@@ -410,6 +460,48 @@ window.CDPI_REAL_API = {
   listJds: function () {
     return cdpiRequest("/api/jds");
   },
+  listJdRecords: function (status) {
+    return cdpiRequest("/api/manage/jds" + (status ? "?status=" + encodeURIComponent(status) : ""));
+  },
+  getJdRecord: function (jdId) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId));
+  },
+  createJd: function (fields) {
+    return cdpiRequest("/api/manage/jds", { method: "POST", body: JSON.stringify(fields) });
+  },
+  updateJd: function (jdId, fields) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId), { method: "PUT", body: JSON.stringify(fields) });
+  },
+  submitJd: function (jdId) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId) + "/submit", { method: "POST" });
+  },
+  approveJd: function (jdId) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId) + "/approve", { method: "POST" });
+  },
+  rejectJd: function (jdId, reason) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId) + "/reject", { method: "POST", body: JSON.stringify({ reason: reason }) });
+  },
+  publishJd: function (jdId) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId) + "/publish", { method: "POST" });
+  },
+  archiveJd: function (jdId) {
+    return cdpiRequest("/api/manage/jds/" + encodeURIComponent(jdId) + "/archive", { method: "POST" });
+  },
+  uploadJdDocument: function (fileBase64, filename) {
+    return cdpiRequest("/api/manage/jds/upload", { method: "POST", body: JSON.stringify({ file_base64: fileBase64, filename: filename }) });
+  },
+  generateJdWithAi: function (inputs) {
+    return cdpiRequest("/api/manage/jds/generate", { method: "POST", body: JSON.stringify(inputs) });
+  },
+  getObservabilitySnapshot: function () {
+    return cdpiRequest("/api/manage/observability/snapshot");
+  },
+  refreshObservability: function (hours, sourceIds) {
+    return cdpiRequest("/api/manage/observability/refresh", { method: "POST", body: JSON.stringify({ hours: hours, source_ids: sourceIds }) });
+  },
+  getObservabilityRefreshHistory: function (limit) {
+    return cdpiRequest("/api/manage/observability/refresh-history" + (limit ? "?limit=" + encodeURIComponent(limit) : ""));
+  },
   listAuditLog: function (action) {
     return cdpiRequest("/api/audit-log" + (action ? "?action=" + encodeURIComponent(action) : ""));
   },
@@ -426,6 +518,23 @@ window.CDPI_REAL_API = {
     return cdpiRequest("/api/candidates/" + encodeURIComponent(candidateId) + "/stage", {
       method: "POST",
       body: JSON.stringify({ stage: stage, updated_by: updatedBy, notes: notes, performance: performance }),
+    });
+  },
+  generateInterviewQuestions: function (candidateId, jdId) {
+    return cdpiRequest("/api/manage/interview-questions/generate", {
+      method: "POST",
+      body: JSON.stringify({ candidate_id: candidateId, jd_id: jdId }),
+    });
+  },
+  // F-07/F-09 (candidate chatbot, minimal slice): the real, already-
+  // built F-08 backend (chat_guardrails.py) finally has a frontend --
+  // staff-facing (gated by the existing candidates.read permission),
+  // not candidate-facing, since this app has no real candidate auth
+  // persona. See chat_guardrails.py's module docstring.
+  chatCandidateQa: function (candidateId, question) {
+    return cdpiRequest("/api/manage/chat/candidate-qa", {
+      method: "POST",
+      body: JSON.stringify({ candidate_id: candidateId, question: question }),
     });
   },
   proposeBulkDecision: function (decision, candidateIds, proposedBy, notes) {

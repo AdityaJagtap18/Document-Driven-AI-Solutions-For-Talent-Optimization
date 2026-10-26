@@ -29,6 +29,8 @@ frontend/src/data/candidates.json
 logs/llm_observability.jsonl
 logs/ai_traces.jsonl
 
+hostinger-deploy/resume_poller_processed.txt
+
 azure-functions/local.settings.json
 
 *.log

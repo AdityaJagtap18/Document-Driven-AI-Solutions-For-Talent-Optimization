@@ -35,6 +35,21 @@ def upsert_candidate(candidate: dict) -> dict:
     return get_container("candidates").upsert_item(candidate)
 
 
+def delete_candidate(candidate_id: str) -> bool:
+    """F-14 (candidate data erasure, minimal slice): deletes the primary
+    candidate document. Returns True if a document existed and was
+    deleted, False if there was nothing to delete (not an error --
+    erasure of an already-absent record is a no-op success, not a
+    failure)."""
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        get_container("candidates").delete_item(item=candidate_id, partition_key=candidate_id)
+        return True
+    except CosmosResourceNotFoundError:
+        return False
+
+
 def get_candidate(candidate_id: str):
     """Returns None only when the candidate genuinely doesn't exist.
     Configuration/connection errors (Cosmos DB not provisioned, bad
@@ -76,6 +91,25 @@ def find_candidate_by_email(email: str):
     return items[0] if items else None
 
 
+def assign_interviewers(candidate_id: str, usernames: list, actor: str):
+    """Sets the record-level access scope for the 'interviewer' role on one
+    candidate (see candidate.schema.json's assigned_interviewer_usernames
+    field and auth.py's interviews.assign permission). Replaces the whole
+    list, same semantics as update_role_endpoint's role_keys replace --
+    the caller sends the full intended assignment, not a delta. Returns
+    None if the candidate doesn't exist (caller maps that to 404)."""
+    candidate = get_candidate(candidate_id)
+    if candidate is None:
+        return None
+    candidate["assigned_interviewer_usernames"] = list(usernames)
+    upsert_candidate(candidate)
+    append_audit_log({
+        "candidate_id": candidate_id, "action": "interviewer_assigned",
+        "assigned_interviewer_usernames": list(usernames), "updated_by": actor,
+    })
+    return candidate
+
+
 def list_candidates(ranking_tier: str = None) -> list:
     container = get_container("candidates")
     if ranking_tier:
@@ -112,6 +146,17 @@ def list_interview_transcripts(candidate_id: str) -> list:
     )
 
 
+def delete_interview_transcripts_for_candidate(candidate_id: str) -> int:
+    """F-14 (candidate data erasure, minimal slice): deletes every real
+    transcript document for this candidate. Returns the real count
+    deleted (0 if none existed -- not an error)."""
+    container = get_container("interview_transcripts")
+    transcripts = list_interview_transcripts(candidate_id)
+    for t in transcripts:
+        container.delete_item(item=t["id"], partition_key=candidate_id)
+    return len(transcripts)
+
+
 # ---------------------------------------------------------------------------
 # scoring_history (append-only — one record per scoring run, never overwritten)
 # ---------------------------------------------------------------------------
@@ -133,6 +178,17 @@ def list_scoring_history(candidate_id: str) -> list:
             partition_key=candidate_id,
         )
     )
+
+
+def delete_scoring_history_for_candidate(candidate_id: str) -> int:
+    """F-14 (candidate data erasure, minimal slice): deletes every real
+    scoring-history record for this candidate. Returns the real count
+    deleted (0 if none existed)."""
+    container = get_container("scoring_history")
+    records = list_scoring_history(candidate_id)
+    for r in records:
+        container.delete_item(item=r["id"], partition_key=candidate_id)
+    return len(records)
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +318,27 @@ def list_bulk_decisions(status: str = None) -> list:
     return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
 
 
+def find_bulk_decisions_referencing_candidate(candidate_id: str) -> list:
+    """F-14 (candidate data erasure, minimal slice): read-only search for
+    bulk-decision batches that include this candidate_id in their
+    candidate_ids list. Deliberately NOT a deletion function -- a bulk
+    decision's candidate_ids array is shared with OTHER real candidates'
+    ids in the same batch, so removing the whole document would erase
+    data belonging to people who were never asked to be erased. Reported
+    to the caller as a real, found, NOT-automatically-modified location,
+    per this feature's own "document the limitation... rather than
+    falsely claiming complete erasure" requirement -- out of scope for
+    this minimal slice to safely auto-redact."""
+    container = get_container("bulk_decisions")
+    return list(
+        container.query_items(
+            query="SELECT c.id, c.decision, c.status, c.proposed_at FROM c WHERE ARRAY_CONTAINS(c.candidate_ids, @cid)",
+            parameters=[{"name": "@cid", "value": candidate_id}],
+            enable_cross_partition_query=True,
+        )
+    )
+
+
 def update_bulk_decision(doc: dict) -> dict:
     """Caller passes the full document back (read via get_bulk_decision(),
     mutate, then save) -- same upsert-the-whole-thing convention as
@@ -308,6 +385,23 @@ def create_user(username: str, password_hash: str, display_name: str, email: str
         "updated_at": _now(),
     }
     return get_container("users").upsert_item(doc)
+
+
+def delete_user(user_id: str) -> bool:
+    """Permanently deletes a user account document -- a real, irreversible
+    hard delete, not a status flip (see update_user()/set_user_status_
+    endpoint for the reversible alternative, which is what day-to-day
+    account removal should normally use). Returns True if a document
+    existed and was deleted, False if there was nothing to delete (same
+    "erasure of an already-absent record is a no-op success" convention
+    as delete_candidate())."""
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        get_container("users").delete_item(item=user_id, partition_key=user_id)
+        return True
+    except CosmosResourceNotFoundError:
+        return False
 
 
 def get_user(user_id: str):
@@ -410,6 +504,41 @@ def ensure_default_roles() -> list:
             create_role(role["role_key"], role["display_name"], role["description"], role["permission_ids"], is_system=True)
             created.append(role["role_key"])
     return created
+
+
+def sync_default_roles() -> list:
+    """Real, previously-missing counterpart to ensure_default_roles():
+    that function only INSERTS a system role that doesn't exist in Cosmos
+    yet -- a system role seeded before a later code change adds a new
+    permission to its auth.DEFAULT_ROLES entry (e.g. recruiter gaining
+    jds.create for Job Description Management) silently keeps its STALE
+    Cosmos permission_ids forever, since nothing ever re-upserts it. This
+    reconciles every is_system role's permission_ids/display_name/
+    description against the current code-defined catalog (mirroring
+    sync_pages()'s own "reconcile metadata against the code registry"
+    pattern) -- never touches a NON-system (admin-created custom) role.
+    Returns the list of role_keys that were actually out of sync."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from auth import DEFAULT_ROLES  # noqa: E402
+
+    updated = []
+    for role in DEFAULT_ROLES:
+        existing = get_role(role["role_key"])
+        if existing is None:
+            create_role(role["role_key"], role["display_name"], role["description"], role["permission_ids"], is_system=True)
+            updated.append(role["role_key"])
+            continue
+        if not existing.get("is_system"):
+            continue
+        if (sorted(existing.get("permission_ids", [])) != sorted(role["permission_ids"])
+                or existing.get("display_name") != role["display_name"]
+                or existing.get("description") != role["description"]):
+            existing["permission_ids"] = list(role["permission_ids"])
+            existing["display_name"] = role["display_name"]
+            existing["description"] = role["description"]
+            update_role(existing)
+            updated.append(role["role_key"])
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -785,6 +914,81 @@ def list_rag_config_history(limit: int = 50) -> list:
 
 
 # ---------------------------------------------------------------------------
+# tokenomics_config (F-02, minimal slice) -- the real budget/alert
+# configuration, same Draft -> Activate -> History lifecycle as
+# rag_configurations above (single active/draft documents, versioned
+# history, never silently applied). See tokenomics.py for the config
+# shape/validation and the real usage/budget-check logic this feeds.
+# ---------------------------------------------------------------------------
+def get_active_tokenomics_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("tokenomics_config").read_item(item="active", partition_key="active")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def get_draft_tokenomics_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("tokenomics_config").read_item(item="draft", partition_key="draft")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def save_draft_tokenomics_config(fields: dict, actor: str) -> dict:
+    """`fields` is the full budget-config dict the caller wants to try --
+    validated by the caller (tokenomics.validate_config()) before this is
+    called, same convention as save_draft_rag_config()."""
+    active = get_active_tokenomics_config()
+    doc = {
+        "id": "draft", "lifecycle_status": "draft",
+        "config_version": (active["config_version"] + 1) if active else 1,
+        "monthly_budget_usd": fields.get("monthly_budget_usd"),
+        "warning_threshold_pct": fields["warning_threshold_pct"],
+        "created_by": actor, "created_at": _now(), "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("tokenomics_config").upsert_item(doc)
+    record_tokenomics_config_change("draft_saved", actor, {"config_version": doc["config_version"]})
+    return saved
+
+
+def activate_tokenomics_config(actor: str) -> dict:
+    """Promotes the current draft to active -- caller must have already
+    validated it. The draft is deleted afterward (consumed), same
+    convention as activate_rag_config()."""
+    draft = get_draft_tokenomics_config()
+    if draft is None:
+        raise ValueError("No draft configuration exists to activate.")
+    active_doc = {
+        "id": "active", "lifecycle_status": "active", "config_version": draft["config_version"],
+        "monthly_budget_usd": draft["monthly_budget_usd"], "warning_threshold_pct": draft["warning_threshold_pct"],
+        "created_by": draft["created_by"], "created_at": draft["created_at"],
+        "updated_by": actor, "updated_at": _now(),
+    }
+    saved = get_container("tokenomics_config").upsert_item(active_doc)
+    get_container("tokenomics_config").delete_item(item="draft", partition_key="draft")
+    record_tokenomics_config_change("activated", actor, {
+        "config_version": saved["config_version"],
+        "monthly_budget_usd": saved["monthly_budget_usd"], "warning_threshold_pct": saved["warning_threshold_pct"],
+    })
+    return saved
+
+
+def record_tokenomics_config_change(operation: str, actor: str, safe_summary: dict) -> dict:
+    doc = {"id": str(uuid.uuid4()), "operation": operation, "actor": actor, "safe_summary": safe_summary or {}, "recorded_at": _now()}
+    return get_container("tokenomics_config_history").upsert_item(doc)
+
+
+def list_tokenomics_config_history(limit: int = 50) -> list:
+    container = get_container("tokenomics_config_history")
+    items = list(container.query_items(query="SELECT * FROM c ORDER BY c.recorded_at DESC", enable_cross_partition_query=True))
+    return items[:limit]
+
+
+# ---------------------------------------------------------------------------
 # RAG prompt versions -- one container, partitioned by prompt_id, holding
 # EVERY version ever created (never deleted). Exactly one version per
 # prompt_id may have status "active" at a time; activating a new one
@@ -1043,6 +1247,19 @@ def list_comms_deliveries(correlation_id: str, limit: int = 50) -> list:
     return items[:limit]
 
 
+def delete_comms_deliveries_for_candidate(candidate_id: str) -> int:
+    """F-14 (candidate data erasure, minimal slice): deletes every real
+    communications-delivery record for this candidate. correlation_id IS
+    the candidate_id, this container's partition key (see
+    record_comms_delivery()'s docstring) -- not a separate lookup.
+    Returns the real count deleted (0 if none existed)."""
+    container = get_container("comms_delivery_log")
+    records = list_comms_deliveries(candidate_id, limit=10000)
+    for r in records:
+        container.delete_item(item=r["id"], partition_key=candidate_id)
+    return len(records)
+
+
 def list_all_comms_deliveries(limit: int = 500) -> list:
     """Cross-partition read across every candidate's delivery records --
     unlike list_comms_deliveries() above, scoped to one correlation_id.
@@ -1180,3 +1397,219 @@ def list_ephemeral_test_runs(limit: int = 50) -> list:
         container.query_items(query="SELECT * FROM c ORDER BY c.created_at DESC", enable_cross_partition_query=True)
     )
     return items[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Job Description Management (jd_management.py) -- the canonical JD record.
+# See context-lake/schema/jd.schema.json. Distinct from jd_manager.py's
+# list_jds(), which reads jd_folder/*.txt for the existing resume-scoring
+# pipeline -- that function is untouched; jd_management.publish_jd() is the
+# only bridge between the two (it writes jd_folder/{jd_id}.txt once a JD is
+# published, and removes it again on archive).
+# ---------------------------------------------------------------------------
+def create_jd(jd: dict) -> dict:
+    for field in ("jd_id", "title", "status", "created_by"):
+        if field not in jd:
+            raise ValueError(f"JD dict missing required field '{field}'")
+    jd.setdefault("id", jd["jd_id"])
+    jd.setdefault("created_at", _now())
+    return get_container("jds").upsert_item(jd)
+
+
+def update_jd(jd: dict) -> dict:
+    if "jd_id" not in jd:
+        raise ValueError("JD dict missing required field 'jd_id'")
+    jd.setdefault("id", jd["jd_id"])
+    jd["updated_at"] = _now()
+    return get_container("jds").upsert_item(jd)
+
+
+def get_jd(jd_id: str):
+    """Returns None only when the JD genuinely doesn't exist -- connection/
+    config errors propagate, same convention as get_candidate()."""
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("jds").read_item(item=jd_id, partition_key=jd_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def list_jd_records(status: str = None) -> list:
+    """Lists JDs from the canonical Cosmos record -- NOT jd_manager.py's
+    file-based list_jds() (kept separate name deliberately to avoid a
+    same-name-different-behavior collision with that existing function).
+    ?status= filters to one lifecycle state; omitted returns every JD
+    regardless of status (the management page's own view)."""
+    container = get_container("jds")
+    if status:
+        query = "SELECT * FROM c WHERE c.status = @status ORDER BY c.created_at DESC"
+        params = [{"name": "@status", "value": status}]
+    else:
+        query = "SELECT * FROM c ORDER BY c.created_at DESC"
+        params = []
+    return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+
+
+def append_jd_audit_log(entry: dict) -> dict:
+    """Business audit trail for JD lifecycle events -- distinct from
+    ai_trace_spans (performance telemetry). Mirrors append_audit_log()'s
+    shape exactly, keyed by jd_id instead of candidate_id."""
+    for field in ("jd_id", "action"):
+        if field not in entry:
+            raise ValueError(f"JD audit log entry missing required field '{field}'")
+    entry.setdefault("entry_id", str(uuid.uuid4()))
+    entry.setdefault("id", entry["entry_id"])
+    entry.setdefault("logged_at", _now())
+    return get_container("jd_audit_log").upsert_item(entry)
+
+
+def list_jd_audit_log(jd_id: str) -> list:
+    container = get_container("jd_audit_log")
+    return list(
+        container.query_items(
+            query="SELECT * FROM c WHERE c.jd_id = @jid ORDER BY c.logged_at ASC",
+            parameters=[{"name": "@jid", "value": jd_id}],
+            partition_key=jd_id,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# Unified Observability: snapshot persistence (observability_snapshots.py).
+# A snapshot is the one durable record a dashboard reads from by default;
+# observability_refresh_results is the per-source breakdown of how that
+# snapshot was collected (or why a source failed/was skipped), so a failed
+# refresh never erases a prior successful snapshot's data.
+# ---------------------------------------------------------------------------
+def save_observability_snapshot(snapshot: dict) -> dict:
+    for field in ("id", "refresh_run_id", "collected_at", "sources"):
+        if field not in snapshot:
+            raise ValueError(f"Observability snapshot missing required field '{field}'")
+    return get_container("observability_snapshots").upsert_item(snapshot)
+
+
+def get_latest_observability_snapshot():
+    container = get_container("observability_snapshots")
+    items = list(container.query_items(
+        query="SELECT * FROM c ORDER BY c.collected_at DESC OFFSET 0 LIMIT 1",
+        enable_cross_partition_query=True,
+    ))
+    return items[0] if items else None
+
+
+def append_observability_refresh_result(result: dict) -> dict:
+    for field in ("refresh_run_id", "source_id", "status"):
+        if field not in result:
+            raise ValueError(f"Refresh result missing required field '{field}'")
+    result.setdefault("id", f"{result['refresh_run_id']}:{result['source_id']}")
+    return get_container("observability_refresh_results").upsert_item(result)
+
+
+def list_observability_refresh_results(refresh_run_id: str) -> list:
+    container = get_container("observability_refresh_results")
+    return list(container.query_items(
+        query="SELECT * FROM c WHERE c.refresh_run_id = @rid ORDER BY c.source_id ASC",
+        parameters=[{"name": "@rid", "value": refresh_run_id}],
+        partition_key=refresh_run_id,
+    ))
+
+
+def list_observability_refresh_history(limit: int = 20) -> list:
+    """One row per past refresh run, rolled up from observability_snapshots
+    (each snapshot document IS one refresh run's summary) -- newest first."""
+    container = get_container("observability_snapshots")
+    items = list(container.query_items(
+        query="SELECT TOP @lim c.id, c.refresh_run_id, c.collected_at, c.started_at, c.completed_at, "
+              "c.triggered_by, c.succeeded_count, c.failed_count, c.skipped_count FROM c ORDER BY c.collected_at DESC",
+        parameters=[{"name": "@lim", "value": limit}],
+        enable_cross_partition_query=True,
+    ))
+    return items
+
+
+# ---------------------------------------------------------------------------
+# F-03 (candidate feedback, minimal slice): one feedback document per
+# candidate_id, created only when a real final hiring decision has been
+# recorded (see candidate_feedback.is_eligible_for_feedback_request()).
+# Deliberately a SEPARATE container from candidates/scoring_history --
+# see candidate_feedback.py's module docstring on why.
+# ---------------------------------------------------------------------------
+def get_feedback_request(candidate_id: str):
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("candidate_feedback").read_item(item=candidate_id, partition_key=candidate_id)
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def create_feedback_request(candidate_id: str, reason: str, jd_id: str = None) -> dict:
+    """Idempotent: if a feedback request already exists for this
+    candidate (whatever its status), returns the EXISTING document
+    unchanged rather than overwriting it -- this is the real duplicate-
+    request-prevention mechanism, not just a convention."""
+    existing = get_feedback_request(candidate_id)
+    if existing is not None:
+        return existing
+    doc = {
+        "id": candidate_id, "candidate_id": candidate_id, "jd_id": jd_id,
+        "status": "requested", "requested_at": _now(), "requested_reason": reason,
+        "submitted_at": None, "ratings": None, "comment": None,
+    }
+    return get_container("candidate_feedback").upsert_item(doc)
+
+
+def submit_feedback(candidate_id: str, ratings: dict, comment: str) -> dict:
+    """Raises ValueError if no request exists, or it was already
+    submitted (one-way transition -- a candidate cannot edit or resubmit
+    feedback once given, same "immutable once recorded" discipline as
+    this repo's audit_log)."""
+    doc = get_feedback_request(candidate_id)
+    if doc is None:
+        raise ValueError(f"No feedback request exists for candidate '{candidate_id}'.")
+    if doc["status"] == "submitted":
+        raise ValueError(f"Feedback for candidate '{candidate_id}' was already submitted.")
+    doc["status"] = "submitted"
+    doc["submitted_at"] = _now()
+    doc["ratings"] = ratings
+    doc["comment"] = comment
+    return get_container("candidate_feedback").upsert_item(doc)
+
+
+def get_model_routing_config():
+    from azure.cosmos.exceptions import CosmosResourceNotFoundError
+
+    try:
+        return get_container("model_routing_config").read_item(item="active", partition_key="active")
+    except CosmosResourceNotFoundError:
+        return None
+
+
+def save_model_routing_config(routes: dict, actor: str) -> dict:
+    """Whole-replace, not a merge -- same semantics as set_pipeline_config().
+    The caller (api_blueprint.py) validates `routes` against
+    model_routing.ROUTABLE_LABELS before calling this."""
+    doc = {"id": "active", "routes": routes, "updated_by": actor, "updated_at": _now()}
+    saved = get_container("model_routing_config").upsert_item(doc)
+    get_container("model_routing_config_history").upsert_item({
+        "id": str(uuid.uuid4()), "actor": actor, "routes": routes, "recorded_at": _now(),
+    })
+    return saved
+
+
+def list_model_routing_config_history(limit: int = 50) -> list:
+    container = get_container("model_routing_config_history")
+    items = list(container.query_items(query="SELECT * FROM c ORDER BY c.recorded_at DESC", enable_cross_partition_query=True))
+    return items[:limit]
+
+
+def list_feedback(jd_id: str = None) -> list:
+    container = get_container("candidate_feedback")
+    if jd_id:
+        query = "SELECT * FROM c WHERE c.jd_id = @jd ORDER BY c.requested_at DESC"
+        params = [{"name": "@jd", "value": jd_id}]
+    else:
+        query = "SELECT * FROM c ORDER BY c.requested_at DESC"
+        params = []
+    return list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))

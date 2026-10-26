@@ -47,43 +47,41 @@ function AzureReadiness(props) {
 
 function AzureReadinessServicesTab(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
-  var cliState = React.useState(null);
-  var cliStatus = cliState[0];
-  var setCliStatus = cliState[1];
+  // Persistent snapshot, per the "no loading flash on revisit" report
+  // requirement -- layered on top of the existing in-memory azureCache
+  // (still used to dedupe concurrent calls within a session). `validate`
+  // actions below invalidate azureCache AND call these hooks' refresh()
+  // so a validate click always shows its own real, fresh result.
+  var listSnapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("azure_readiness_services", function () {
+    return window.CDPI_AZURE_CACHE.get("azure-readiness:list", function () { return api.getAzureReadiness(); });
+  });
+  var cliSnapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("azure_readiness_cli_status", function () {
+    return window.CDPI_AZURE_CACHE.get("azure-readiness:cli-status", function () { return api.getAzureReadinessCliStatus(); });
+  });
+  var data = { loading: listSnapshot.state.loading && !listSnapshot.state.data, error: listSnapshot.state.error, data: listSnapshot.state.data };
+  var cliStatus = cliSnapshot.state.data;
   var validatingState = React.useState(null);
   var validatingId = validatingState[0];
   var setValidatingId = validatingState[1];
 
-  function load(bypassCache) {
-    if (bypassCache) {
-      window.CDPI_AZURE_CACHE.invalidate("azure-readiness:list");
-      window.CDPI_AZURE_CACHE.invalidate("azure-readiness:cli-status");
-    }
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    window.CDPI_AZURE_CACHE.get("azure-readiness:list", function () { return api.getAzureReadiness(); })
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
-    window.CDPI_AZURE_CACHE.get("azure-readiness:cli-status", function () { return api.getAzureReadinessCliStatus(); })
-      .then(setCliStatus).catch(function () { setCliStatus(null); });
+  function reloadAfterValidate() {
+    window.CDPI_AZURE_CACHE.invalidate("azure-readiness:list");
+    window.CDPI_AZURE_CACHE.invalidate("azure-readiness:cli-status");
+    return Promise.all([listSnapshot.refresh(), cliSnapshot.refresh()]);
   }
-
-  React.useEffect(function () { load(false); }, []);
 
   function validateOne(integrationId) {
     setValidatingId(integrationId);
-    api.validateAzureReadiness(integrationId).then(function () { load(true); }).catch(function (err) { window.alert(err.message); }).then(function () { setValidatingId(null); });
+    api.validateAzureReadiness(integrationId).then(reloadAfterValidate).catch(function (err) { window.alert(err.message); }).then(function () { setValidatingId(null); });
   }
 
   function validateAll() {
     setValidatingId("__all__");
-    api.validateAllAzureReadiness().then(function () { load(true); }).catch(function (err) { window.alert(err.message); }).then(function () { setValidatingId(null); });
+    api.validateAllAzureReadiness().then(reloadAfterValidate).catch(function (err) { window.alert(err.message); }).then(function () { setValidatingId(null); });
   }
 
   if (data.loading) return <p className="muted">Loading…</p>;
-  if (data.error) return <div className="banner banner-error">Couldn't load Azure readiness: {data.error}</div>;
+  if (data.error && !data.data) return <div className="banner banner-error">Couldn't load Azure readiness: {data.error}</div>;
 
   return (
     <div data-testid="readiness-check-result">
@@ -104,13 +102,15 @@ function AzureReadinessServicesTab(props) {
         </div>
       )}
 
-      {props.canValidate && (
-        <div className="toolbar">
+      <div className="toolbar">
+        {props.canValidate && (
           <button className="btn" data-testid="run-readiness-check" onClick={validateAll} disabled={validatingId === "__all__"}>
             {validatingId === "__all__" ? "Validating all…" : "Validate all"}
           </button>
-        </div>
-      )}
+        )}
+        <button className="btn" onClick={reloadAfterValidate} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+        <span className="muted">Snapshot from {listSnapshot.state.lastUpdated ? new Date(listSnapshot.state.lastUpdated).toLocaleString() : "just now"}</span>
+      </div>
 
       <div className="table-card">
         <table className="candidate-table">

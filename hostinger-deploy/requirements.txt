@@ -1,0 +1,36 @@
+# Hostinger Python App dependencies -- covers (1) the Flask/WSGI web
+# process (wsgi_app.py -> the real, unmodified api_blueprint.py) and
+# (2) the ResumeParser.py pipeline resume_blob_poller.py shells out to
+# (same subprocess call function_app.py's blob trigger makes on Azure).
+#
+# Deliberately NOT included, vs. the repo's root requirements.txt --
+# real, stated gaps on this deployment path, not silently dropped:
+#   - selenium            (tests/e2e/* only -- never used by a live deploy)
+#   - watchdog             (file_watcher.py's local polling loop -- replaced
+#                            here by resume_blob_poller.py as a Cron Job)
+#   - openai-whisper, sounddevice, soundfield, edge-tts
+#                           (interview_bot.py's local voice I/O -- pulls in
+#                            torch via openai-whisper, multi-GB and needs a
+#                            compiler toolchain shared hosting doesn't have;
+#                            voice-bot endpoints will error until these are
+#                            installed on a plan that can actually support
+#                            them, e.g. a VPS)
+
+flask
+azure-functions
+azure-cosmos
+azure-storage-blob
+python-dotenv
+requests
+bcrypt
+PyJWT
+azure-identity
+azure-keyvault-secrets
+azure-monitor-opentelemetry
+azure-monitor-query
+langchain
+langchain-openai
+langchain-community
+openai
+pandas
+PyPDF2

@@ -47,13 +47,19 @@ function computeStage(candidateId, candidatesById, auditByCandidate) {
   if (actions.indexOf("human_review_approve") !== -1) return { key: "reviewed", detail: "Approved" };
   if (actions.indexOf("human_review_reject") !== -1) return { key: "reviewed", detail: "Rejected" };
   if (actions.indexOf("document_verification") !== -1) return { key: "doc_verified", detail: null };
-  if (candidate) return { key: "scored", detail: candidate.ranking_tier };
+  // Still just the AI's own suggestion at this stage (no human decision
+  // recorded yet) -- shown with the softer framing; contrast with the
+  // "Approved"/"Rejected" cases above, which describe a REAL human
+  // decision already made and correctly stay as plain past-tense text.
+  if (candidate) return { key: "scored", detail: tierDisplayLabel(candidate.ranking_tier) };
   if (actions.indexOf("application_submitted") !== -1) return { key: "applied", detail: "Awaiting processing" };
   return { key: "scored", detail: null };
 }
 
 function Pipeline(props) {
   var api = props.api;
+  var permissions = props.permissions || [];
+  var currentUser = props.currentUser;
   var state = React.useState({ loading: true, error: null, candidates: [], auditEntries: [], lastUpdated: null });
   var data = state[0];
   var setData = state[1];
@@ -155,7 +161,7 @@ function Pipeline(props) {
         <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
 
-      <BulkApprovalsPanel api={api} pending={pending} onReviewed={function () { loadPending(); load(); }} />
+      <BulkApprovalsPanel api={api} pending={pending} currentUser={currentUser} onReviewed={function () { loadPending(); load(); }} />
 
       <div className="pipeline-board">
         {columns.map(function (col) {
@@ -191,6 +197,8 @@ function Pipeline(props) {
       {modalCandidate && (
         <StageTimelineModal
           api={api}
+          permissions={permissions}
+          currentUser={currentUser}
           candidateId={modalCandidate.candidateId}
           candidateName={modalCandidate.candidateName}
           editable={true}
@@ -213,9 +221,7 @@ function BulkApprovalsPanel(props) {
   var api = props.api;
   var pending = props.pending;
   var onReviewed = props.onReviewed;
-  var reviewerState = React.useState("");
-  var reviewerName = reviewerState[0];
-  var setReviewerName = reviewerState[1];
+  var reviewerName = (props.currentUser && props.currentUser.username) || "";
   var actionState = React.useState({}); // decision id -> "pending" | error message
   var actions = actionState[0];
   var setActions = actionState[1];
@@ -229,12 +235,8 @@ function BulkApprovalsPanel(props) {
   }
 
   function handle(decisionId, type) {
-    if (!reviewerName.trim()) {
-      setAction(decisionId, "Enter your name first.");
-      return;
-    }
     setAction(decisionId, "pending");
-    var call = type === "approve" ? api.approveBulkDecision(decisionId, reviewerName.trim()) : api.rejectBulkDecision(decisionId, reviewerName.trim(), "");
+    var call = type === "approve" ? api.approveBulkDecision(decisionId, reviewerName) : api.rejectBulkDecision(decisionId, reviewerName, "");
     call
       .then(function () {
         setAction(decisionId, null);
@@ -253,10 +255,7 @@ function BulkApprovalsPanel(props) {
     <div className="bulk-approvals-panel">
       <div className="bulk-approvals-header">
         <h4>Pending Bulk Approvals ({pending.decisions.length})</h4>
-        <label className="login-field bulk-approvals-reviewer">
-          Reviewing as
-          <input type="text" value={reviewerName} onChange={function (e) { setReviewerName(e.target.value); }} />
-        </label>
+        <span className="muted">Reviewing as <strong>{reviewerName}</strong></span>
       </div>
       {pending.decisions.map(function (d) {
         var action = actions[d.id];

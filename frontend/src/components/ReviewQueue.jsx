@@ -21,7 +21,9 @@ var TIER_OPTIONS = ["To be Considered", "Recommended for Fast-Track", "Rejected"
 
 function ReviewQueue(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, candidates: [], reviewerName: "", tier: "To be Considered" });
+  var permissions = props.permissions || [];
+  var reviewerName = (props.currentUser && props.currentUser.username) || "";
+  var state = React.useState({ loading: true, error: null, candidates: [], tier: "To be Considered" });
   var data = state[0];
   var setData = state[1];
   var actionState = React.useState({}); // candidate_id -> "pending" | "done" | error message
@@ -59,20 +61,12 @@ function ReviewQueue(props) {
   }
 
   function handleDecision(candidateId, decision) {
-    if (!data.reviewerName.trim()) {
-      setActions(function (a) {
-        var next = Object.assign({}, a);
-        next[candidateId] = "Enter your name before reviewing.";
-        return next;
-      });
-      return;
-    }
     setActions(function (a) {
       var next = Object.assign({}, a);
       next[candidateId] = "pending";
       return next;
     });
-    api.reviewCandidate(candidateId, decision, data.reviewerName.trim(), "")
+    api.reviewCandidate(candidateId, decision, reviewerName, "")
       .then(function () {
         setActions(function (a) {
           var next = Object.assign({}, a);
@@ -103,9 +97,9 @@ function ReviewQueue(props) {
   var selectedIds = Object.keys(selected);
 
   function handleBulkPropose(decision) {
-    if (!data.reviewerName.trim() || selectedIds.length === 0) return;
+    if (selectedIds.length === 0) return;
     setBulk({ submitting: true, error: null, result: null });
-    api.proposeBulkDecision(decision, selectedIds, data.reviewerName.trim(), "")
+    api.proposeBulkDecision(decision, selectedIds, reviewerName, "")
       .then(function (result) {
         setBulk({ submitting: false, error: null, result: result });
         setSelected({});
@@ -125,20 +119,10 @@ function ReviewQueue(props) {
       </p>
 
       <div className="toolbar">
-        <label htmlFor="reviewer-name">Reviewing as</label>
-        <input
-          id="reviewer-name"
-          type="text"
-          placeholder="your name or email"
-          value={data.reviewerName}
-          onChange={function (e) {
-            var value = e.target.value;
-            setData(function (d) { return Object.assign({}, d, { reviewerName: value }); });
-          }}
-        />
+        <span id="reviewer-name" className="muted">Reviewing as <strong>{reviewerName}</strong></span>
         <label htmlFor="tier-filter">Tier</label>
         <select id="tier-filter" value={data.tier} onChange={function (e) { setTier(e.target.value); }}>
-          {TIER_OPTIONS.map(function (t) { return <option key={t} value={t}>{t}</option>; })}
+          {TIER_OPTIONS.map(function (t) { return <option key={t} value={t}>{tierDisplayLabel(t)}</option>; })}
         </select>
         <button className="btn" onClick={function () { setConfigOpen(true); }}>Configure Stages</button>
       </div>
@@ -148,19 +132,18 @@ function ReviewQueue(props) {
           <span>{selectedIds.length} selected</span>
           <button
             className="btn btn-approve"
-            disabled={bulk.submitting || !data.reviewerName.trim()}
+            disabled={bulk.submitting}
             onClick={function () { handleBulkPropose("approve"); }}
           >
             Propose Bulk Accept
           </button>
           <button
             className="btn btn-reject"
-            disabled={bulk.submitting || !data.reviewerName.trim()}
+            disabled={bulk.submitting}
             onClick={function () { handleBulkPropose("reject"); }}
           >
             Propose Bulk Reject
           </button>
-          {!data.reviewerName.trim() && <span className="banner-error-inline">Enter your name first.</span>}
         </div>
       )}
       {bulk.result && (
@@ -221,6 +204,8 @@ function ReviewQueue(props) {
       {modalCandidate && (
         <StageTimelineModal
           api={api}
+          permissions={permissions}
+          currentUser={props.currentUser}
           candidateId={modalCandidate.candidateId}
           candidateName={modalCandidate.candidateName}
           editable={true}

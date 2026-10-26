@@ -22,9 +22,9 @@ function SecretsManagement(props) {
   var api = props.api;
   var permissions = props.permissions || [];
   var canWrite = permissions.indexOf("secrets.write") !== -1;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("secrets_management", function () { return api.listSecrets(); });
+  var data = { loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error, data: snapshot.state.data };
+  var load = snapshot.refresh;
   var filterState = React.useState("");
   var filter = filterState[0];
   var setFilter = filterState[1];
@@ -37,15 +37,6 @@ function SecretsManagement(props) {
   var saveState = React.useState({ saving: false, error: null, savedKey: null });
   var save = saveState[0];
   var setSave = saveState[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.listSecrets()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   function startEdit(key) {
     setEditingKey(key);
@@ -95,8 +86,9 @@ function SecretsManagement(props) {
       )}
 
       <div className="toolbar">
-        <button className="btn" onClick={load}>Refresh</button>
+        <button className="btn" onClick={load} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
         <input type="text" placeholder="Filter by name…" value={filter} onChange={function (e) { setFilter(e.target.value); }} />
+        <span className="muted">Snapshot from {snapshot.state.lastUpdated ? new Date(snapshot.state.lastUpdated).toLocaleString() : "just now"}</span>
       </div>
 
       {data.error && <div className="banner banner-error">Couldn't load secrets: {data.error}</div>}

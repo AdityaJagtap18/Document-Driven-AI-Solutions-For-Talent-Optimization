@@ -14,6 +14,31 @@ def extract_name_from_filename(filename):
     return clean_name
 
 
+# Real, observed LLM outputs for a Name field it couldn't confidently
+# extract -- confirmed by inspection of real merge-extraction responses
+# in logs/llm_response_cache.json, not a hypothetical list. The model
+# answering "Not Provided" (or similar) is a real, valid refusal, but
+# previously slipped past ResumeParser.py's own fallback-trigger check
+# (which only caught an EMPTY string, "candidate" in the text, or a
+# literal "<placeholder>" token) because these phrases are non-empty,
+# don't mention "candidate", and don't start with "<" -- a real,
+# confirmed bug, not a hypothetical edge case.
+_PLACEHOLDER_NAMES = {
+    "not provided", "not specified", "n/a", "na", "unknown", "none",
+    "unspecified", "not available", "not mentioned", "not found",
+}
+
+
+def is_placeholder_name(name: str) -> bool:
+    """True when `name` is one of the real placeholder phrases a model
+    has been observed to answer instead of a genuine name -- case- and
+    punctuation-insensitive (".", so "N/A." still matches)."""
+    if not isinstance(name, str):
+        return False
+    normalized = name.strip().strip(".").lower()
+    return normalized in _PLACEHOLDER_NAMES
+
+
 def extract_contact_details(text):
     if not isinstance(text, str):
         return '', '', ''

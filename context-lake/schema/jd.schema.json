@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JobDescription",
+  "description": "Cosmos DB 'jds' container document -- the canonical JD record (see jd_management.py). Partition key: /id. Only PUBLISHED JDs are synced to jd_folder/*.txt, which the existing resume-scoring pipeline (jd_manager.py/ResumeMEtrics.py) reads -- draft/pending/rejected/archived JDs never affect candidate matching.",
+  "type": "object",
+  "required": ["id", "jd_id", "title", "status", "created_by", "created_at", "source"],
+  "properties": {
+    "id": { "type": "string", "description": "Same value as jd_id -- the partition key." },
+    "jd_id": { "type": "string", "description": "Stable UUID, generated at creation. Also used as the synced .txt filename stem once published, so jd_manager.py's existing jd_id convention (filename stem) is preserved." },
+
+    "status": {
+      "type": "string",
+      "enum": ["draft", "pending_approval", "approved", "published", "rejected", "archived"],
+      "description": "draft -> pending_approval -> approved -> published -> archived, with pending_approval -> rejected -> draft as the rejection loop."
+    },
+
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "responsibilities": { "type": "array", "items": { "type": "string" } },
+    "required_qualifications": { "type": "array", "items": { "type": "string" } },
+    "preferred_qualifications": { "type": "array", "items": { "type": "string" } },
+    "required_skills": { "type": "array", "items": { "type": "string" } },
+    "preferred_skills": { "type": "array", "items": { "type": "string" } },
+    "required_experience": { "type": "string" },
+    "seniority_level": { "type": "string" },
+    "employment_type": { "type": "string" },
+    "location": { "type": "string" },
+    "work_arrangement": { "type": "string", "enum": ["onsite", "remote", "hybrid", ""] },
+    "department": { "type": "string" },
+    "openings_count": { "type": "integer", "minimum": 1 },
+    "salary_range": { "type": "string" },
+    "hiring_contact": { "type": "string", "description": "Hiring manager or recruiter's display name/email -- free text, no FK to the users container (no per-JD ownership model exists yet)." },
+    "application_deadline": { "type": "string", "format": "date" },
+    "additional_requirements": { "type": "string" },
+
+    "source": {
+      "type": "string",
+      "enum": ["manual", "uploaded", "ai_generated"],
+      "description": "How this JD's content originated. ai_generated content is still a draft until a human reviews/edits/submits it -- this field never implies auto-approval."
+    },
+    "source_document_blob_path": { "type": "string", "description": "Set when source=\"uploaded\": path in the raw-resumes Blob container (reusing the existing blob_store.py container, no new one created for this)." },
+    "ai_generation_metadata": {
+      "type": "object",
+      "description": "Set when source=\"ai_generated\": {model, provider, trace_id, generated_at} -- never the raw prompt (avoid logging internal prompts to a document a wider set of roles can read).",
+      "properties": {
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "trace_id": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "created_by": { "type": "string", "description": "Username of the account that created this JD." },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_by": { "type": "string" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "submitted_by": { "type": "string" },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "approved_by": { "type": "string" },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "rejected_by": { "type": "string" },
+    "rejected_at": { "type": "string", "format": "date-time" },
+    "rejection_reason": { "type": "string" },
+    "published_at": { "type": "string", "format": "date-time" },
+    "archived_by": { "type": "string" },
+    "archived_at": { "type": "string", "format": "date-time" }
+  }
+}

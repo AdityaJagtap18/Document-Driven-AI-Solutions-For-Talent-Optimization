@@ -19,22 +19,16 @@ var STATUS_BADGE_CLASS = { available: "badge-good", planned: "badge-neutral", da
 
 function PersonaCatalogue(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("persona_catalogue", function () {
+    return api.getPersonaCatalogue();
+  });
+  var data = snapshot.state;
   var selectedState = React.useState(0);
   var selected = selectedState[0];
   var setSelected = selectedState[1];
 
-  React.useEffect(function () {
-    api.getPersonaCatalogue()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (data.loading) return <div className="view"><h2>Persona Catalogue</h2><p className="muted">Loading…</p></div>;
-  if (data.error) return <div className="view"><h2>Persona Catalogue</h2><div className="banner banner-error">Couldn't load the persona catalogue: {data.error}</div></div>;
+  if (data.loading && !data.data) return <div className="view"><h2>Persona Catalogue</h2><p className="muted">Loading…</p></div>;
+  if (data.error && !data.data) return <div className="view"><h2>Persona Catalogue</h2><div className="banner banner-error">Couldn't load the persona catalogue: {data.error}</div></div>;
 
   var personas = data.data.personas;
   var problems = data.data.validation_problems || [];
@@ -43,12 +37,15 @@ function PersonaCatalogue(props) {
   return (
     <div className="view">
       <h2>Persona Catalogue</h2>
-      <p className="muted">
-        The 12 representative persona configurations from the CDPI Product Personas doc (Section 8).
-        Each persona's allowed pages and report access below are computed live from the real role and
-        page registry -- not a hand-typed list -- so this view can never drift from what that persona's
-        account would actually see.
-      </p>
+      <div className="toolbar">
+        <p className="muted">
+          The 12 representative persona configurations from the CDPI Product Personas doc (Section 8).
+          Each persona's allowed pages and report access below are computed from the role and page
+          registry as of the snapshot from {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "just now"}
+          — click Refresh after changing roles/page access elsewhere to see the update here.
+        </p>
+        <button className="btn" onClick={snapshot.refresh} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
       {problems.length > 0 && (
         <div className="banner banner-error">
           Validation found {problems.length} inconsistency(ies) between the catalogue and the live role data: {problems.join("; ")}

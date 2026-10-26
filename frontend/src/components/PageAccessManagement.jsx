@@ -20,9 +20,12 @@
 function PageAccessManagement(props) {
   var api = props.api;
 
-  var state = React.useState({ loading: true, error: null, pages: [] });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("page_access_management", function () { return api.listPages(); });
+  var data = {
+    loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error,
+    pages: (snapshot.state.data && snapshot.state.data.pages) || [],
+  };
+  var load = snapshot.refresh;
   var filterState = React.useState({ search: "", module: "", status: "", protection: "" });
   var filters = filterState[0];
   var setFilters = filterState[1];
@@ -32,15 +35,6 @@ function PageAccessManagement(props) {
   var configPageState = React.useState(null); // page_id | null
   var configPageId = configPageState[0];
   var setConfigPageId = configPageState[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.listPages()
-      .then(function (result) { setData({ loading: false, error: null, pages: result.pages }); })
-      .catch(function (err) { setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   function handleSync() {
     setSync({ syncing: true, result: null, error: null });
@@ -97,10 +91,11 @@ function PageAccessManagement(props) {
           <option value="protected">Protected only</option>
           <option value="public">Public only</option>
         </select>
-        <button className="btn" onClick={load}>Refresh</button>
+        <button className="btn" onClick={load} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
         <button className="btn btn-primary" onClick={handleSync} disabled={sync.syncing}>
           {sync.syncing ? "Syncing…" : "Sync Pages"}
         </button>
+        <span className="muted">Snapshot from {snapshot.state.lastUpdated ? new Date(snapshot.state.lastUpdated).toLocaleString() : "just now"}</span>
       </div>
 
       {sync.error && <div className="banner banner-error">Sync failed: {sync.error}</div>}

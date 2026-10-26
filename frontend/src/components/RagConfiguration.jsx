@@ -71,20 +71,11 @@ function RagConfiguration(props) {
 
 function RagConfigOverview(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("rag_config_overview", function () { return api.getRagConfig(); });
+  var data = { loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error, data: snapshot.state.data };
+  var load = snapshot.refresh;
 
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.getRagConfig()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
-
-  if (data.error) return <div className="banner banner-error">Couldn't load RAG configuration: {data.error}</div>;
+  if (data.error && !data.data) return <div className="banner banner-error">Couldn't load RAG configuration: {data.error}</div>;
   if (data.loading) return <p className="muted">Loading…</p>;
 
   var src = data.data.source_status;
@@ -491,20 +482,15 @@ function RagConfigHistoryTab(props) {
   var canActivate = props.canActivate;
 
   var state = React.useState({ loading: true, error: null, history: [] });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("rag_config_history", function () { return api.getRagConfigHistory(50); });
+  var data = {
+    loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error,
+    history: (snapshot.state.data && snapshot.state.data.history) || [],
+  };
+  var load = snapshot.refresh;
   var rollbackState = React.useState({ busy: false, error: null });
   var rollback = rollbackState[0];
   var setRollback = rollbackState[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.getRagConfigHistory(50)
-      .then(function (result) { setData({ loading: false, error: null, history: result.history }); })
-      .catch(function (err) { setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   function handleRollback(historyId) {
     if (!window.confirm("Roll back to this activated configuration snapshot? This creates a new DRAFT (not a direct activation) -- you'll need to review and activate it explicitly.")) return;

@@ -20783,3 +20783,4052 @@ __root__
   "resume_name": "alex_morgan_resume.pdf"
 }
 [2026-10-24 14:02:25] Completed: alex_morgan_resume.pdf
+[2026-10-26 15:09:34] BE Project Resume Parsing Start
+[2026-10-26 15:09:34] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:09:46] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:15:55] BE Project Resume Parsing Start
+[2026-10-26 15:15:55] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:16:07] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:16:33] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:16:33] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Basic machine-learning or LLM concepts"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Data processing and validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Spring Boot"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java expertise, REST API development skills, and familiarity with SQL and relational databases. Background in building scalable systems and collaborating on debugging and production issues.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Streamlined billing review process for finance team."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices"
+      ],
+      "Impact": "Improved scalability and deployment flexibility."
+    }
+  ],
+  "Certifications & Courses": [
+    "Bachelor's degree in Information Technology (B.E.)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java programming",
+    "REST API development",
+    "SQL and relational database knowledge",
+    "Problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Leadership"
+  ],
+  "Industry Experience": "Finance",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical background but lacks direct experience with AI and machine-learning concepts.",
+  "Potential Concerns": [
+    "No direct Python experience",
+    "No machine-learning or LLM experience",
+    "May be overqualified for a junior role"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Potential mismatch in expectations due to overqualification",
+    "Limited exposure to Python and machine-learning"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Can quickly adapt to Python and machine-learning concepts given strong foundational skills.",
+  "Effort Needed by the Company": "Medium \u2013 Training required for Python and machine-learning concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills and leadership experience but may require additional training for Python and machine-learning tasks. Overqualification for junior role could lead to retention concerns.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:16:33] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:16:33] Parsing started: daniel_osei_resume.pdf
+[2026-10-26 15:16:45] Semantic ranking for daniel_osei_resume.pdf: using 5/5 chunks for summarization (all 5 persisted to the semantic index).
+[2026-10-26 15:17:21] Context lake: wrote candidate document for daniel_osei_resume.pdf
+[2026-10-26 15:17:21] Details: {
+  "Name": "Daniel Osei",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM concepts",
+      "Machine Learning"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine learning",
+      "LLM-assisted extraction and classification"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "SQL",
+    "REST API development",
+    "Data Processing",
+    "Debugging"
+  ],
+  "Profile Summary": "Entry-level software engineer with academic coursework and personal project experience in Python, SQL, and REST API development, aligning with the requirements for the Junior Software Engineer role in AI document processing.",
+  "Projects": [
+    {
+      "Project Name": "Student Grade Analyzer",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Developed a tool for importing, cleaning, and visualizing datasets, showcasing data processing and validation skills."
+    },
+    {
+      "Project Name": "Personal Budget Tracker",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Flask",
+        "SQLite",
+        "REST API"
+      ],
+      "Impact": "Built a Flask app with a SQLite backend, demonstrating REST API development and relational database expertise."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "SQL",
+    "REST API development",
+    "Data processing and validation",
+    "Debugging"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "None (entry-level)",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates relevant technical skills and a willingness to learn, but lacks professional experience and exposure to machine learning or LLM concepts.",
+  "Potential Concerns": [
+    "No professional experience",
+    "Lack of exposure to machine learning or LLM concepts"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No professional experience could lead to a steeper learning curve"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With proper training and mentorship, the candidate has strong potential to grow into the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require onboarding and training in machine learning and LLM concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "0",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong foundational skills and project experience but will require support to bridge gaps in machine learning and LLM concepts.",
+  "Email": "daniel.osei.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/daniel-osei-synth",
+  "resume_name": "daniel_osei_resume.pdf"
+}
+[2026-10-26 15:17:21] Completed: daniel_osei_resume.pdf
+[2026-10-26 15:17:21] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 15:17:32] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:18:05] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 15:18:05] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Basic LLM Concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Data Processing",
+    "Machine Learning"
+  ],
+  "Profile Summary": "Senior ML/AI engineer with 7 years of experience, proficient in Python, LLM technologies, and production-grade systems. Strong alignment with AI-powered document processing tasks.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "RAG",
+        "Document Processing"
+      ],
+      "Impact": "Developed an assistant capable of answering questions over a 10k-document corpus, showcasing expertise in LLM-assisted workflows."
+    },
+    {
+      "Project Name": "LLM Cost/Latency Observability Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "Monitoring Tools"
+      ],
+      "Impact": "Improved performance monitoring and optimization for LLM systems."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM integration",
+    "Data validation and cleaning",
+    "Problem-solving in production environments"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Process optimization",
+    "Communication"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "Medium \u2013 Candidate exceeds junior-level scope, which may lead to misalignment with role expectations.",
+  "Potential Concerns": [
+    "Overqualification for a junior role",
+    "Missing SQL and Java experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Overqualification may impact long-term engagement in the role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and ability to contribute to advanced projects.",
+  "Effort Needed by the Company": "Medium \u2013 May require role adjustment or additional responsibilities to match candidate's skill level.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate demonstrates strong technical skills and alignment with the role but may be overqualified for a junior position. Consider discussing role expectations and growth opportunities.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 15:18:05] Completed: elena_petrova_resume.pdf
+[2026-10-26 15:18:05] Parsing started: fatima_al-sayed_resume.pdf
+[2026-10-26 15:18:16] Semantic ranking for fatima_al-sayed_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:18:44] Context lake: wrote candidate document for fatima_al-sayed_resume.pdf
+[2026-10-26 15:18:44] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Machine learning",
+    "LLM concepts"
+  ],
+  "Profile Summary": "A recent Computer Science graduate with internship experience in REST API development and document processing. Familiar with Python programming, SQL, data processing, and basic machine learning and LLM concepts. Demonstrates strong problem-solving skills and experience with structured/unstructured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM concepts",
+        "Data processing"
+      ],
+      "Impact": "Developed a prototype for LLM-assisted section classification and document processing, showcasing skills relevant to the job."
+    },
+    {
+      "Project Name": "Course Recommender",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "scikit-learn"
+      ],
+      "Impact": "Demonstrated familiarity with machine learning concepts through the development of a course recommendation system."
+    }
+  ],
+  "Certifications & Courses": [
+    "Basic machine-learning coursework"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Machine learning",
+    "LLM concepts"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High \u2013 Candidate has relevant technical skills, educational background, and internship experience that align with the company's requirements.",
+  "Potential Concerns": [
+    "Limited professional experience beyond internship",
+    "No explicit mention of Java experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of extensive production experience may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Candidate has a strong foundational skill set and relevant project experience, indicating potential for growth in the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require onboarding and mentoring to gain production-level experience.",
+  "Resume Strength Score": "7.8",
+  "Relevant Experience (yrs)": "0.5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate demonstrates strong alignment with the role's technical requirements and has potential for growth, but may require mentorship to bridge gaps in professional experience.",
+  "Email": "fatima.alsayed.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/fatima-alsayed-synth",
+  "resume_name": "fatima_al-sayed_resume.pdf"
+}
+[2026-10-26 15:18:44] Completed: fatima_al-sayed_resume.pdf
+[2026-10-26 15:18:44] Parsing started: grace_mensah_resume.pdf
+[2026-10-26 15:18:55] Semantic ranking for grace_mensah_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:19:26] Context lake: wrote candidate document for grace_mensah_resume.pdf
+[2026-10-26 15:19:26] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Advanced LLM fine-tuning"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Machine Learning",
+    "LLM concepts",
+    "Data Validation",
+    "Problem-Solving"
+  ],
+  "Profile Summary": "Recent graduate with a strong foundation in machine learning, LLM concepts, and data processing, aligning well with AI-powered document processing responsibilities.",
+  "Projects": [
+    {
+      "Project Name": "Flask and LLM API-based Resume Extraction Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "LLM API"
+      ],
+      "Impact": "Demonstrated ability to extract structured fields from resumes, showcasing skills directly applicable to LLM-assisted document processing."
+    },
+    {
+      "Project Name": "Basic Classification Model for Survey Data",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "Machine Learning"
+      ],
+      "Impact": "Built a model to identify incomplete survey entries, demonstrating foundational machine-learning skills."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and cleaning",
+    "Machine learning concepts",
+    "LLM-assisted extraction"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Communication"
+  ],
+  "Industry Experience": "None explicitly mentioned",
+  "Culture Fit Assessment": "Medium \u2013 Candidate shows strong technical alignment but lacks advanced experience or certifications.",
+  "Potential Concerns": [
+    "Limited professional experience",
+    "No certifications or advanced training",
+    "No Java knowledge"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited hands-on experience beyond internship and academic projects"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and relevant academic background indicate potential for rapid growth in the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require mentorship and training to adapt to production-level tasks.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "0.5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate demonstrates strong alignment with technical requirements but may need additional support to bridge the gap between academic and professional experience.",
+  "Email": "grace.mensah.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/grace-mensah-synth",
+  "resume_name": "grace_mensah_resume.pdf"
+}
+[2026-10-26 15:19:26] Completed: grace_mensah_resume.pdf
+[2026-10-26 15:19:26] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 15:19:37] Semantic ranking for marcus_chen_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:20:04] Context lake: wrote candidate document for marcus_chen_resume.pdf
+[2026-10-26 15:20:04] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Document Processing",
+    "Transformer Models"
+  ],
+  "Profile Summary": "Computer Science graduate with internship experience in fine-tuning transformer models, building Flask APIs, and developing LLM-assisted document extraction tools. Strong alignment with AI-powered document processing roles.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "Flask"
+      ],
+      "Impact": "Developed a prototype for resume parsing using LLM-assisted document section classification and structured data extraction."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM concepts",
+    "Document processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Analytics",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates relevant technical skills and alignment with the job responsibilities, indicating potential for seamless integration into the team.",
+  "Potential Concerns": [
+    "Lack of explicit SQL experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No major issues detected"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in Python and LLM concepts indicate potential for growth in AI and software engineering roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in SQL and relational database management.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "1 year (internship experience)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with the role and has relevant technical skills. SQL training may be required.",
+  "Email": "marcus.chen.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/marcus-chen-synth",
+  "resume_name": "marcus_chen_resume.pdf"
+}
+[2026-10-26 15:20:04] Completed: marcus_chen_resume.pdf
+[2026-10-26 15:20:04] Parsing started: priya_raman_resume.pdf
+[2026-10-26 15:20:16] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:20:43] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 15:20:43] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM tools",
+      "Machine learning frameworks"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine learning",
+      "LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Data Processing",
+    "Relational Databases"
+  ],
+  "Profile Summary": "Backend engineer with 3 years of experience in building REST APIs and data pipelines using Python, aligning with the job's focus on API development, data processing, and SQL optimization.",
+  "Projects": [
+    {
+      "Project Name": "Warehouse Inventory Synchronization Microservice",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "PostgreSQL"
+      ],
+      "Impact": "Developed a microservice that synchronized warehouse inventory across regional databases, showcasing expertise in REST API development and relational database interactions."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Team collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Technology",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and problem-solving skills, which are crucial for collaborative and innovative environments.",
+  "Potential Concerns": [
+    "No explicit experience with machine learning or LLM concepts"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of direct experience with LLMs and machine learning may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong Python and backend skills provide a solid foundation for learning LLM and machine learning concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Training required for LLM and machine learning concepts, but candidate has the foundational skills to learn quickly.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong technical alignment with the role but may need mentorship or training in machine learning and LLM concepts. High potential for growth within the company.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 15:20:43] Completed: priya_raman_resume.pdf
+[2026-10-26 15:20:43] Parsing started: robert_nakamura_resume.pdf
+[2026-10-26 15:20:55] Semantic ranking for robert_nakamura_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:21:22] Context lake: wrote candidate document for robert_nakamura_resume.pdf
+[2026-10-26 15:21:22] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Basic Machine-Learning",
+      "LLM Concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "Terraform",
+    "Azure",
+    "Data Processing",
+    "Automation"
+  ],
+  "Profile Summary": "DevOps Engineer with 4 years of experience, proficient in Python, REST API development, and automation scripting. Skilled in cloud infrastructure and CI/CD pipelines, with a strong focus on optimizing workflows and improving operational efficiency.",
+  "Projects": [
+    {
+      "Project Name": "Infra-as-Code Template Library",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Terraform",
+        "Azure",
+        "Python"
+      ],
+      "Impact": "Improved modularity and reusability of infrastructure code, leading to enhanced efficiency in deployment pipelines."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "Automation scripting",
+    "Cloud infrastructure management"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates technical alignment but lacks direct experience with machine-learning and LLM concepts.",
+  "Potential Concerns": [
+    "No explicit SQL experience",
+    "No direct mention of machine-learning or LLM concepts"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of SQL and relational database experience may require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in Python, automation, and cloud infrastructure suggest potential to quickly learn missing skills.",
+  "Effort Needed by the Company": "Medium \u2013 Some upskilling required in SQL, relational databases, and machine-learning concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "4",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills and problem-solving abilities but may require mentoring in SQL and machine-learning concepts to fully align with the role.",
+  "Email": "robert.nakamura.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/robert-nakamura-synth",
+  "resume_name": "robert_nakamura_resume.pdf"
+}
+[2026-10-26 15:21:22] Completed: robert_nakamura_resume.pdf
+[2026-10-26 15:21:22] Parsing started: tomás_ibarra_resume.pdf
+[2026-10-26 15:21:34] Semantic ranking for tomás_ibarra_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:22:08] Context lake: wrote candidate document for tomás_ibarra_resume.pdf
+[2026-10-26 15:22:08] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python (proficiency)",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM frameworks"
+    ],
+    "Concepts & Methodologies": [
+      "Data validation",
+      "Unstructured data processing"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Spring Boot",
+    "Data processing"
+  ],
+  "Profile Summary": "Mid-level backend developer with strong Java and Spring Boot experience, currently upskilling in Python and REST API design. Demonstrated ability to process large-scale data and maintain production systems.",
+  "Projects": [
+    {
+      "Project Name": "Order Management System",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Java",
+        "Spring Boot",
+        "REST API",
+        "MySQL"
+      ],
+      "Impact": "Processed 5k daily orders and maintained system stability."
+    },
+    {
+      "Project Name": "Order Status Notification Service",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Webhooks"
+      ],
+      "Impact": "Improved downstream system communication through real-time notifications."
+    }
+  ],
+  "Certifications & Courses": [
+    "Internal Python Bootcamp"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Data processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Communication"
+  ],
+  "Industry Experience": "E-commerce (Order Management Systems)",
+  "Culture Fit Assessment": "Medium \u2013 Candidate shows strong technical alignment but lacks direct Python and machine learning experience, which may require adjustment to the role's focus.",
+  "Potential Concerns": [
+    "Limited Python proficiency",
+    "No direct experience with machine learning or LLM concepts"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Potential overqualification for a junior role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and active upskilling indicate potential to quickly adapt and grow into more advanced roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require Python and machine learning training but has a strong foundation to build upon.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "4",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in Python and machine learning to fully meet role expectations.",
+  "Email": "tomas.ibarra.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/tomas-ibarra-synth",
+  "resume_name": "tom\u00e1s_ibarra_resume.pdf"
+}
+[2026-10-26 15:22:08] Completed: tomás_ibarra_resume.pdf
+[2026-10-26 15:22:08] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 15:22:19] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:22:52] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 15:22:52] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Machine-learning",
+      "LLM concepts",
+      "Unstructured data processing"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Basic machine-learning",
+      "LLM-assisted extraction"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data validation",
+    "Debugging"
+  ],
+  "Profile Summary": "The candidate has strong Python programming skills, REST API development and testing experience, SQL expertise, and a background in QA/test engineering. They are transitioning into backend development, which aligns with the role's focus on REST APIs and data processing.",
+  "Projects": [
+    {
+      "Project Name": "API Contract Test Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, demonstrating strong API testing and validation skills."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation",
+    "Debugging"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Process streamlining",
+    "Communication"
+  ],
+  "Industry Experience": "Not specified",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates relevant technical skills and problem-solving abilities but lacks experience with machine-learning and LLM concepts, which are key to the role.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning and LLM concepts",
+    "No explicit mention of unstructured data processing"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No direct experience with AI or LLM-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With training in machine-learning and LLM concepts, the candidate could quickly grow into the role.",
+  "Effort Needed by the Company": "Medium \u2013 Some training and mentorship will be required to bridge gaps in AI and unstructured data processing.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong potential in backend development and data validation but requires upskilling in AI and LLM concepts to fully meet the job requirements.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 15:22:52] Completed: wei_zhang_resume.pdf
+[2026-10-26 15:25:13] BE Project Resume Parsing Start
+[2026-10-26 15:25:13] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:25:26] BE Project Resume Parsing Start
+[2026-10-26 15:25:26] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:25:26] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:25:28] BE Project Resume Parsing Start
+[2026-10-26 15:25:28] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:25:39] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:25:41] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:25:42] BE Project Resume Parsing Start
+[2026-10-26 15:25:42] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:25:44] BE Project Resume Parsing Start
+[2026-10-26 15:25:44] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 15:25:51] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:25:51] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Basic machine-learning or LLM concepts"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Data processing and validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Spring Boot"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java expertise, REST API development skills, and familiarity with SQL and relational databases. Background in building scalable systems and collaborating on debugging and production issues.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Streamlined billing review process for finance team."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices"
+      ],
+      "Impact": "Improved scalability and deployment flexibility."
+    }
+  ],
+  "Certifications & Courses": [
+    "Bachelor's degree in Information Technology (B.E.)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java programming",
+    "REST API development",
+    "SQL and relational database knowledge",
+    "Problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Leadership"
+  ],
+  "Industry Experience": "Finance",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical background but lacks direct experience with AI and machine-learning concepts.",
+  "Potential Concerns": [
+    "No direct Python experience",
+    "No machine-learning or LLM experience",
+    "May be overqualified for a junior role"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Potential mismatch in expectations due to overqualification",
+    "Limited exposure to Python and machine-learning"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Can quickly adapt to Python and machine-learning concepts given strong foundational skills.",
+  "Effort Needed by the Company": "Medium \u2013 Training required for Python and machine-learning concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills and leadership experience but may require additional training for Python and machine-learning tasks. Overqualification for junior role could lead to retention concerns.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:25:51] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:25:51] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 15:25:55] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:25:56] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:26:02] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:26:02] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Basic machine-learning or LLM concepts"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Data processing and validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Spring Boot"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java expertise, REST API development skills, and familiarity with SQL and relational databases. Background in building scalable systems and collaborating on debugging and production issues.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Streamlined billing review process for finance team."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices"
+      ],
+      "Impact": "Improved scalability and deployment flexibility."
+    }
+  ],
+  "Certifications & Courses": [
+    "Bachelor's degree in Information Technology (B.E.)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java programming",
+    "REST API development",
+    "SQL and relational database knowledge",
+    "Problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Leadership"
+  ],
+  "Industry Experience": "Finance",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical background but lacks direct experience with AI and machine-learning concepts.",
+  "Potential Concerns": [
+    "No direct Python experience",
+    "No machine-learning or LLM experience",
+    "May be overqualified for a junior role"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Potential mismatch in expectations due to overqualification",
+    "Limited exposure to Python and machine-learning"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Can quickly adapt to Python and machine-learning concepts given strong foundational skills.",
+  "Effort Needed by the Company": "Medium \u2013 Training required for Python and machine-learning concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills and leadership experience but may require additional training for Python and machine-learning tasks. Overqualification for junior role could lead to retention concerns.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:26:02] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:26:03] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:26:03] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Basic machine-learning or LLM concepts"
+    ],
+    "Tools & Technologies": [
+      "Advanced SQL optimization tools"
+    ],
+    "Concepts & Methodologies": [
+      "Data processing and validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API development",
+    "SQL",
+    "Spring Boot"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java expertise, REST API development skills, and familiarity with SQL and relational databases. Background in building scalable systems and collaborating on debugging and production issues.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Streamlined billing review process for finance team."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices"
+      ],
+      "Impact": "Improved scalability and deployment flexibility."
+    }
+  ],
+  "Certifications & Courses": [
+    "Bachelor's degree in Information Technology (B.E.)"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java programming",
+    "REST API development",
+    "SQL and relational database knowledge",
+    "Problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Leadership"
+  ],
+  "Industry Experience": "Finance",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical background but lacks direct experience with AI and machine-learning concepts.",
+  "Potential Concerns": [
+    "No direct Python experience",
+    "No machine-learning or LLM experience",
+    "May be overqualified for a junior role"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Potential mismatch in expectations due to overqualification",
+    "Limited exposure to Python and machine-learning"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Can quickly adapt to Python and machine-learning concepts given strong foundational skills.",
+  "Effort Needed by the Company": "Medium \u2013 Training required for Python and machine-learning concepts.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills and leadership experience but may require additional training for Python and machine-learning tasks. Overqualification for junior role could lead to retention concerns.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:26:03] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:26:04] Semantic ranking for marcus_chen_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:26:29] Context lake: wrote candidate document for marcus_chen_resume.pdf
+[2026-10-26 15:26:29] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Document Processing",
+    "Transformer Models"
+  ],
+  "Profile Summary": "A Computer Science graduate with hands-on experience in Python, REST API development, and LLM-assisted document processing, directly aligning with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "Document Section Classification"
+      ],
+      "Impact": "Improved structured data extraction and classification accuracy by 15%."
+    },
+    {
+      "Project Name": "Flask API for Document Classification",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Flask",
+        "Python",
+        "LLM"
+      ],
+      "Impact": "Enabled seamless integration of LLM-based document classifiers into production systems."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "Machine learning concepts",
+    "LLM fine-tuning",
+    "Document processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "AI and Machine Learning",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and relevant experience for the role, indicating potential for smooth integration.",
+  "Potential Concerns": [
+    "Lack of explicit SQL experience",
+    "No mention of relational database tools"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to SQL and relational databases may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and relevant project experience indicate potential for significant growth in AI document processing roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in SQL and relational database management.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "1",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with technical requirements but may need support in SQL and database-related tasks.",
+  "Email": "marcus.chen.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/marcus-chen-synth",
+  "resume_name": "marcus_chen_resume.pdf"
+}
+[2026-10-26 15:26:29] Completed: marcus_chen_resume.pdf
+[2026-10-26 15:26:29] Parsing started: priya_raman_resume.pdf
+[2026-10-26 15:26:35] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:26:35] Details: {
+  "Name": "Not Mentioned",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Data Processing",
+      "Data Validation",
+      "Machine Learning",
+      "LLM Concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "React"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java expertise, REST API development skills, and familiarity with relational databases. Demonstrates problem-solving and leadership abilities in collaborative environments. Limited exposure to Python and machine-learning concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard Development",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Streamlined billing processes and showcased ability to handle data-driven projects with structured data handling and validation."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "REST APIs"
+      ],
+      "Impact": "Improved system scalability and performance, demonstrating architectural knowledge and problem-solving skills."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Java expertise",
+    "REST API development",
+    "SQL proficiency",
+    "Microservices architecture knowledge"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Leadership",
+    "Team collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Candidate has relevant technical skills and collaborative experience but lacks exposure to Python and machine-learning concepts, which are central to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct machine-learning or LLM experience",
+    "May be overqualified for a junior role"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No direct experience with Python, which is required for the role",
+    "No mention of machine-learning or LLM concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in software engineering and REST APIs, with potential to learn Python and machine-learning concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in Python and machine-learning/LLM concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong technical skills but lacks specific experience in Python and machine-learning/LLM concepts. May require additional training to align fully with the role.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:26:35] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:26:35] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 15:26:35] Details: {
+  "Name": "Not Provided",
+  "JD Match": "75%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Data processing and validation",
+      "Machine-learning",
+      "LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "Spring Boot",
+    "REST API",
+    "SQL",
+    "MySQL"
+  ],
+  "Profile Summary": "Experienced full-stack developer with 5 years of expertise in Java, Spring Boot, REST API development, and SQL. Demonstrates strong backend development skills and experience in structured data processing. Lacks direct exposure to Python, machine-learning, and LLM concepts but has a solid foundation in software engineering and problem-solving.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot",
+        "REST API",
+        "SQL"
+      ],
+      "Impact": "Developed a dashboard for financial data review, showcasing data processing and validation skills, and improved internal team workflows."
+    },
+    {
+      "Project Name": "Monolith to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Java",
+        "Spring Boot",
+        "REST API"
+      ],
+      "Impact": "Led the migration to independently deployable services, improving system scalability and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "Spring Boot",
+    "REST API development",
+    "SQL",
+    "MySQL"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication",
+    "Leadership"
+  ],
+  "Industry Experience": "Finance (payment processing systems, financial data review)",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates strong technical skills and collaboration experience, but lacks direct experience in Python and machine-learning, which may require additional training.",
+  "Potential Concerns": [
+    "Lack of Python experience",
+    "No direct experience with machine-learning or LLM concepts"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Overqualification for a junior role may lead to dissatisfaction or lack of engagement."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and leadership experience indicate potential for growth in backend development and learning new technologies like Python and machine-learning.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in Python, data processing, and machine-learning/LLM concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Mid-Level",
+  "HR Notes": "Candidate has strong backend development skills and relevant experience in Java and SQL but may need support transitioning to Python and machine-learning tasks. Potential overqualification for a junior role should be considered.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 15:26:35] Completed: aisha_khan_resume.pdf
+[2026-10-26 15:26:40] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:27:12] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 15:27:12] Details: {
+  "Name": "Not Provided",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 15:27:12] Completed: priya_raman_resume.pdf
+[2026-10-26 15:43:31] BE Project Resume Parsing Start
+[2026-10-26 15:43:31] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 15:43:32] BE Project Resume Parsing Start
+[2026-10-26 15:43:32] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 15:43:43] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:43:44] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:44:30] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 15:44:30] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Communication Skills"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Data Processing",
+    "RAG"
+  ],
+  "Profile Summary": "Experienced ML/AI professional with 7 years of experience, including production-level LLMs, recommendation systems, and RAG pipelines. Strong Python programming background and expertise in debugging and maintaining complex systems.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "Data Pipelines"
+      ],
+      "Impact": "Developed an assistant capable of answering questions over a large internal corpus (10k documents), showcasing expertise in document ingestion, processing, and structured/unstructured data handling."
+    },
+    {
+      "Project Name": "LLM Cost/Latency Observability Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "Monitoring Tools"
+      ],
+      "Impact": "Owned and optimized a dashboard to monitor LLM cost and latency, improving system performance and reducing operational overhead."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM workflows",
+    "Data processing and validation",
+    "Debugging production systems"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Ownership of complex systems"
+  ],
+  "Industry Experience": "Technology/AI",
+  "Culture Fit Assessment": "High \u2013 Demonstrates ownership, problem-solving skills, and technical expertise aligned with the company's needs.",
+  "Potential Concerns": [
+    "Lack of explicit SQL and relational database experience",
+    "Communication skills not highlighted"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No explicit mention of SQL, which is a required skill"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and experience with advanced AI workflows suggest potential for rapid growth.",
+  "Effort Needed by the Company": "Medium \u2013 May require training on SQL and relational databases.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate exceeds junior-level requirements and brings significant expertise in AI and ML workflows. May need upskilling in SQL and communication.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 15:44:30] Completed: elena_petrova_resume.pdf
+[2026-10-26 15:44:30] Parsing started: jordan_lee_resume.pdf
+[2026-10-26 15:44:30] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 15:44:30] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "Senior ML Engineer with 7 years of experience in building production LLM and recommendation systems, strong Python expertise, and a background in AI-powered document processing pipelines.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant for Internal Knowledge Search",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLMs",
+        "Document Processing"
+      ],
+      "Impact": "Reduced support ticket resolution time by 30%."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "LLM expertise",
+    "REST API development",
+    "Data processing and validation",
+    "MLOps"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Collaboration"
+  ],
+  "Industry Experience": "AI/ML Industry",
+  "Culture Fit Assessment": "Medium \u2013 Candidate is overqualified for a junior role but aligns technically with job requirements.",
+  "Potential Concerns": [
+    "Lack of explicit SQL or relational database experience."
+  ],
+  "Red Flags & Risk Analysis": [
+    "Overqualification for a junior role may lead to retention concerns."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Significant expertise in ML/AI pipelines could allow the candidate to take on more senior roles in the future.",
+  "Effort Needed by the Company": "Medium \u2013 Some training may be required for SQL and relational database skills.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate is technically strong and aligns well with the job responsibilities but may require some upskilling in SQL. Overqualification could be a concern for retention.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 15:44:30] Completed: elena_petrova_resume.pdf
+[2026-10-26 15:44:41] Semantic ranking for jordan_lee_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:45:12] Context lake: wrote candidate document for jordan_lee_resume.pdf
+[2026-10-26 15:45:12] Details: {
+  "Name": "Jordan Lee",
+  "JD Match": "65%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "REST API development",
+      "Machine learning frameworks"
+    ],
+    "Concepts & Methodologies": [
+      "LLM concepts",
+      "Advanced data validation techniques"
+    ]
+  },
+  "Top Matching Keywords": [
+    "SQL",
+    "Data Processing",
+    "Troubleshooting",
+    "Automation",
+    "Networking Fundamentals"
+  ],
+  "Profile Summary": "Candidate with 4 years of IT support experience, basic SQL reporting skills, and exposure to scripting and automation tasks. Familiar with foundational technical skills relevant to junior software engineering roles.",
+  "Projects": [
+    {
+      "Project Name": "Excel/SQL Dashboard for Support-Ticket Volume Tracking",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Excel",
+        "SQL"
+      ],
+      "Impact": "Demonstrated SQL query skills and data analysis capabilities by tracking and categorizing support-ticket volume."
+    }
+  ],
+  "Certifications & Courses": [
+    "Associate's degree in Information Technology"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "SQL query optimization",
+    "Data processing",
+    "Troubleshooting production issues",
+    "Automation with Bash scripting"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "IT Support",
+  "Culture Fit Assessment": "Medium \u2013 Candidate has relevant foundational skills but lacks direct experience with Python, REST APIs, and machine learning concepts.",
+  "Potential Concerns": [
+    "No experience with Python or Java",
+    "Limited exposure to REST API development",
+    "No hands-on machine learning or LLM experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of programming experience in required languages",
+    "No direct experience with REST API development or machine learning"
+  ],
+  "Candidate\u2019s Growth Potential": "Moderate \u2013 With training in Python, REST APIs, and machine learning, the candidate could grow into the role.",
+  "Effort Needed by the Company": "Medium \u2013 Training required in Python, REST API development, and machine learning concepts.",
+  "Resume Strength Score": "6.5",
+  "Relevant Experience (yrs)": "2 years (directly relevant)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has foundational skills but will require mentorship and training to meet all job requirements.",
+  "Email": "jordan.lee.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/jordan-lee-synth",
+  "resume_name": "jordan_lee_resume.pdf"
+}
+[2026-10-26 15:45:12] Completed: jordan_lee_resume.pdf
+[2026-10-26 15:45:12] Parsing started: taylor_brooks_resume.pdf
+[2026-10-26 15:45:23] Semantic ranking for taylor_brooks_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:45:48] BE Project Resume Parsing Start
+[2026-10-26 15:45:48] Parsing started: taylor_brooks_resume.pdf
+[2026-10-26 15:45:55] Context lake: wrote candidate document for taylor_brooks_resume.pdf
+[2026-10-26 15:45:55] Details: {
+  "Name": "Taylor Brooks",
+  "JD Match": "10%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Java",
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "REST API",
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Strong communication",
+    "Customer outreach"
+  ],
+  "Profile Summary": "The candidate has a background in marketing, event planning, and customer outreach, with no demonstrated technical skills or experience relevant to the Junior Software Engineer \u2014 AI Document Processing role.",
+  "Projects": [
+    {
+      "Project Name": "Seasonal Marketing Campaign",
+      "Relevance to JD": "Low",
+      "Technologies Used": [
+        "Social Media Platforms",
+        "Email Campaign Tools"
+      ],
+      "Impact": "Increased engagement and customer outreach through coordinated marketing efforts."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Project management",
+    "Organizational skills",
+    "Collaboration"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Strong communication",
+    "Team collaboration",
+    "Event management"
+  ],
+  "Industry Experience": "Marketing",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates strong communication and collaboration skills, which may align with team-oriented aspects of the role, but lacks technical expertise.",
+  "Potential Concerns": [
+    "No technical skills or experience relevant to the job description",
+    "Educational background not aligned with the role",
+    "No programming or data-related experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Complete mismatch between resume and job requirements",
+    "No evidence of technical aptitude or interest in software engineering"
+  ],
+  "Candidate\u2019s Growth Potential": "Low \u2013 Without a technical foundation, significant upskilling would be required to meet the job requirements.",
+  "Effort Needed by the Company": "High \u2013 The candidate would require extensive training and mentorship to develop the necessary technical skills.",
+  "Resume Strength Score": "2.0",
+  "Relevant Experience (yrs)": "0",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate's background is heavily focused on marketing and event planning, with no alignment to the technical requirements of the role. Consider for non-technical roles if applicable.",
+  "Email": "taylor.brooks.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/taylor-brooks-synth",
+  "resume_name": "taylor_brooks_resume.pdf"
+}
+[2026-10-26 15:45:55] Completed: taylor_brooks_resume.pdf
+[2026-10-26 15:45:55] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 15:46:00] Semantic ranking for taylor_brooks_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:46:07] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:46:21] Context lake: wrote candidate document for taylor_brooks_resume.pdf
+[2026-10-26 15:46:21] Details: {
+  "Name": "Taylor Brooks",
+  "JD Match": "10%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python",
+      "Java",
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "REST API",
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Strong communication",
+    "Customer outreach"
+  ],
+  "Profile Summary": "The candidate has a background in marketing, event planning, and customer outreach, with no demonstrated technical skills or experience relevant to the Junior Software Engineer \u2014 AI Document Processing role.",
+  "Projects": [
+    {
+      "Project Name": "Seasonal Marketing Campaign",
+      "Relevance to JD": "Low",
+      "Technologies Used": [
+        "Social Media Platforms",
+        "Email Campaign Tools"
+      ],
+      "Impact": "Increased engagement and customer outreach through coordinated marketing efforts."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Project management",
+    "Organizational skills",
+    "Collaboration"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Strong communication",
+    "Team collaboration",
+    "Event management"
+  ],
+  "Industry Experience": "Marketing",
+  "Culture Fit Assessment": "Medium \u2013 Candidate demonstrates strong communication and collaboration skills, which may align with team-oriented aspects of the role, but lacks technical expertise.",
+  "Potential Concerns": [
+    "No technical skills or experience relevant to the job description",
+    "Educational background not aligned with the role",
+    "No programming or data-related experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Complete mismatch between resume and job requirements",
+    "No evidence of technical aptitude or interest in software engineering"
+  ],
+  "Candidate\u2019s Growth Potential": "Low \u2013 Without a technical foundation, significant upskilling would be required to meet the job requirements.",
+  "Effort Needed by the Company": "High \u2013 The candidate would require extensive training and mentorship to develop the necessary technical skills.",
+  "Resume Strength Score": "2.0",
+  "Relevant Experience (yrs)": "0",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Average",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate's background is heavily focused on marketing and event planning, with no alignment to the technical requirements of the role. Consider for non-technical roles if applicable.",
+  "Email": "taylor.brooks.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/taylor-brooks-synth",
+  "resume_name": "taylor_brooks_resume.pdf"
+}
+[2026-10-26 15:46:21] Completed: taylor_brooks_resume.pdf
+[2026-10-26 15:46:21] Move to ParsedReadyForQuestions skipped for taylor_brooks_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 15:46:21] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 15:46:33] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 15:46:37] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 15:46:37] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 15:46:37] Completed: wei_zhang_resume.pdf
+[2026-10-26 15:46:45] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 15:46:45] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 15:46:45] Completed: wei_zhang_resume.pdf
+[2026-10-26 15:46:45] Move to ParsedReadyForQuestions skipped for wei_zhang_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:01:36] BE Project Resume Parsing Start
+[2026-10-26 16:01:36] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 16:01:50] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:01:51] BE Project Resume Parsing Start
+[2026-10-26 16:01:51] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 16:01:52] BE Project Resume Parsing Start
+[2026-10-26 16:01:52] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 16:02:05] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:07] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:08] BE Project Resume Parsing Start
+[2026-10-26 16:02:08] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 16:02:10] BE Project Resume Parsing Start
+[2026-10-26 16:02:10] Parsing started: aisha_khan_resume.pdf
+[2026-10-26 16:02:22] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:24] Semantic ranking for aisha_khan_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:29] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 16:02:29] Details: {
+  "Name": "Aisha Khan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java and Spring Boot expertise, hands-on REST API development, and familiarity with structured data handling. Limited exposure to Python and no direct experience with machine learning or LLM concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Developed a tool for data validation and structured data handling, showcasing backend and frontend integration skills."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices Architecture"
+      ],
+      "Impact": "Led a system migration project, demonstrating problem-solving, leadership, and architectural knowledge."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Leadership",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical foundation but limited exposure to AI and Python, which are core to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct experience with machine learning or LLM concepts",
+    "No explicit mention of SQL expertise"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of Python proficiency may require additional training",
+    "No experience with machine learning or LLM concepts may limit immediate contributions to AI-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in backend development and REST API work, with potential to upskill in Python and AI concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Will require training in Python and AI/ML concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong backend development skills and leadership experience but will need support to upskill in Python and AI-related tasks. Potential for growth is high.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 16:02:29] Completed: aisha_khan_resume.pdf
+[2026-10-26 16:02:29] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 16:02:30] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 16:02:30] Details: {
+  "Name": "Aisha Khan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java and Spring Boot expertise, hands-on REST API development, and familiarity with structured data handling. Limited exposure to Python and no direct experience with machine learning or LLM concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Developed a tool for data validation and structured data handling, showcasing backend and frontend integration skills."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices Architecture"
+      ],
+      "Impact": "Led a system migration project, demonstrating problem-solving, leadership, and architectural knowledge."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Leadership",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical foundation but limited exposure to AI and Python, which are core to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct experience with machine learning or LLM concepts",
+    "No explicit mention of SQL expertise"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of Python proficiency may require additional training",
+    "No experience with machine learning or LLM concepts may limit immediate contributions to AI-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in backend development and REST API work, with potential to upskill in Python and AI concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Will require training in Python and AI/ML concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong backend development skills and leadership experience but will need support to upskill in Python and AI-related tasks. Potential for growth is high.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 16:02:30] Completed: aisha_khan_resume.pdf
+[2026-10-26 16:02:30] Move to ParsedReadyForQuestions skipped for aisha_khan_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:02:30] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 16:02:31] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 16:02:31] Details: {
+  "Name": "Aisha Khan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java and Spring Boot expertise, hands-on REST API development, and familiarity with structured data handling. Limited exposure to Python and no direct experience with machine learning or LLM concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Developed a tool for data validation and structured data handling, showcasing backend and frontend integration skills."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices Architecture"
+      ],
+      "Impact": "Led a system migration project, demonstrating problem-solving, leadership, and architectural knowledge."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Leadership",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical foundation but limited exposure to AI and Python, which are core to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct experience with machine learning or LLM concepts",
+    "No explicit mention of SQL expertise"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of Python proficiency may require additional training",
+    "No experience with machine learning or LLM concepts may limit immediate contributions to AI-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in backend development and REST API work, with potential to upskill in Python and AI concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Will require training in Python and AI/ML concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong backend development skills and leadership experience but will need support to upskill in Python and AI-related tasks. Potential for growth is high.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 16:02:31] Completed: aisha_khan_resume.pdf
+[2026-10-26 16:02:31] Move to ParsedReadyForQuestions skipped for aisha_khan_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:02:31] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 16:02:42] Semantic ranking for marcus_chen_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:43] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:44] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:02:45] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 16:02:45] Details: {
+  "Name": "Aisha Khan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java and Spring Boot expertise, hands-on REST API development, and familiarity with structured data handling. Limited exposure to Python and no direct experience with machine learning or LLM concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Developed a tool for data validation and structured data handling, showcasing backend and frontend integration skills."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices Architecture"
+      ],
+      "Impact": "Led a system migration project, demonstrating problem-solving, leadership, and architectural knowledge."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Leadership",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical foundation but limited exposure to AI and Python, which are core to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct experience with machine learning or LLM concepts",
+    "No explicit mention of SQL expertise"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of Python proficiency may require additional training",
+    "No experience with machine learning or LLM concepts may limit immediate contributions to AI-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in backend development and REST API work, with potential to upskill in Python and AI concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Will require training in Python and AI/ML concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong backend development skills and leadership experience but will need support to upskill in Python and AI-related tasks. Potential for growth is high.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 16:02:45] Completed: aisha_khan_resume.pdf
+[2026-10-26 16:02:45] Move to ParsedReadyForQuestions skipped for aisha_khan_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:02:45] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 16:02:47] Context lake: wrote candidate document for aisha_khan_resume.pdf
+[2026-10-26 16:02:47] Details: {
+  "Name": "Aisha Khan",
+  "JD Match": "70%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Python"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": [
+      "Machine Learning",
+      "LLM Concepts",
+      "Data Processing",
+      "Data Validation"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Profile Summary": "Experienced full-stack developer with strong Java and Spring Boot expertise, hands-on REST API development, and familiarity with structured data handling. Limited exposure to Python and no direct experience with machine learning or LLM concepts.",
+  "Projects": [
+    {
+      "Project Name": "Internal Billing Dashboard",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "React",
+        "Spring Boot"
+      ],
+      "Impact": "Developed a tool for data validation and structured data handling, showcasing backend and frontend integration skills."
+    },
+    {
+      "Project Name": "Monolithic to Microservices Migration",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Spring Boot",
+        "Microservices Architecture"
+      ],
+      "Impact": "Led a system migration project, demonstrating problem-solving, leadership, and architectural knowledge."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Java",
+    "REST API Development",
+    "SQL",
+    "Spring Boot",
+    "Structured Data Handling"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-Solving",
+    "Leadership",
+    "Team Collaboration"
+  ],
+  "Industry Experience": "Payment Processing",
+  "Culture Fit Assessment": "Medium \u2013 Strong technical foundation but limited exposure to AI and Python, which are core to the role.",
+  "Potential Concerns": [
+    "Limited Python experience",
+    "No direct experience with machine learning or LLM concepts",
+    "No explicit mention of SQL expertise"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of Python proficiency may require additional training",
+    "No experience with machine learning or LLM concepts may limit immediate contributions to AI-related tasks"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills in backend development and REST API work, with potential to upskill in Python and AI concepts.",
+  "Effort Needed by the Company": "Medium \u2013 Will require training in Python and AI/ML concepts to fully align with the role.",
+  "Resume Strength Score": "7.5",
+  "Relevant Experience (yrs)": "5",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong backend development skills and leadership experience but will need support to upskill in Python and AI-related tasks. Potential for growth is high.",
+  "Email": "aisha.khan.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/aisha-khan-synth",
+  "resume_name": "aisha_khan_resume.pdf"
+}
+[2026-10-26 16:02:47] Completed: aisha_khan_resume.pdf
+[2026-10-26 16:02:47] Move to ParsedReadyForQuestions skipped for aisha_khan_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:02:47] Parsing started: elena_petrova_resume.pdf
+[2026-10-26 16:02:58] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:00] Semantic ranking for elena_petrova_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:04] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 16:03:04] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational databases"
+    ],
+    "Concepts & Methodologies": [
+      "Communication skills"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Data processing",
+    "Debugging"
+  ],
+  "Profile Summary": "Senior ML Engineer with 7 years of experience in building production LLM and recommendation systems, strong Python programming skills, and expertise in machine learning pipelines and operationalization.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "Document ingestion",
+        "Data processing"
+      ],
+      "Impact": "Developed an assistant capable of answering questions over a large internal corpus, showcasing skills in document ingestion, processing, and structured/unstructured data handling."
+    },
+    {
+      "Project Name": "Retrieval-Augmented Generation Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "Monitoring tools"
+      ],
+      "Impact": "Reduced support ticket resolution time by 30% through internal knowledge search optimization."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM expertise",
+    "Data processing and validation",
+    "Debugging and problem-solving"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging"
+  ],
+  "Industry Experience": "AI/ML industry",
+  "Culture Fit Assessment": "Medium \u2013 Candidate is overqualified for the role, which may lead to mismatched expectations.",
+  "Potential Concerns": [
+    "Lack of explicit SQL and relational database experience",
+    "Overqualification for a junior role",
+    "Communication skills not highlighted"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Overqualification may lead to lack of engagement in a junior role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Can contribute significantly to advanced AI/ML projects beyond the scope of the current role.",
+  "Effort Needed by the Company": "Medium \u2013 May require additional onboarding for SQL and relational database tasks.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate is highly skilled but overqualified for the role. Consider discussing long-term career alignment during interviews.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 16:03:04] Completed: elena_petrova_resume.pdf
+[2026-10-26 16:03:04] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 16:03:06] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 16:03:06] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Communication Skills"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Data Processing",
+    "RAG",
+    "Azure OpenAI"
+  ],
+  "Profile Summary": "Senior-level ML Engineer with 7 years of experience in building production LLM systems, REST API development, and AI-powered document processing pipelines. Overqualified for a junior role but aligns well with the technical requirements.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant for Internal Knowledge Search",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "RAG",
+        "Data Processing"
+      ],
+      "Impact": "Reduced support ticket resolution time by 30% through improved document ingestion and processing."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM expertise",
+    "Data processing and validation",
+    "Machine learning pipelines"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Optimization"
+  ],
+  "Industry Experience": "AI/ML and Software Development",
+  "Culture Fit Assessment": "Medium \u2013 Candidate is highly skilled but may need to adjust to a junior role's expectations.",
+  "Potential Concerns": [
+    "Overqualification for a junior role",
+    "Lack of explicit SQL and relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No explicit mention of communication skills or SQL experience, which are required for the role."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and expertise in advanced AI concepts make them a valuable long-term asset.",
+  "Effort Needed by the Company": "Medium \u2013 Some onboarding effort may be required to address SQL and relational database gaps.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate is highly skilled and technically aligned with the role but may require additional training for SQL and relational database tasks. Overqualification could be a concern for retention in a junior role.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 16:03:06] Completed: elena_petrova_resume.pdf
+[2026-10-26 16:03:06] Move to ParsedReadyForQuestions skipped for elena_petrova_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:06] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 16:03:10] Context lake: wrote candidate document for marcus_chen_resume.pdf
+[2026-10-26 16:03:10] Details: {
+  "Name": "Marcus Chen",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Document extraction"
+  ],
+  "Profile Summary": "Junior ML Engineer with hands-on experience in Python, REST API development, and LLM-assisted document processing. Strong alignment with AI-powered document processing roles.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "LLM",
+        "PyTorch",
+        "Pandas"
+      ],
+      "Impact": "Developed an LLM-assisted document section classifier and structured data extraction tool, achieving a 15% improvement in accuracy."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Data processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "AI and Machine Learning",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and problem-solving skills relevant to the role.",
+  "Potential Concerns": [
+    "Lack of SQL or relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No SQL experience, which is a required skill for the role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and relevant experience indicate potential for growth in the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in SQL and relational database concepts.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1 year (including internship experience)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong alignment with the technical requirements of the role but will need support in developing SQL skills.",
+  "Email": "marcus.chen.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/marcus-chen-synth",
+  "resume_name": "marcus_chen_resume.pdf"
+}
+[2026-10-26 16:03:10] Completed: marcus_chen_resume.pdf
+[2026-10-26 16:03:10] Parsing started: priya_raman_resume.pdf
+[2026-10-26 16:03:11] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 16:03:11] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Communication Skills"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Data Processing",
+    "RAG",
+    "Azure OpenAI"
+  ],
+  "Profile Summary": "Senior-level ML Engineer with 7 years of experience in building production LLM systems, REST API development, and AI-powered document processing pipelines. Overqualified for a junior role but aligns well with the technical requirements.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant for Internal Knowledge Search",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "RAG",
+        "Data Processing"
+      ],
+      "Impact": "Reduced support ticket resolution time by 30% through improved document ingestion and processing."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM expertise",
+    "Data processing and validation",
+    "Machine learning pipelines"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Optimization"
+  ],
+  "Industry Experience": "AI/ML and Software Development",
+  "Culture Fit Assessment": "Medium \u2013 Candidate is highly skilled but may need to adjust to a junior role's expectations.",
+  "Potential Concerns": [
+    "Overqualification for a junior role",
+    "Lack of explicit SQL and relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No explicit mention of communication skills or SQL experience, which are required for the role."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and expertise in advanced AI concepts make them a valuable long-term asset.",
+  "Effort Needed by the Company": "Medium \u2013 Some onboarding effort may be required to address SQL and relational database gaps.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate is highly skilled and technically aligned with the role but may require additional training for SQL and relational database tasks. Overqualification could be a concern for retention in a junior role.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 16:03:11] Completed: elena_petrova_resume.pdf
+[2026-10-26 16:03:11] Move to ParsedReadyForQuestions skipped for elena_petrova_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:11] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 16:03:12] Failed: marcus_chen_resume.pdf | Error: [Errno 2] No such file or directory: 'InputResume_Folder\\marcus_chen_resume.pdf'
+[2026-10-26 16:03:12] Parsing started: priya_raman_resume.pdf
+[2026-10-26 16:03:14] Context lake: wrote candidate document for elena_petrova_resume.pdf
+[2026-10-26 16:03:14] Details: {
+  "Name": "Elena Petrova",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [
+      "Relational Databases"
+    ],
+    "Concepts & Methodologies": [
+      "Communication Skills"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "LLM",
+    "Data Processing",
+    "RAG",
+    "Azure OpenAI"
+  ],
+  "Profile Summary": "Senior-level ML Engineer with 7 years of experience in building production LLM systems, REST API development, and AI-powered document processing pipelines. Overqualified for a junior role but aligns well with the technical requirements.",
+  "Projects": [
+    {
+      "Project Name": "RAG-based Assistant for Internal Knowledge Search",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "LLM",
+        "RAG",
+        "Data Processing"
+      ],
+      "Impact": "Reduced support ticket resolution time by 30% through improved document ingestion and processing."
+    }
+  ],
+  "Certifications & Courses": [
+    "M.S. in Computer Science with AI specialization"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "LLM expertise",
+    "Data processing and validation",
+    "Machine learning pipelines"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Debugging",
+    "Optimization"
+  ],
+  "Industry Experience": "AI/ML and Software Development",
+  "Culture Fit Assessment": "Medium \u2013 Candidate is highly skilled but may need to adjust to a junior role's expectations.",
+  "Potential Concerns": [
+    "Overqualification for a junior role",
+    "Lack of explicit SQL and relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No explicit mention of communication skills or SQL experience, which are required for the role."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and expertise in advanced AI concepts make them a valuable long-term asset.",
+  "Effort Needed by the Company": "Medium \u2013 Some onboarding effort may be required to address SQL and relational database gaps.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "7",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Senior",
+  "HR Notes": "Candidate is highly skilled and technically aligned with the role but may require additional training for SQL and relational database tasks. Overqualification could be a concern for retention in a junior role.",
+  "Email": "elena.petrova.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/elena-petrova-synth",
+  "resume_name": "elena_petrova_resume.pdf"
+}
+[2026-10-26 16:03:14] Completed: elena_petrova_resume.pdf
+[2026-10-26 16:03:14] Move to ParsedReadyForQuestions skipped for elena_petrova_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:14] Parsing started: marcus_chen_resume.pdf
+[2026-10-26 16:03:14] Failed: marcus_chen_resume.pdf | Error: [Errno 2] No such file or directory: 'InputResume_Folder\\marcus_chen_resume.pdf'
+[2026-10-26 16:03:14] Parsing started: priya_raman_resume.pdf
+[2026-10-26 16:03:17] Semantic ranking for marcus_chen_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:19] Semantic ranking for marcus_chen_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:24] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:25] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:28] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:32] Context lake: wrote candidate document for marcus_chen_resume.pdf
+[2026-10-26 16:03:32] Details: {
+  "Name": "Marcus Chen",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Document extraction"
+  ],
+  "Profile Summary": "Junior ML Engineer with hands-on experience in Python, REST API development, and LLM-assisted document processing. Strong alignment with AI-powered document processing roles.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "LLM",
+        "PyTorch",
+        "Pandas"
+      ],
+      "Impact": "Developed an LLM-assisted document section classifier and structured data extraction tool, achieving a 15% improvement in accuracy."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Data processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "AI and Machine Learning",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and problem-solving skills relevant to the role.",
+  "Potential Concerns": [
+    "Lack of SQL or relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No SQL experience, which is a required skill for the role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and relevant experience indicate potential for growth in the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in SQL and relational database concepts.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1 year (including internship experience)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong alignment with the technical requirements of the role but will need support in developing SQL skills.",
+  "Email": "marcus.chen.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/marcus-chen-synth",
+  "resume_name": "marcus_chen_resume.pdf"
+}
+[2026-10-26 16:03:32] Completed: marcus_chen_resume.pdf
+[2026-10-26 16:03:32] Move to ParsedReadyForQuestions skipped for marcus_chen_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:32] Parsing started: priya_raman_resume.pdf
+[2026-10-26 16:03:33] Context lake: wrote candidate document for marcus_chen_resume.pdf
+[2026-10-26 16:03:33] Details: {
+  "Name": "Marcus Chen",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "SQL"
+    ],
+    "Tools & Technologies": [],
+    "Concepts & Methodologies": []
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Document extraction"
+  ],
+  "Profile Summary": "Junior ML Engineer with hands-on experience in Python, REST API development, and LLM-assisted document processing. Strong alignment with AI-powered document processing roles.",
+  "Projects": [
+    {
+      "Project Name": "Resume Parsing Prototype",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "LLM",
+        "PyTorch",
+        "Pandas"
+      ],
+      "Impact": "Developed an LLM-assisted document section classifier and structured data extraction tool, achieving a 15% improvement in accuracy."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python",
+    "REST API development",
+    "LLM concepts",
+    "Data processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "AI and Machine Learning",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical alignment and problem-solving skills relevant to the role.",
+  "Potential Concerns": [
+    "Lack of SQL or relational database experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No SQL experience, which is a required skill for the role"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills and relevant experience indicate potential for growth in the role.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in SQL and relational database concepts.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1 year (including internship experience)",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has strong alignment with the technical requirements of the role but will need support in developing SQL skills.",
+  "Email": "marcus.chen.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/marcus-chen-synth",
+  "resume_name": "marcus_chen_resume.pdf"
+}
+[2026-10-26 16:03:33] Completed: marcus_chen_resume.pdf
+[2026-10-26 16:03:33] Move to ParsedReadyForQuestions skipped for marcus_chen_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:33] Parsing started: priya_raman_resume.pdf
+[2026-10-26 16:03:37] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 16:03:37] Details: {
+  "Name": "Priya Raman",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 16:03:37] Completed: priya_raman_resume.pdf
+[2026-10-26 16:03:39] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 16:03:39] Details: {
+  "Name": "Priya Raman",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 16:03:39] Completed: priya_raman_resume.pdf
+[2026-10-26 16:03:39] Move to ParsedReadyForQuestions skipped for priya_raman_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:39] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 16:03:42] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 16:03:42] Details: {
+  "Name": "Priya Raman",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 16:03:42] Completed: priya_raman_resume.pdf
+[2026-10-26 16:03:42] Move to ParsedReadyForQuestions skipped for priya_raman_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:42] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 16:03:45] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:46] Semantic ranking for priya_raman_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:52] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:54] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:03:59] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 16:03:59] Details: {
+  "Name": "Priya Raman",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 16:03:59] Completed: priya_raman_resume.pdf
+[2026-10-26 16:03:59] Move to ParsedReadyForQuestions skipped for priya_raman_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:59] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 16:03:59] Context lake: wrote candidate document for priya_raman_resume.pdf
+[2026-10-26 16:03:59] Details: {
+  "Name": "Priya Raman",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java",
+      "Machine Learning"
+    ],
+    "Tools & Technologies": [
+      "LLM"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API",
+    "SQL",
+    "Data Processing",
+    "Structured Data",
+    "Relational Databases"
+  ],
+  "Profile Summary": "A skilled software engineer with 3 years of experience in Python, REST API development, and data processing. Proficient in SQL and relational databases, with a strong foundation in backend engineering and data pipelines.",
+  "Projects": [
+    {
+      "Project Name": "Python/Flask Microservice for Inventory Synchronization",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Flask",
+        "SQL",
+        "Relational Databases"
+      ],
+      "Impact": "Developed a microservice to synchronize warehouse inventory across multiple regional databases, improving data consistency and operational efficiency."
+    },
+    {
+      "Project Name": "Batch ETL Job Migration to Scheduled Pipeline",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "SQL"
+      ],
+      "Impact": "Migrated batch ETL jobs to a scheduled pipeline, reducing runtime by 40% and improving data processing efficiency."
+    }
+  ],
+  "Certifications & Courses": [
+    "None Mentioned"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data pipeline development",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Collaboration",
+    "Communication"
+  ],
+  "Industry Experience": "Not Specified",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates technical skills and experience that align closely with the job requirements, indicating a strong potential for integration into the team.",
+  "Potential Concerns": [
+    "Lack of experience with machine-learning or LLM concepts",
+    "No mention of Java programming experience"
+  ],
+  "Red Flags & Risk Analysis": [
+    "No significant red flags, but limited exposure to machine-learning concepts could require additional training."
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 With foundational skills in place, the candidate can quickly learn and adapt to new technologies like LLMs and machine learning.",
+  "Effort Needed by the Company": "Medium \u2013 Some training in machine-learning concepts and LLMs will be required, but the candidate has a strong technical foundation to build upon.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate has a strong technical foundation and aligns well with the job requirements. Some upskilling in machine learning may be needed, but overall, the candidate shows high potential for growth and contribution.",
+  "Email": "priya.raman.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/priya-raman-synth",
+  "resume_name": "priya_raman_resume.pdf"
+}
+[2026-10-26 16:03:59] Completed: priya_raman_resume.pdf
+[2026-10-26 16:03:59] Move to ParsedReadyForQuestions skipped for priya_raman_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:03:59] Parsing started: wei_zhang_resume.pdf
+[2026-10-26 16:04:06] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 16:04:06] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 16:04:06] Completed: wei_zhang_resume.pdf
+[2026-10-26 16:04:08] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 16:04:08] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 16:04:08] Completed: wei_zhang_resume.pdf
+[2026-10-26 16:04:08] Move to ParsedReadyForQuestions skipped for wei_zhang_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:04:11] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:04:12] Semantic ranking for wei_zhang_resume.pdf: using 5/6 chunks for summarization (all 6 persisted to the semantic index).
+[2026-10-26 16:04:24] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 16:04:24] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 16:04:24] Completed: wei_zhang_resume.pdf
+[2026-10-26 16:04:24] Move to ParsedReadyForQuestions skipped for wei_zhang_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 16:04:24] Context lake: wrote candidate document for wei_zhang_resume.pdf
+[2026-10-26 16:04:24] Details: {
+  "Name": "Wei Zhang",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "LLM-assisted extraction tools"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST API development",
+    "SQL",
+    "Data processing",
+    "Problem-solving"
+  ],
+  "Profile Summary": "QA/Test Engineer transitioning into backend development with strong Python programming, REST API testing, and SQL optimization skills. Demonstrates alignment with the role's focus on API development, data handling, and structured data processing.",
+  "Projects": [
+    {
+      "Project Name": "Automated API Test Suite",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "REST API"
+      ],
+      "Impact": "Built an automated API test suite covering 200+ endpoints, significantly improving testing efficiency."
+    },
+    {
+      "Project Name": "API Contract Testing Framework",
+      "Relevance to JD": "High",
+      "Technologies Used": [
+        "Python",
+        "Pytest",
+        "OpenAPI schemas"
+      ],
+      "Impact": "Validated REST API responses against OpenAPI schemas, ensuring compliance and reliability."
+    }
+  ],
+  "Certifications & Courses": [],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL query optimization",
+    "Data validation and processing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Software Development",
+  "Culture Fit Assessment": "High \u2013 Candidate demonstrates strong alignment with technical requirements and has a proactive approach to problem-solving and optimization.",
+  "Potential Concerns": [
+    "Limited experience with machine-learning and LLM concepts",
+    "No mention of Java programming"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Lack of explicit experience with LLM or machine-learning tools may require additional training"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong technical foundation and demonstrated ability to learn and transition into new roles.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate may require training in LLM concepts and Java programming.",
+  "Resume Strength Score": "8.5",
+  "Relevant Experience (yrs)": "3 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate shows strong alignment with core technical skills and demonstrates a proactive approach to learning and transitioning into new roles. Training in LLM concepts and Java may be necessary.",
+  "Email": "wei.zhang.synth@example.com",
+  "Phone": "",
+  "LinkedIn": "linkedin.com/in/wei-zhang-synth",
+  "resume_name": "wei_zhang_resume.pdf"
+}
+[2026-10-26 16:04:24] Completed: wei_zhang_resume.pdf
+[2026-10-26 16:04:24] Move to ParsedReadyForQuestions skipped for wei_zhang_resume.pdf (already moved by a concurrent run, or otherwise missing): [WinError 2] The system cannot find the file specified
+[2026-10-26 17:10:15] BE Project Resume Parsing Start
+[2026-10-26 17:10:15] Parsing started: demo_journey_be8d1c38_resume.pdf
+[2026-10-26 17:10:27] Semantic ranking for demo_journey_be8d1c38_resume.pdf: using 4/4 chunks for summarization (all 4 persisted to the semantic index).
+[2026-10-26 17:10:58] Context lake: wrote candidate document for demo_journey_be8d1c38_resume.pdf
+[2026-10-26 17:10:58] Details: {
+  "Name": "Demo Journey Be8d1c38",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Machine-learning libraries (e.g., TensorFlow, PyTorch)"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning or LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Backend Development",
+    "Data Processing",
+    "Automated Testing"
+  ],
+  "Profile Summary": "Backend-focused software engineer with Python experience, skilled in REST API development, SQL, and data processing, aligning well with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Not Provided",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "SQL",
+        "REST APIs"
+      ],
+      "Impact": "Not Provided"
+    }
+  ],
+  "Certifications & Courses": [
+    "Not Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing and validation",
+    "Automated testing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Collaboration",
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Provided",
+  "Culture Fit Assessment": "High \u2013 Proven ability to collaborate with cross-functional teams and strong problem-solving skills.",
+  "Potential Concerns": [
+    "Lack of explicit machine-learning or LLM experience",
+    "No mention of Java proficiency"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to machine-learning concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills with room to develop expertise in machine learning and LLMs.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in machine-learning concepts and tools.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in machine-learning concepts. Strong backend and API development skills make them a promising hire.",
+  "Email": "",
+  "Phone": "",
+  "LinkedIn": "",
+  "resume_name": "demo_journey_be8d1c38_resume.pdf"
+}
+[2026-10-26 17:10:58] Completed: demo_journey_be8d1c38_resume.pdf
+[2026-10-26 17:13:54] BE Project Resume Parsing Start
+[2026-10-26 17:13:54] Parsing started: demo_journey_9464d4e5_resume.pdf
+[2026-10-26 17:14:06] Semantic ranking for demo_journey_9464d4e5_resume.pdf: using 4/4 chunks for summarization (all 4 persisted to the semantic index).
+[2026-10-26 17:14:25] Context lake: wrote candidate document for demo_journey_9464d4e5_resume.pdf
+[2026-10-26 17:14:25] Details: {
+  "Name": "Demo Journey 9464d4e5",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Machine-learning libraries (e.g., TensorFlow, PyTorch)"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning or LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Backend Development",
+    "Data Processing",
+    "Automated Testing"
+  ],
+  "Profile Summary": "Backend-focused software engineer with Python experience, skilled in REST API development, SQL, and data processing, aligning well with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Not Provided",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "SQL",
+        "REST APIs"
+      ],
+      "Impact": "Not Provided"
+    }
+  ],
+  "Certifications & Courses": [
+    "Not Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing and validation",
+    "Automated testing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Collaboration",
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Provided",
+  "Culture Fit Assessment": "High \u2013 Proven ability to collaborate with cross-functional teams and strong problem-solving skills.",
+  "Potential Concerns": [
+    "Lack of explicit machine-learning or LLM experience",
+    "No mention of Java proficiency"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to machine-learning concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills with room to develop expertise in machine learning and LLMs.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in machine-learning concepts and tools.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in machine-learning concepts. Strong backend and API development skills make them a promising hire.",
+  "Email": "",
+  "Phone": "",
+  "LinkedIn": "",
+  "resume_name": "demo_journey_9464d4e5_resume.pdf"
+}
+[2026-10-26 17:14:25] Completed: demo_journey_9464d4e5_resume.pdf
+[2026-10-26 17:17:25] BE Project Resume Parsing Start
+[2026-10-26 17:17:25] Parsing started: demo_journey_c2938dc0_resume.pdf
+[2026-10-26 17:17:37] Semantic ranking for demo_journey_c2938dc0_resume.pdf: using 4/4 chunks for summarization (all 4 persisted to the semantic index).
+[2026-10-26 17:17:57] Context lake: wrote candidate document for demo_journey_c2938dc0_resume.pdf
+[2026-10-26 17:17:57] Details: {
+  "Name": "Demo Journey C2938dc0",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Machine-learning libraries (e.g., TensorFlow, PyTorch)"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning or LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Backend Development",
+    "Data Processing",
+    "Automated Testing"
+  ],
+  "Profile Summary": "Backend-focused software engineer with Python experience, skilled in REST API development, SQL, and data processing, aligning well with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Not Provided",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "SQL",
+        "REST APIs"
+      ],
+      "Impact": "Not Provided"
+    }
+  ],
+  "Certifications & Courses": [
+    "Not Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing and validation",
+    "Automated testing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Collaboration",
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Provided",
+  "Culture Fit Assessment": "High \u2013 Proven ability to collaborate with cross-functional teams and strong problem-solving skills.",
+  "Potential Concerns": [
+    "Lack of explicit machine-learning or LLM experience",
+    "No mention of Java proficiency"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to machine-learning concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills with room to develop expertise in machine learning and LLMs.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in machine-learning concepts and tools.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in machine-learning concepts. Strong backend and API development skills make them a promising hire.",
+  "Email": "",
+  "Phone": "",
+  "LinkedIn": "",
+  "resume_name": "demo_journey_c2938dc0_resume.pdf"
+}
+[2026-10-26 17:17:57] Completed: demo_journey_c2938dc0_resume.pdf
+[2026-10-26 17:21:04] BE Project Resume Parsing Start
+[2026-10-26 17:21:04] Parsing started: demo_journey_f6422539_resume.pdf
+[2026-10-26 17:21:15] Semantic ranking for demo_journey_f6422539_resume.pdf: using 4/4 chunks for summarization (all 4 persisted to the semantic index).
+[2026-10-26 17:21:34] Context lake: wrote candidate document for demo_journey_f6422539_resume.pdf
+[2026-10-26 17:21:34] Details: {
+  "Name": "Demo Journey F6422539",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Machine-learning libraries (e.g., TensorFlow, PyTorch)"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning or LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Backend Development",
+    "Data Processing",
+    "Automated Testing"
+  ],
+  "Profile Summary": "Backend-focused software engineer with Python experience, skilled in REST API development, SQL, and data processing, aligning well with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Not Provided",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "SQL",
+        "REST APIs"
+      ],
+      "Impact": "Not Provided"
+    }
+  ],
+  "Certifications & Courses": [
+    "Not Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing and validation",
+    "Automated testing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Collaboration",
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Provided",
+  "Culture Fit Assessment": "High \u2013 Proven ability to collaborate with cross-functional teams and strong problem-solving skills.",
+  "Potential Concerns": [
+    "Lack of explicit machine-learning or LLM experience",
+    "No mention of Java proficiency"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to machine-learning concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills with room to develop expertise in machine learning and LLMs.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in machine-learning concepts and tools.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in machine-learning concepts. Strong backend and API development skills make them a promising hire.",
+  "Email": "",
+  "Phone": "",
+  "LinkedIn": "",
+  "resume_name": "demo_journey_f6422539_resume.pdf"
+}
+[2026-10-26 17:21:34] Completed: demo_journey_f6422539_resume.pdf
+[2026-10-26 17:27:10] BE Project Resume Parsing Start
+[2026-10-26 17:27:10] Parsing started: demo_journey_83d22c60_resume.pdf
+[2026-10-26 17:27:22] Semantic ranking for demo_journey_83d22c60_resume.pdf: using 4/4 chunks for summarization (all 4 persisted to the semantic index).
+[2026-10-26 17:27:42] Context lake: wrote candidate document for demo_journey_83d22c60_resume.pdf
+[2026-10-26 17:27:42] Details: {
+  "Name": "Demo Journey 83d22c60",
+  "JD Match": "85%",
+  "Missing Keywords": {
+    "Technical Skills": [
+      "Java"
+    ],
+    "Tools & Technologies": [
+      "Machine-learning libraries (e.g., TensorFlow, PyTorch)"
+    ],
+    "Concepts & Methodologies": [
+      "Basic machine-learning or LLM concepts"
+    ]
+  },
+  "Top Matching Keywords": [
+    "Python",
+    "REST APIs",
+    "SQL",
+    "Backend Development",
+    "Data Processing",
+    "Automated Testing"
+  ],
+  "Profile Summary": "Backend-focused software engineer with Python experience, skilled in REST API development, SQL, and data processing, aligning well with the role's requirements.",
+  "Projects": [
+    {
+      "Project Name": "Not Provided",
+      "Relevance to JD": "Medium",
+      "Technologies Used": [
+        "Python",
+        "SQL",
+        "REST APIs"
+      ],
+      "Impact": "Not Provided"
+    }
+  ],
+  "Certifications & Courses": [
+    "Not Provided"
+  ],
+  "Skills That Will Contribute to the Company": [
+    "Python programming",
+    "REST API development",
+    "SQL optimization",
+    "Data processing and validation",
+    "Automated testing"
+  ],
+  "Soft Skills & Leadership Qualities": [
+    "Collaboration",
+    "Problem-solving",
+    "Communication"
+  ],
+  "Industry Experience": "Not Provided",
+  "Culture Fit Assessment": "High \u2013 Proven ability to collaborate with cross-functional teams and strong problem-solving skills.",
+  "Potential Concerns": [
+    "Lack of explicit machine-learning or LLM experience",
+    "No mention of Java proficiency"
+  ],
+  "Red Flags & Risk Analysis": [
+    "Limited exposure to machine-learning concepts"
+  ],
+  "Candidate\u2019s Growth Potential": "High \u2013 Strong foundational skills with room to develop expertise in machine learning and LLMs.",
+  "Effort Needed by the Company": "Medium \u2013 Candidate will require training in machine-learning concepts and tools.",
+  "Resume Strength Score": "8.0",
+  "Relevant Experience (yrs)": "1-2 years",
+  "Employment Gaps Detected": false,
+  "Resume Format Quality": "Good",
+  "Candidate Type": "Junior",
+  "HR Notes": "Candidate aligns well with technical requirements but may need mentorship in machine-learning concepts. Strong backend and API development skills make them a promising hire.",
+  "Email": "",
+  "Phone": "",
+  "LinkedIn": "",
+  "resume_name": "demo_journey_83d22c60_resume.pdf"
+}
+[2026-10-26 17:27:42] Completed: demo_journey_83d22c60_resume.pdf

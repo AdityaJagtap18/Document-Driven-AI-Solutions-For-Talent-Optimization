@@ -6,7 +6,7 @@
  * based on `mode` alone.
  */
 window.CDPI_CONFIG = {
-  mode: "real", // "mock" | "real" -- temporarily real to show the verified Azure Readiness page live
+  mode: "real", // "mock" | "real" -- real Functions host at localhost:7071 once it's running (see docs/fde/DECISIONS_AND_BLOCKERS.md for a known local-startup auth issue)
   baseUrl: "http://localhost:7071",
   functionKey: "",
 };

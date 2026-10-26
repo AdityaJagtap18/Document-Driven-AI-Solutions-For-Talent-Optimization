@@ -60,48 +60,115 @@ function _saveHiddenWidgets(ids) {
   try { window.localStorage.setItem(OBS_REPORT_WIDGETS_STORAGE_KEY, JSON.stringify(ids)); } catch (e) { /* per-device convenience only; ignore quota/availability errors */ }
 }
 
+/** Adapts a persisted observability_snapshots.py snapshot into the same
+ * summary/telemetry/serviceHealth/docProcessing/comms shapes the existing
+ * chart/table sub-components below already consume -- so this snapshot
+ * architecture change doesn't require rewriting every widget, only how
+ * data gets INTO them. A source with status != "success" (not_configured,
+ * failed, or simply absent from a snapshot taken before that source
+ * existed) maps to an honest "unavailable" shape, never a fabricated
+ * zero/empty-but-successful one. A "failed" source that has a real
+ * last_known_good result from an earlier refresh uses THAT instead of
+ * going blank -- a bad refresh never erases good data (see
+ * observability_snapshots.run_refresh()'s docstring). */
+function _sourceData(snapshot, sourceId) {
+  var src = snapshot && snapshot.sources && snapshot.sources[sourceId];
+  if (!src) return null;
+  if (src.status === "success") return src.data;
+  if (src.status === "failed" && src.last_known_good && src.last_known_good.status === "success") return src.last_known_good.data;
+  return null;
+}
+function _sourceUnavailableReason(snapshot, sourceId) {
+  var src = snapshot && snapshot.sources && snapshot.sources[sourceId];
+  if (!src) return "No refresh has collected this source yet.";
+  if (src.status === "not_configured") return "Not configured.";
+  if (src.status === "failed") return "Last refresh failed: " + (src.error || "unknown error") + (src.last_known_good ? " (showing last known good data from an earlier refresh)" : "");
+  return null;
+}
+
+function _adaptSnapshot(snapshot) {
+  var reqVol = _sourceData(snapshot, "azure_request_volume") || { available: false, buckets: [] };
+  var latency = _sourceData(snapshot, "azure_latency") || { available: false };
+  var aiUsage = _sourceData(snapshot, "azure_ai_usage") || { available: false, by_model: [] };
+  var recentErrors = _sourceData(snapshot, "azure_recent_errors") || { available: false, errors: [] };
+  var telHealth = _sourceData(snapshot, "azure_telemetry_health") || { azure_configured: false, ingestion_confirmed: false, detail: _sourceUnavailableReason(snapshot, "azure_telemetry_health") || "Unavailable." };
+  var localTraces = _sourceData(snapshot, "local_ai_traces") || { total_spans: 0, by_workflow: {} };
+  var localLlm = _sourceData(snapshot, "local_llm_calls") || { total_calls: 0, total_tokens: 0, total_cost_usd: 0, by_label: {} };
+
+  var totalReq = reqVol.available ? reqVol.buckets.reduce(function (s, b) { return s + b.total; }, 0) : null;
+  var succeeded = reqVol.available ? reqVol.buckets.reduce(function (s, b) { return s + b.succeeded; }, 0) : null;
+  var failedReq = reqVol.available ? reqVol.buckets.reduce(function (s, b) { return s + b.failed; }, 0) : null;
+  var aiRequests = aiUsage.available ? aiUsage.by_model.reduce(function (s, m) { return s + m.calls; }, 0) : null;
+  var aiTokens = aiUsage.available ? aiUsage.by_model.reduce(function (s, m) { return s + (m.total_tokens || 0); }, 0) : null;
+  var aiCost = aiUsage.available ? Math.round(aiUsage.by_model.reduce(function (s, m) { return s + (m.total_cost_usd || 0); }, 0) * 1000000) / 1000000 : null;
+
+  var overallStatus = "UNKNOWN";
+  if (!snapshot || !snapshot.collected_at) overallStatus = "NOT_CONFIGURED";
+  else if (!telHealth.azure_configured) overallStatus = "UNKNOWN";
+  else if (!telHealth.ingestion_confirmed) overallStatus = "CONFIGURED_NO_INGESTION";
+  else if (failedReq && totalReq && failedReq / totalReq > 0.1) overallStatus = "DEGRADED";
+  else overallStatus = "HEALTHY";
+
+  var summary = {
+    reporting_period_hours: snapshot && snapshot.hours_window,
+    generated_at: snapshot && snapshot.collected_at,
+    overall_status: overallStatus,
+    telemetry_health: telHealth,
+    azure_telemetry: {
+      configured: telHealth.azure_configured, total_requests: totalReq, succeeded_requests: succeeded,
+      failed_requests: failedReq, success_rate: (totalReq ? succeeded / totalReq : null),
+      failure_rate: (totalReq ? failedReq / totalReq : null), latency: latency,
+      ai_requests: aiRequests, ai_total_tokens: aiTokens, ai_total_cost_usd: aiCost,
+      unavailable_reason: reqVol.available ? null : _sourceUnavailableReason(snapshot, "azure_request_volume"),
+    },
+    local_observability: {
+      llm_calls: localLlm, ai_traces: localTraces,
+      note: "Sourced from this process's local JSONL logs, as of the last refresh -- always available regardless of Azure Monitor configuration.",
+    },
+  };
+  var telemetry = {
+    reporting_period_hours: snapshot && snapshot.hours_window,
+    request_volume: reqVol, ai_usage: aiUsage, recent_errors: recentErrors,
+  };
+  return { summary: summary, telemetry: telemetry };
+}
+
 function AzureObservabilityReport(props) {
   var api = props.api;
   var hoursState = React.useState(24);
   var hours = hoursState[0];
   var setHours = hoursState[1];
 
-  var summaryState = React.useState(null);
-  var summary = summaryState[0];
-  var setSummary = summaryState[1];
-  var telemetryState = React.useState(null);
-  var telemetry = telemetryState[0];
-  var setTelemetry = telemetryState[1];
-  var loadingState = React.useState(true);
-  var loading = loadingState[0];
-  var setLoading = loadingState[1];
-  var errorState = React.useState(null);
-  var error = errorState[0];
-  var setError = errorState[1];
+  // Persistent frontend snapshot of the already-persisted backend
+  // snapshot (api.getObservabilitySnapshot() -- itself a pure read of
+  // observability_snapshots.py's cached last-known-good data, never a
+  // real Azure collection). This is a second, frontend-side cache layer
+  // on top of that: per the "no loading flash on revisit" requirement,
+  // opening this page never shows "Loading..." once it's been opened
+  // once in this browser, even though the backend read is already fast.
+  var pageSnapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("azure_observability_report:" + hours, function () {
+    return api.getObservabilitySnapshot();
+  });
+  var snapshot = pageSnapshot.state.data;
+  var refreshingState = React.useState(false);
+  var refreshing = refreshingState[0];
+  var setRefreshing = refreshingState[1];
   var exportingState = React.useState(false);
   var exporting = exportingState[0];
   var setExporting = exportingState[1];
+  var historyState = React.useState([]);
+  var refreshHistory = historyState[0];
+  var setRefreshHistory = historyState[1];
+  var showHistoryState = React.useState(false);
+  var showHistory = showHistoryState[0];
+  var setShowHistory = showHistoryState[1];
 
-  var serviceHealthState = React.useState(null);
-  var serviceHealth = serviceHealthState[0];
-  var setServiceHealth = serviceHealthState[1];
-  var serviceHealthErrorState = React.useState(null);
-  var serviceHealthError = serviceHealthErrorState[0];
-  var setServiceHealthError = serviceHealthErrorState[1];
-
-  var docProcessingState = React.useState(null);
-  var docProcessing = docProcessingState[0];
-  var setDocProcessing = docProcessingState[1];
-  var docProcessingErrorState = React.useState(null);
-  var docProcessingError = docProcessingErrorState[0];
-  var setDocProcessingError = docProcessingErrorState[1];
-
-  var commsState = React.useState(null);
-  var comms = commsState[0];
-  var setComms = commsState[1];
-  var commsErrorState = React.useState(null);
-  var commsError = commsErrorState[0];
-  var setCommsError = commsErrorState[1];
+  var serviceHealth = { services: (_sourceData(snapshot, "service_health") || {}).services || null };
+  var serviceHealthError = _sourceUnavailableReason(snapshot, "service_health");
+  var docProcessing = _sourceData(snapshot, "document_processing");
+  var docProcessingError = _sourceUnavailableReason(snapshot, "document_processing");
+  var comms = _sourceData(snapshot, "comms_delivery");
+  var commsError = _sourceUnavailableReason(snapshot, "comms_delivery");
 
   var customizingState = React.useState(false);
   var customizing = customizingState[0];
@@ -121,39 +188,34 @@ function AzureObservabilityReport(props) {
     _saveHiddenWidgets([]);
   }
 
-  function load(bypassCache) {
-    if (bypassCache) {
-      window.CDPI_AZURE_CACHE.invalidate("obs-report:summary:" + hours);
-      window.CDPI_AZURE_CACHE.invalidate("obs-report:telemetry:" + hours);
-      window.CDPI_AZURE_CACHE.invalidatePrefix("azure-readiness:");
-      window.CDPI_AZURE_CACHE.invalidate("obs-report:doc-processing");
-      window.CDPI_AZURE_CACHE.invalidate("obs-report:comms-delivery");
-    }
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      window.CDPI_AZURE_CACHE.get("obs-report:summary:" + hours, function () { return api.getObservabilityReportSummary(hours); }),
-      window.CDPI_AZURE_CACHE.get("obs-report:telemetry:" + hours, function () { return api.getObservabilityReportTelemetry(hours, 20); }),
-    ])
-      .then(function (results) {
-        setSummary(results[0]);
-        setTelemetry(results[1]);
-      })
-      .catch(function (err) { setError(err.message); })
-      .then(function () { setLoading(false); });
+  // The persisted-data read itself (NEVER a real Azure/local collection
+  // -- per the "manual refresh is the default; opening the dashboard
+  // must not auto-collect" requirement) is `pageSnapshot` above --
+  // fetched once per `hours` the first time that window is viewed in
+  // this browser, cached after that, so no "Loading..." flash on revisit.
+  var loading = pageSnapshot.state.loading && !pageSnapshot.state.data;
+  var error = pageSnapshot.state.error;
 
-    // Each of these fails independently -- a 403 (role lacks the
-    // permission) or any other error only blanks its own section,
-    // never the rest of the page.
-    window.CDPI_AZURE_CACHE.get("azure-readiness:list", function () { return api.getAzureReadiness(); })
-      .then(setServiceHealth).catch(function (err) { setServiceHealthError(err.message); });
-    window.CDPI_AZURE_CACHE.get("obs-report:doc-processing", function () { return api.resumeProcessingReport(); })
-      .then(setDocProcessing).catch(function (err) { setDocProcessingError(err.message); });
-    window.CDPI_AZURE_CACHE.get("obs-report:comms-delivery", function () { return api.communicationDeliveryReport(); })
-      .then(setComms).catch(function (err) { setCommsError(err.message); });
+  /** The ONLY action that collects real data -- explicit user click,
+   * never automatic. */
+  function refreshAll() {
+    setRefreshing(true);
+    api.refreshObservability(hours)
+      .then(function () {
+        window.CDPI_AZURE_CACHE.invalidatePrefix("azure-readiness:"); // keep Azure Readiness/Service Hub pages consistent with this real refresh
+        return pageSnapshot.refresh(); // re-reads what the refresh just persisted, updating this page's own snapshot too
+      })
+      .catch(function (err) { window.alert(err.message); })
+      .then(function () { setRefreshing(false); });
   }
 
-  React.useEffect(function () { load(false); }, [hours]);
+  function loadHistory() {
+    api.getObservabilityRefreshHistory(20).then(function (r) { setRefreshHistory(r.history || []); }).catch(function () { setRefreshHistory([]); });
+  }
+
+  var adapted = _adaptSnapshot(snapshot);
+  var summary = adapted.summary;
+  var telemetry = adapted.telemetry;
 
   function doExport() {
     setExporting(true);
@@ -194,12 +256,38 @@ function AzureObservabilityReport(props) {
             <option value={168}>Last 7 days</option>
           </select>
         </label>
-        <button className="btn" onClick={function () { load(true); }} disabled={loading}>{loading ? "Refreshing…" : "Refresh"}</button>
+        <button className="btn btn-primary" onClick={refreshAll} disabled={refreshing}>{refreshing ? "Collecting real data…" : "Refresh All"}</button>
         <button className="btn" onClick={doExport} disabled={exporting || loading}>{exporting ? "Exporting…" : "Export CSV"}</button>
         <button className={"btn" + (customizing ? " btn-primary" : "")} onClick={function () { setCustomizing(!customizing); }}>
           {customizing ? "Done customizing" : "Customize"}
         </button>
+        <button className="btn" onClick={function () { setShowHistory(!showHistory); if (!showHistory) loadHistory(); }}>
+          {showHistory ? "Hide refresh history" : "Refresh history"}
+        </button>
       </div>
+
+      <p className="muted" style={{ fontSize: "0.82rem" }}>
+        {snapshot && snapshot.collected_at
+          ? <React.Fragment>Showing data collected {new Date(snapshot.collected_at).toLocaleString()} ({snapshot.succeeded_count} succeeded, {snapshot.failed_count} failed, {snapshot.skipped_count} not configured) -- opening this page never re-queries Azure; click "Refresh All" to collect current data.</React.Fragment>
+          : <React.Fragment>No refresh has ever been run. Click "Refresh All" to collect real data for the first time.</React.Fragment>}
+      </p>
+
+      {showHistory && (
+        <div className="chart-card" style={{ marginBottom: 16 }}>
+          <h4>Refresh History</h4>
+          {refreshHistory.length === 0 && <p className="muted">No past refreshes recorded.</p>}
+          {refreshHistory.length > 0 && (
+            <table className="table">
+              <thead><tr><th>Collected</th><th>Triggered by</th><th>Succeeded</th><th>Failed</th><th>Not configured</th></tr></thead>
+              <tbody>
+                {refreshHistory.map(function (h) {
+                  return <tr key={h.id}><td>{new Date(h.collected_at).toLocaleString()}</td><td>{h.triggered_by}</td><td>{h.succeeded_count}</td><td>{h.failed_count}</td><td>{h.skipped_count}</td></tr>;
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {customizing && (
         <div className="chart-card" style={{ marginBottom: 16 }}>
@@ -221,9 +309,9 @@ function AzureObservabilityReport(props) {
       )}
 
       {error && <div className="banner banner-error">{error}</div>}
-      {loading && !summary && <p className="muted">Loading…</p>}
+      {loading && <p className="muted">Loading…</p>}
 
-      {summary && (
+      {!loading && (
         <React.Fragment>
           <ReportHeader summary={summary} hours={hours} />
           {isVisible("kpis") && <KpiRow summary={summary} />}
@@ -259,7 +347,7 @@ function ReportHeader(props) {
         Overall status: <span className={"badge " + (OBS_REPORT_STATUS_BADGE[s.overall_status] || "badge-neutral")}>{s.overall_status}</span>
       </h4>
       <p className="muted" style={{ fontSize: "0.85rem" }}>
-        Reporting period: last {props.hours}h &middot; Generated: {new Date(s.generated_at).toLocaleString()} &middot;{" "}
+        Reporting period: last {props.hours}h &middot; Generated: {s.generated_at ? new Date(s.generated_at).toLocaleString() : "never (no refresh yet)"} &middot;{" "}
         Data source: Azure Monitor (Log Analytics) + local JSONL &middot; Environment: this app's configured Azure resource group
       </p>
       <p className="muted" style={{ fontSize: "0.85rem" }}>
@@ -475,23 +563,25 @@ function RecentErrorsTable(props) {
       {!errs.available && <p className="muted">Unavailable — {errs.detail}</p>}
       {errs.available && errs.errors.length === 0 && <p className="muted">No failures found in this window.</p>}
       {errs.available && errs.errors.length > 0 && (
-        <table className="table">
-          <thead><tr><th>Time</th><th>Source</th><th>Workflow / Label</th><th>Stage</th><th>Error</th><th>Correlation ID</th></tr></thead>
-          <tbody>
-            {errs.errors.map(function (e, i) {
-              return (
-                <tr key={i}>
-                  <td>{new Date(e.timestamp).toLocaleString()}</td>
-                  <td>{e.source}</td>
-                  <td>{e.workflow || e.label || "—"}</td>
-                  <td>{e.stage || "—"}</td>
-                  <td style={{ maxWidth: 320, overflowWrap: "break-word" }}>{e.error || "—"}</td>
-                  <td><code style={{ fontSize: "0.75rem" }}>{e.correlation_id || "—"}</code></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="table-scroll-area">
+          <table className="table">
+            <thead><tr><th>Time</th><th>Source</th><th>Workflow / Label</th><th>Stage</th><th>Error</th><th>Correlation ID</th></tr></thead>
+            <tbody>
+              {errs.errors.map(function (e, i) {
+                return (
+                  <tr key={i}>
+                    <td>{new Date(e.timestamp).toLocaleString()}</td>
+                    <td>{e.source}</td>
+                    <td>{e.workflow || e.label || "—"}</td>
+                    <td>{e.stage || "—"}</td>
+                    <td style={{ maxWidth: 320, overflowWrap: "break-word" }}>{e.error || "—"}</td>
+                    <td><code style={{ fontSize: "0.75rem" }}>{e.correlation_id || "—"}</code></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

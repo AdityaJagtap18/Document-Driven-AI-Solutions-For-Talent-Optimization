@@ -16,28 +16,27 @@ function UserManagement(props) {
   var api = props.api;
   var currentUser = props.currentUser;
 
-  var state = React.useState({ loading: true, error: null, users: [], roles: [] });
-  var data = state[0];
-  var setData = state[1];
+  // Snapshot-cached, per the "no loading flash on revisit" requirement --
+  // every mutation handler below (create/edit/status/roles) still calls
+  // `load` (now snapshot.refresh) on success, so your own change is
+  // never hidden behind a stale cached list; only an idle REvisit with
+  // no changes skips the reload.
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("user_management", function () {
+    return Promise.all([api.listUsers(), api.listRoles()])
+      .then(function (results) { return { users: results[0].users, roles: results[1].roles }; });
+  });
+  var data = {
+    loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error,
+    users: (snapshot.state.data && snapshot.state.data.users) || [],
+    roles: (snapshot.state.data && snapshot.state.data.roles) || [],
+  };
+  var load = snapshot.refresh;
   var formState = React.useState(null); // { mode: "create"|"edit"|"roles", user } | null
   var form = formState[0];
   var setForm = formState[1];
   var actionError = React.useState(null);
   var errorMsg = actionError[0];
   var setErrorMsg = actionError[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    return Promise.all([api.listUsers(), api.listRoles()])
-      .then(function (results) {
-        setData({ loading: false, error: null, users: results[0].users, roles: results[1].roles });
-      })
-      .catch(function (err) {
-        setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); });
-      });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   function roleLabel(roleKey) {
     var role = data.roles.filter(function (r) { return r.role_key === roleKey; })[0];
@@ -61,8 +60,9 @@ function UserManagement(props) {
       </p>
 
       <div className="toolbar">
-        <button className="btn" onClick={load}>Refresh</button>
+        <button className="btn" onClick={load} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
         <button className="btn btn-primary" onClick={function () { setForm({ mode: "create" }); }}>+ New User</button>
+        <span className="muted">Snapshot from {snapshot.state.lastUpdated ? new Date(snapshot.state.lastUpdated).toLocaleString() : "just now"}</span>
       </div>
 
       {errorMsg && <div className="banner banner-error">{errorMsg}</div>}

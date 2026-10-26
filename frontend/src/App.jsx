@@ -69,28 +69,55 @@ function initials(name) {
 // granted directly to the "candidate" role in the page-access policy
 // seed instead, same mechanism as every other page, just a different
 // role doing the granting.
+// `group` controls sidebar grouping only (see the grouped render in App()
+// below) -- it has no effect on access; a page's real visibility is still
+// decided entirely by navItemsFor()/effective_pages() below. GROUP_ORDER
+// is the fixed display order of the section headers; items within a
+// group render in the order they appear here.
+var GROUP_ORDER = ["Main", "Reports", "Recruitment", "Administration", "AI & Observability", "Azure", "Configuration"];
+
 var NAV_ITEMS = [
-  { tab: "dashboard", label: "Dashboard", Icon: IconDashboard, pageId: "dashboard" },
-  { tab: "reports", label: "Admin Reports", Icon: IconReports, pageId: "admin_reports" },
-  { tab: "pipeline", label: "Pipeline", Icon: IconPipeline, pageId: "pipeline" },
-  { tab: "review", label: "Review Queue", Icon: IconQueue, pageId: "review_queue" },
-  { tab: "recruiter-reports", label: "Recruiter Reports", Icon: IconReports, pageId: "recruiter_reports" },
-  { tab: "users", label: "Users", Icon: IconUsers, pageId: "user_management" },
-  { tab: "roles", label: "Roles & Permissions", Icon: IconShield, pageId: "role_management" },
-  { tab: "persona-catalogue", label: "Persona Catalogue", Icon: IconShield, pageId: "persona_catalogue" },
-  { tab: "page-access", label: "Page Access", Icon: IconShield, pageId: "page_access_management" },
-  { tab: "ai-observability", label: "AI Observability", Icon: IconPulse, pageId: "ai_observability" },
-  { tab: "azure-observability-report", label: "Azure Observability Report", Icon: IconPulse, pageId: "azure_observability_report" },
-  { tab: "azure-services", label: "Azure Service Hub", Icon: IconCloud, pageId: "azure_services" },
-  { tab: "azure-readiness", label: "Azure Readiness", Icon: IconCloud, pageId: "azure_readiness" },
-  { tab: "secrets", label: "Secrets", Icon: IconKey, pageId: "secrets_management" },
-  { tab: "rag-config", label: "RAG Configuration", Icon: IconSearch, pageId: "rag_config" },
-  { tab: "communications-config", label: "Communications", Icon: IconMail, pageId: "communications_config" },
-  { tab: "portal", label: "Candidate Portal", Icon: IconPortal, pageId: "candidate_portal" },
+  { tab: "dashboard", label: "Dashboard", Icon: IconDashboard, pageId: "dashboard", group: "Main" },
+  { tab: "pipeline", label: "Pipeline", Icon: IconPipeline, pageId: "pipeline", group: "Main" },
+  { tab: "review", label: "Review Queue", Icon: IconQueue, pageId: "review_queue", group: "Main" },
+  { tab: "portal", label: "Candidate Portal", Icon: IconPortal, pageId: "candidate_portal", group: "Main" },
+
+  { tab: "reports", label: "Admin Reports", Icon: IconReports, pageId: "admin_reports", group: "Reports" },
+  { tab: "recruiter-reports", label: "Recruiter Reports", Icon: IconReports, pageId: "recruiter_reports", group: "Reports" },
+  { tab: "recruitment-ops", label: "Recruitment Operations", Icon: IconReports, pageId: "recruitment_ops_dashboard", group: "Reports" },
+  { tab: "patch-notes", label: "Patch Notes", Icon: IconReports, pageId: "patch_notes", group: "Reports" },
+
+  { tab: "jd-management", label: "Job Descriptions", Icon: IconQueue, pageId: "jd_management", group: "Recruitment" },
+
+  { tab: "users", label: "Users", Icon: IconUsers, pageId: "user_management", group: "Administration" },
+  { tab: "roles", label: "Roles & Permissions", Icon: IconShield, pageId: "role_management", group: "Administration" },
+  { tab: "persona-catalogue", label: "Persona Catalogue", Icon: IconShield, pageId: "persona_catalogue", group: "Administration" },
+  { tab: "page-access", label: "Page Access", Icon: IconShield, pageId: "page_access_management", group: "Administration" },
+
+  { tab: "ai-observability", label: "AI Observability", Icon: IconPulse, pageId: "ai_observability", group: "AI & Observability" },
+  { tab: "azure-observability-report", label: "Azure Observability Report", Icon: IconPulse, pageId: "azure_observability_report", group: "AI & Observability" },
+
+  { tab: "azure-services", label: "Azure Service Hub", Icon: IconCloud, pageId: "azure_services", group: "Azure" },
+  { tab: "azure-readiness", label: "Azure Readiness", Icon: IconCloud, pageId: "azure_readiness", group: "Azure" },
+
+  { tab: "secrets", label: "Secrets", Icon: IconKey, pageId: "secrets_management", group: "Configuration" },
+  { tab: "rag-config", label: "RAG Configuration", Icon: IconSearch, pageId: "rag_config", group: "Configuration" },
+  { tab: "communications-config", label: "Communications", Icon: IconMail, pageId: "communications_config", group: "Configuration" },
 ];
 
 function navItemsFor(pages) {
   return NAV_ITEMS.filter(function (item) { return pages.indexOf(item.pageId) !== -1; });
+}
+
+/** Groups an already-filtered nav-item list into [{ group, items }], in
+ * GROUP_ORDER's fixed order, skipping any group this user has zero items
+ * in (e.g. a role with no Azure page access gets no empty "Azure"
+ * header) -- same filtering logic sidebar rendering already needs,
+ * factored out so App() doesn't recompute reduce/sort details inline. */
+function groupedNavItems(items) {
+  return GROUP_ORDER
+    .map(function (group) { return { group: group, items: items.filter(function (item) { return item.group === group; }) }; })
+    .filter(function (g) { return g.items.length > 0; });
 }
 
 function App() {
@@ -188,21 +215,27 @@ function App() {
         </div>
 
         <div>
-          <div className="sidebar-section-label">Main menu</div>
-          <nav className="sidebar-nav">
-            {navItems.map(function (item) {
-              var Icon = item.Icon;
-              return (
-                <button
-                  key={item.tab}
-                  className={"sidebar-link" + (item.tab === activeTab ? " sidebar-link-active" : "")}
-                  onClick={function () { setTab(item.tab); }}
-                >
-                  <Icon /> {item.label}
-                </button>
-              );
-            })}
-          </nav>
+          {groupedNavItems(navItems).map(function (section) {
+            return (
+              <div key={section.group} className="sidebar-section">
+                <div className="sidebar-section-label">{section.group}</div>
+                <nav className="sidebar-nav">
+                  {section.items.map(function (item) {
+                    var Icon = item.Icon;
+                    return (
+                      <button
+                        key={item.tab}
+                        className={"sidebar-link" + (item.tab === activeTab ? " sidebar-link-active" : "")}
+                        onClick={function () { setTab(item.tab); }}
+                      >
+                        <Icon /> {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+            );
+          })}
         </div>
 
         <div className="sidebar-footer">
@@ -231,10 +264,13 @@ function App() {
         <main className="app-main">
           {activeTab === "dashboard" && <Dashboard api={api} />}
           {activeTab === "reports" && <AdminReports api={api} permissions={permissions} />}
-          {activeTab === "pipeline" && <Pipeline api={api} />}
-          {activeTab === "review" && <ReviewQueue api={api} />}
+          {activeTab === "pipeline" && <Pipeline api={api} permissions={permissions} currentUser={user} />}
+          {activeTab === "review" && <ReviewQueue api={api} permissions={permissions} currentUser={user} />}
           {activeTab === "recruiter-reports" && <RecruiterReports api={api} />}
+          {activeTab === "recruitment-ops" && <RecruitmentOpsDashboard api={api} />}
+          {activeTab === "jd-management" && <JDManagement api={api} permissions={permissions} />}
           {activeTab === "portal" && <CandidatePortal api={api} />}
+          {activeTab === "patch-notes" && <PatchNotes />}
           {activeTab === "users" && <UserManagement api={api} currentUser={user} />}
           {activeTab === "roles" && <RoleManagement api={api} />}
           {activeTab === "persona-catalogue" && <PersonaCatalogue api={api} />}

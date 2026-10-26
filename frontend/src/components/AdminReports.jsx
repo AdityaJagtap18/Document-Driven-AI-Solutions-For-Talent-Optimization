@@ -123,31 +123,26 @@ function AdminReports(props) {
   var permissions = props.permissions || [];
   var canViewResumeProcessing = permissions.indexOf("observability.read") !== -1;
   var canViewCommsDelivery = permissions.indexOf("comms.delivery.read") !== -1;
-  var state = React.useState({ loading: true, error: null, candidates: [], observability: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("admin_reports", function () {
+    return Promise.all([api.listCandidates(), api.observabilitySummary()])
+      .then(function (results) { return { candidates: results[0].candidates, observability: results[1] }; });
+  });
+  var data = snapshot.state;
 
-  React.useEffect(function () {
-    Promise.all([api.listCandidates(), api.observabilitySummary()])
-      .then(function (results) {
-        setData({ loading: false, error: null, candidates: results[0].candidates, observability: results[1] });
-      })
-      .catch(function (err) {
-        setData({ loading: false, error: err.message, candidates: [], observability: null });
-      });
-  }, []);
+  if (data.loading && !data.data) return <div className="view"><h2>Reports</h2><p className="muted">Loading…</p></div>;
+  if (data.error && !data.data) return <div className="view"><h2>Reports</h2><div className="banner banner-error">{data.error}</div></div>;
 
-  if (data.loading) return <div className="view"><h2>Reports</h2><p className="muted">Loading…</p></div>;
-  if (data.error) return <div className="view"><h2>Reports</h2><div className="banner banner-error">{data.error}</div></div>;
-
-  var candidates = data.candidates;
+  var candidates = data.data.candidates;
 
   // 1. Tier distribution (half-donut gauge + legend)
   var tierCounts = countBy(candidates, function (c) { return c.ranking_tier; });
+  // Labels shown to the user are the softer, AI-suggestion framing
+  // (tierDisplayLabel, see uiLabels.js) -- grouping itself still keys on
+  // the real ranking_tier value above.
   var tierSegments = [
-    { label: "Recommended for Fast-Track", value: tierCounts["Recommended for Fast-Track"] || 0, color: CHART_COLORS.good },
-    { label: "To be Considered", value: tierCounts["To be Considered"] || 0, color: CHART_COLORS.neutral },
-    { label: "Rejected", value: tierCounts["Rejected"] || 0, color: CHART_COLORS.bad },
+    { label: tierDisplayLabel("Recommended for Fast-Track"), value: tierCounts["Recommended for Fast-Track"] || 0, color: CHART_COLORS.good },
+    { label: tierDisplayLabel("To be Considered"), value: tierCounts["To be Considered"] || 0, color: CHART_COLORS.neutral },
+    { label: tierDisplayLabel("Rejected"), value: tierCounts["Rejected"] || 0, color: CHART_COLORS.bad },
   ];
 
   // 2. Candidate Type distribution (Doughnut)
@@ -233,14 +228,14 @@ function AdminReports(props) {
     data: {
       labels: dimensions,
       datasets: [
-        { label: "Recommended for Fast-Track", data: avgByTier("Recommended for Fast-Track"), borderColor: CHART_COLORS.good, backgroundColor: "rgba(31,111,92,0.2)" },
-        { label: "Rejected", data: avgByTier("Rejected"), borderColor: CHART_COLORS.bad, backgroundColor: "rgba(164,64,47,0.2)" },
+        { label: tierDisplayLabel("Recommended for Fast-Track"), data: avgByTier("Recommended for Fast-Track"), borderColor: CHART_COLORS.good, backgroundColor: "rgba(31,111,92,0.2)" },
+        { label: tierDisplayLabel("Rejected"), data: avgByTier("Rejected"), borderColor: CHART_COLORS.bad, backgroundColor: "rgba(164,64,47,0.2)" },
       ],
     },
   };
 
   // 8. LLM tokens by call label (Bar)
-  var byLabel = (data.observability && data.observability.by_label) || {};
+  var byLabel = (data.data.observability && data.data.observability.by_label) || {};
   var labelEntries = Object.entries(byLabel);
   var tokensConfig = {
     type: "bar",
@@ -254,10 +249,15 @@ function AdminReports(props) {
   return (
     <div className="view">
       <h2>Reports</h2>
-      <p className="muted">
-        {candidates.length} candidate(s). Built from the same data as the Dashboard — nothing here is
-        separately maintained or hand-curated.
-      </p>
+      <div className="toolbar">
+        <p className="muted">
+          {candidates.length} candidate(s). Built from the same data as the Dashboard — nothing here is
+          separately maintained or hand-curated. Showing the snapshot from{" "}
+          {data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : "just now"} — click Refresh for current data.
+        </p>
+        <button className="btn" onClick={snapshot.refresh} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
+      {data.error && <div className="banner-error-inline">Refresh failed: {data.error} (showing the last snapshot)</div>}
       <div className="chart-grid">
         <ChartCard title="Normalized Weighted Score by Rank" wide><ChartCanvas config={rankLineConfig} /></ChartCard>
         <GaugeCard title="Tier Distribution" total={candidates.length} segments={tierSegments} />
@@ -281,22 +281,20 @@ function AdminReports(props) {
  * observability.read (ai_operations_mlops, admin). */
 function ResumeProcessingReportCard(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("resume_processing_report", function () {
+    return api.resumeProcessingReport();
+  });
+  var data = snapshot.state;
 
-  React.useEffect(function () {
-    api.resumeProcessingReport()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
-  }, []);
-
-  if (data.loading) return null;
-  if (data.error) return <div className="banner-error-inline">Resume Processing Report: {data.error}</div>;
+  if (data.loading && !data.data) return null;
+  if (data.error && !data.data) return <div className="banner-error-inline">Resume Processing Report: {data.error}</div>;
 
   return (
     <React.Fragment>
-      <h3 className="subsection-heading">Resume Processing Report</h3>
+      <div className="toolbar">
+        <h3 className="subsection-heading">Resume Processing Report</h3>
+        <button className="btn" onClick={snapshot.refresh} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
       <p className="muted">Source: {data.data.data_source}</p>
       <div className="integration-card-secrets">
         <span className="badge badge-neutral">{data.data.total_processing_attempts} attempts</span>
@@ -328,24 +326,22 @@ function ResumeProcessingReportCard(props) {
  * comms.delivery.read (recruitment_ops_manager-equivalent, admin). */
 function CommunicationDeliveryReportCard(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("communication_delivery_report", function () {
+    return api.communicationDeliveryReport();
+  });
+  var data = snapshot.state;
 
-  React.useEffect(function () {
-    api.communicationDeliveryReport()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
-  }, []);
-
-  if (data.loading) return null;
-  if (data.error) return <div className="banner-error-inline">Communication Delivery Report: {data.error}</div>;
+  if (data.loading && !data.data) return null;
+  if (data.error && !data.data) return <div className="banner-error-inline">Communication Delivery Report: {data.error}</div>;
 
   var channels = Object.keys(data.data.by_channel);
 
   return (
     <React.Fragment>
-      <h3 className="subsection-heading">Communication Delivery Report</h3>
+      <div className="toolbar">
+        <h3 className="subsection-heading">Communication Delivery Report</h3>
+        <button className="btn" onClick={snapshot.refresh} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
       <p className="muted">{data.data.note}</p>
       {!channels.length && <p className="muted">No delivery records yet.</p>}
       {!!channels.length && (

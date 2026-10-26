@@ -196,6 +196,54 @@ def call_with_retry(fn, *args, max_attempts=3, base_delay=1.0, on_retry=None,
     raise last_exception
 
 
+def cached_call_with_retry(fn, prompt_text, *, label, model, temperature=0, max_tokens=None,
+                            prompt_version=None, **kwargs):
+    """F-18 (LLM caching, minimal slice): a content-addressed cache
+    wrapped around call_with_retry(), for the narrow set of call sites
+    llm_cache.CACHEABLE_LABELS actually covers -- see that module's
+    docstring for exactly why only those two are safe to cache here.
+
+    Assumes this repo's established call shape for those two sites:
+    `fn` is called as `fn(prompt_text)` (e.g. `llm.predict`), and
+    returns a plain string. Not a generic replacement for
+    call_with_retry() -- other call sites keep calling that directly.
+
+    On a cache hit, the real model is never called: returns the cached
+    string immediately and records a zero-cost observability entry
+    (cache_hit=True) so the AI Observability Center and tokenomics still
+    see that this request happened, just not as a billed call. On a
+    miss, delegates to call_with_retry() exactly as before, then stores
+    the real result for next time."""
+    import llm_cache
+    from observability import record_llm_call
+
+    if not llm_cache.is_cacheable_label(label):
+        return call_with_retry(fn, prompt_text, label=label, model=model, prompt_version=prompt_version, **kwargs)
+
+    key = llm_cache.compute_cache_key(label, model, prompt_text, temperature, max_tokens, prompt_version)
+    cached_content = llm_cache.get(key)
+    if cached_content is not None:
+        try:
+            record_llm_call(
+                label=label, model=model, latency_ms=0.0,
+                prompt_tokens=0, completion_tokens=0, total_tokens=0, cost_usd=0.0,
+                success=True, retries=0, prompt_version=prompt_version,
+                workflow=kwargs.get("workflow", "llm"), cache_hit=True,
+                trace_id=kwargs.get("trace_id"), parent_span_id=kwargs.get("parent_span_id"),
+                correlation_id=kwargs.get("correlation_id"),
+            )
+        except Exception as e:
+            print(f"[WARN] Observability recording for a cache hit failed (the cached result is still returned): {e}")
+        return cached_content
+
+    result = call_with_retry(fn, prompt_text, label=label, model=model, prompt_version=prompt_version, **kwargs)
+    try:
+        llm_cache.set(key, result, label)
+    except Exception as e:
+        print(f"[WARN] Caching the real LLM response failed (the real result is still returned): {e}")
+    return result
+
+
 def _call_with_observability(fn, args, kwargs, label, model, start, attempt,
                               trace_id, parent_span_id, correlation_id, prompt_version, workflow):
     from langchain_community.callbacks import get_openai_callback

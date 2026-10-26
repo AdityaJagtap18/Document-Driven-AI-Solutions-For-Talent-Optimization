@@ -35,9 +35,9 @@ function sortValue(candidate, key) {
 
 function Dashboard(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, candidates: [], observability: null, filter: "" });
-  var data = state[0];
-  var setData = state[1];
+  var filterState = React.useState("");
+  var filter = filterState[0];
+  var setFilter = filterState[1];
   var expandedState = React.useState(null);
   var expandedId = expandedState[0];
   var setExpandedId = expandedState[1];
@@ -48,28 +48,26 @@ function Dashboard(props) {
   var sort = sortState[0];
   var setSort = sortState[1];
 
-  React.useEffect(function () {
-    var cancelled = false;
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
+  // Snapshot-cached, per the "reports show their last snapshot, never
+  // reload on revisit" requirement -- keyed by filter, so switching the
+  // tier filter shows that filter's own cached snapshot instantly once
+  // it's been loaded once, rather than always re-fetching.
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("dashboard_candidates:" + (filter || "all"), function () {
+    return api.listCandidates(filter || undefined);
+  });
+  var observabilitySnapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("dashboard_observability", function () {
+    return api.observabilitySummary();
+  });
+  var meta = snapshot.state;
+  var data = {
+    loading: meta.loading && !meta.data, error: meta.error,
+    candidates: (meta.data && meta.data.candidates) || [],
+    observability: observabilitySnapshot.state.data,
+  };
 
-    Promise.all([
-      api.listCandidates(data.filter || undefined),
-      api.observabilitySummary(),
-    ])
-      .then(function (results) {
-        if (cancelled) return;
-        setData({ loading: false, error: null, candidates: results[0].candidates, observability: results[1], filter: data.filter });
-      })
-      .catch(function (err) {
-        if (cancelled) return;
-        setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); });
-      });
-
-    return function () { cancelled = true; };
-  }, [data.filter]);
-
-  function setFilter(value) {
-    setData(function (d) { return Object.assign({}, d, { filter: value }); });
+  function refreshAll() {
+    snapshot.refresh();
+    observabilitySnapshot.refresh();
   }
 
   var tierCounts = { "Recommended for Fast-Track": 0, "To be Considered": 0, "Rejected": 0 };
@@ -101,6 +99,13 @@ function Dashboard(props) {
   return (
     <div className="view">
       <h2>Recruiter Dashboard</h2>
+      <div className="toolbar">
+        <p className="muted">
+          Showing the snapshot from {meta.lastUpdated ? new Date(meta.lastUpdated).toLocaleString() : "just now"} —
+          click Refresh for current data.
+        </p>
+        <button className="btn" onClick={refreshAll} disabled={data.loading}>{data.loading ? "Refreshing…" : "Refresh"}</button>
+      </div>
 
       {data.error && <div className="banner banner-error">Couldn't load data: {data.error}</div>}
 
@@ -120,11 +125,11 @@ function Dashboard(props) {
 
       <div className="toolbar">
         <label htmlFor="tier-filter">Filter by tier</label>
-        <select id="tier-filter" value={data.filter} onChange={function (e) { setFilter(e.target.value); }}>
+        <select id="tier-filter" value={filter} onChange={function (e) { setFilter(e.target.value); }}>
           <option value="">All</option>
-          <option value="Recommended for Fast-Track">Recommended for Fast-Track</option>
-          <option value="To be Considered">To be Considered</option>
-          <option value="Rejected">Rejected</option>
+          <option value="Recommended for Fast-Track">{tierDisplayLabel("Recommended for Fast-Track")}</option>
+          <option value="To be Considered">{tierDisplayLabel("To be Considered")}</option>
+          <option value="Rejected">{tierDisplayLabel("Rejected")}</option>
         </select>
         <input
           type="search"
@@ -331,5 +336,7 @@ function StatTile(props) {
 function TierBadge(props) {
   var toneClass = props.tier === "Recommended for Fast-Track" ? "badge-good"
     : props.tier === "Rejected" ? "badge-bad" : "badge-neutral";
-  return <span className={"badge " + toneClass}>{props.tier}</span>;
+  // Reads as an AI suggestion a recruiter can accept or override, not a
+  // decision already made -- see uiLabels.js's own doc comment.
+  return <span className={"badge " + toneClass}>{tierDisplayLabel(props.tier)}</span>;
 }

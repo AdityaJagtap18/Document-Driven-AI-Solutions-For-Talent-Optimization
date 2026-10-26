@@ -68,6 +68,7 @@ body {
 }
 .sidebar-brand-name { font-weight: 700; font-size: 1.05rem; color: var(--primary); }
 
+.sidebar-section { margin-bottom: 18px; }
 .sidebar-section-label {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--fg-muted); padding: 0 10px; margin-bottom: 8px;
@@ -175,6 +176,7 @@ body {
 .stat-tile-value { font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat-tile-good .stat-tile-value { color: var(--good); }
 .stat-tile-bad .stat-tile-value { color: var(--bad); }
+.stat-tile-warn .stat-tile-value { color: var(--accent-orange); }
 
 .toolbar { display: flex; align-items: center; gap: 10px; margin: 20px 0 12px; }
 .toolbar label { font-size: 0.85rem; color: var(--fg-muted); }
@@ -188,7 +190,18 @@ body {
 /* ---------------------------------------------------------------------
    Candidate table
 --------------------------------------------------------------------- */
-.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); overflow: hidden; }
+/* Every .table-card in the app (every report/list/history table, on
+   every page) gets a fixed-height scroll window instead of pushing the
+   rest of the page down indefinitely once its row count grows -- the
+   header row stays pinned via position:sticky so it's still readable
+   while scrolled. A table-card with few rows is simply shorter than
+   the max-height and never shows a scrollbar, so this is a no-op for
+   small tables. One global rule, not a per-page opt-in. */
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); max-height: 420px; overflow-y: auto; overflow-x: hidden; }
+.table-card thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-soft); }
+.table-scroll-area { max-height: 420px; overflow-y: auto; }
+.table-scroll-area table { width: 100%; }
+.table-scroll-area thead th { position: sticky; top: 0; background: var(--surface-soft); z-index: 1; }
 .candidate-table { width: 100%; border-collapse: collapse; }
 .candidate-table th, .candidate-table td { text-align: left; padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
 .candidate-table th { background: var(--surface-soft); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); font-weight: 700; }
@@ -224,6 +237,16 @@ body {
 .badge-good { background: #e7f7f0; color: var(--good); }
 .badge-bad { background: #fdeceb; color: var(--bad); }
 .badge-neutral { background: #fdf1e5; color: var(--neutral); }
+
+/* ---------------------------------------------------------------------
+   Patch Notes
+---------------------------------------------------------------------- */
+.patch-note-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; margin-bottom: 24px; }
+.patch-note-row { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.patch-note-row-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.patch-note-id { font-family: monospace; font-size: 0.78rem; color: var(--fg-muted); min-width: 70px; }
+.patch-note-title { font-weight: 600; flex: 1; }
+.patch-note-text { margin: 6px 0 0; font-size: 0.85rem; }
 
 /* ---------------------------------------------------------------------
    Review queue
@@ -467,6 +490,21 @@ body {
   font-size: 0.9rem; font-family: inherit; resize: vertical; width: 100%; box-sizing: border-box;
 }
 .stage-advance-blocked { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+.interview-questions-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.interview-questions-section h4 { margin: 0; font-size: 0.9rem; }
+.interview-questions-section p.muted { margin: 0; font-size: 0.8rem; }
+.interview-questions-list { margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; }
+
+.candidate-chat-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.candidate-chat-section h4 { margin: 0; font-size: 0.9rem; }
+.candidate-chat-section p.muted { margin: 0; font-size: 0.8rem; }
+.candidate-chat-history { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.candidate-chat-message { padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.88rem; max-width: 85%; }
+.candidate-chat-question { align-self: flex-end; background: var(--primary-soft); color: var(--primary); }
+.candidate-chat-answer { align-self: flex-start; background: var(--surface-soft); border: 1px solid var(--border); }
+.candidate-chat-form { display: flex; gap: 8px; }
+.candidate-chat-form input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.88rem; }
 
 .stage-config-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .stage-config-row { display: flex; gap: 6px; align-items: center; }

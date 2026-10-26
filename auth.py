@@ -123,16 +123,25 @@ PERMISSIONS = {
 
     "resumes.upload": {"label": "Submit applications", "description": "Submit a resume/application (the public application form is unauthenticated; this permission exists for catalog completeness).", "module": "Resume Upload and Parsing"},
 
-    "jds.read": {"label": "View job descriptions", "description": "View the active job descriptions used for resume matching.", "module": "Resume-JD Matching"},
+    "jds.read": {"label": "View job descriptions", "description": "View the active job descriptions used for resume matching. Also gates the staff Job Descriptions management page -- see jds.read.public for the narrower, candidate-safe alternative.", "module": "Resume-JD Matching"},
+    "jds.read.public": {"label": "View open job titles (public)", "description": "List active job titles for the candidate-facing Application Form's 'Applying for' dropdown ONLY (list_jds_endpoint accepts this OR jds.read) -- deliberately separate from jds.read so granting it to the candidate role can never also open the staff Job Descriptions management page (that page's access gate is literally required_permission: jds.read).", "module": "Resume-JD Matching"},
+    "jds.create": {"label": "Create and edit job descriptions", "description": "Create a new JD (manual entry, document upload, or AI-assisted generation), edit a draft, and submit it for approval. Does not include approving or publishing.", "module": "Job Description Management"},
+    "jds.approve": {"label": "Approve and publish job descriptions", "description": "Approve or reject a submitted JD, publish an approved JD (making it live for candidate matching), and archive a JD. The only place a JD actually becomes visible to candidates or starts being scored against -- mirrors screening.approve's propose/approve split for bulk candidate decisions.", "module": "Job Description Management"},
 
     "interviews.read": {"label": "View hiring-stage timelines", "description": "View a candidate's hiring-stage/interview timeline.", "module": "Interview Management"},
     "interviews.manage": {"label": "Manage hiring stages", "description": "Record stage progress and configure the pipeline stage list.", "module": "Interview Management"},
+    "interviews.assign": {"label": "Assign interviewers", "description": "Set which interviewer usernames are assigned to a candidate -- the record-level access scope enforced against the 'interviewer' role (see candidate.schema.json's assigned_interviewer_usernames field). Deliberately NOT granted to the interviewer role itself, so an interviewer can't assign themself to -- or another interviewer away from -- a candidate.", "module": "Interview Management"},
 
     "documents.verify": {"label": "Verify documents", "description": "Run certificate/marksheet verification against Document Intelligence.", "module": "Document Verification"},
 
     "analytics.read": {"label": "View analytics", "description": "View executive-summary and observability reports.", "module": "Analytics and Reports"},
 
     "audit.read": {"label": "View audit log", "description": "View the immutable audit log of recorded actions.", "module": "Audit Logs"},
+    "candidates.erase": {"label": "Erase candidate data", "description": "Run the real, irreversible candidate data erasure workflow (F-14) across the Cosmos-scoped data stores it covers. A genuinely new capability (not covered by candidates.update or audit.read, which are not deletion authorities) -- deliberately restricted to admin only by default, never granted to recruiter/interviewer/hiring-manager-tier roles, given the irreversible, compliance-sensitive nature of real data deletion.", "module": "Audit Logs"},
+    "tokenomics.config.write": {"label": "Configure token-usage budgets", "description": "Set/activate the real monthly token-usage budget and warning threshold (F-02). Viewing cost/usage data already uses the existing analytics.read permission (same AI Observability Center data); this is specifically the write/activate authority for the budget configuration, which no existing permission covers.", "module": "AI Observability"},
+    "feedback.read": {"label": "View candidate feedback", "description": "View post-hiring-decision candidate experience feedback submissions and aggregate scores (F-03). Deliberately a separate permission from candidates.read/analytics.read -- candidate experience feedback is kept apart from hiring evaluation data by design, so viewing it is a distinct authority, not implied by viewing candidates or analytics.", "module": "Candidate Feedback"},
+    "llm_cache.manage": {"label": "Manage the LLM response cache", "description": "Clear the local resume-processing LLM response cache (F-18). Viewing cache hit/miss statistics already uses the existing analytics.read permission; this is specifically the destructive clear-cache authority.", "module": "AI Observability"},
+    "model_routing.manage": {"label": "Configure model routing", "description": "Set which model each of the 6 previously-hardcoded LLM call sites uses (F-17) -- chat QA, interview questions, interview-answer scoring, RAG/AI evaluation judges, and JD generation. Viewing the current routing already uses analytics.read.", "module": "AI Observability"},
 
     "screening.propose": {"label": "Propose bulk decisions", "description": "Propose a bulk accept/reject on a batch of screening-phase candidates.", "module": "Candidate Management"},
     "screening.approve": {"label": "Approve bulk decisions", "description": "Approve or reject a recruiter's bulk-decision proposal -- the only place it actually takes effect.", "module": "Candidate Management"},
@@ -194,8 +203,8 @@ DEFAULT_ROLES = [
         "is_system": True,
         "permission_ids": [
             "candidates.read", "candidates.update",
-            "resumes.upload", "jds.read",
-            "interviews.read", "interviews.manage",
+            "resumes.upload", "jds.read", "jds.create",
+            "interviews.read", "interviews.manage", "interviews.assign",
             "documents.verify", "analytics.read",
             "screening.propose",
             # Added for the Recruiter persona's (P02) required Resume
@@ -203,12 +212,16 @@ DEFAULT_ROLES = [
             # Personas doc, section 8.4) -- both reports already existed
             # before this grant, gated by these two permissions.
             "observability.read", "comms.delivery.read",
+            # F-03: recruiters are an explicit intended audience for the
+            # candidate feedback dashboard (spec: "recruiters and
+            # authorized administrators"), not admin-only.
+            "feedback.read",
         ],
     },
     {
         "role_key": "interviewer",
         "display_name": "Interviewer",
-        "description": "Views candidates and interview timelines, records stage feedback. (Scoping to only an interviewer's own assigned candidates isn't modeled in this repo's data yet -- see README's known limitations.)",
+        "description": "Views candidates and interview timelines, records stage feedback -- scoped to only this interviewer's assigned candidates (candidate.schema.json's assigned_interviewer_usernames, enforced in api_blueprint.py's _is_scoped_interviewer/_interviewer_may_access). A user who also holds a broader role (recruiter/admin/recruitment_ops_manager/hiring_manager) is NOT scoped -- this narrows only an account that is purely an interviewer.",
         "is_system": True,
         "permission_ids": [
             "candidates.read", "interviews.read", "interviews.manage",
@@ -217,9 +230,9 @@ DEFAULT_ROLES = [
     {
         "role_key": "candidate",
         "display_name": "Candidate",
-        "description": "No administrative or recruiter permissions. Candidates use the existing anonymous email-based status check (candidates/by-email/{email}), not this permission system, to see their own application.",
+        "description": "No administrative or recruiter permissions. Candidates use the existing anonymous email-based status check (candidates/by-email/{email}), not this permission system, to see their own application. Holds jds.read.public ONLY (never the broader jds.read) so the real Application Form's 'Applying for' dropdown (CandidatePortal.jsx's ApplicationForm) can list real open roles without also opening the staff Job Descriptions management page -- list_jds_endpoint returns nothing sensitive (title/filename/id of active JDs only), and a self-service apply form that can't show which jobs are open isn't meaningfully usable.",
         "is_system": True,
-        "permission_ids": [],
+        "permission_ids": ["jds.read.public"],
     },
     # -----------------------------------------------------------------
     # Persona-to-role mapping (CDPI Product Personas and Reporting
@@ -236,16 +249,16 @@ DEFAULT_ROLES = [
     {
         "role_key": "hiring_manager",
         "display_name": "Hiring Manager",
-        "description": "Reviews shortlists and candidate evidence for assigned vacancies, submits hiring feedback/decisions. Read-focused -- cannot change recruitment workflow, scoring, or screening decisions.",
+        "description": "Reviews shortlists and candidate evidence for assigned vacancies, submits hiring feedback/decisions. Read-focused -- cannot change recruitment workflow, scoring, or screening decisions. Can view job descriptions (including drafts) for context, but not create, approve, or publish them.",
         "is_system": True,
-        "permission_ids": ["candidates.read", "interviews.read", "analytics.read"],
+        "permission_ids": ["candidates.read", "interviews.read", "analytics.read", "jds.read"],
     },
     {
         "role_key": "recruitment_ops_manager",
         "display_name": "Recruitment Operations Manager",
         "description": "Monitors pipeline throughput, recruiter workload, and interview/communication operations across the recruitment team. Broader read access than a Recruiter, plus interview-stage management, but not scoring/AI/Azure configuration.",
         "is_system": True,
-        "permission_ids": ["candidates.read", "jds.read", "interviews.read", "interviews.manage", "analytics.read", "audit.read", "comms.delivery.read", "observability.read"],
+        "permission_ids": ["candidates.read", "jds.read", "interviews.read", "interviews.manage", "interviews.assign", "analytics.read", "audit.read", "comms.delivery.read", "observability.read"],
     },
     {
         "role_key": "hr_director",
@@ -257,9 +270,9 @@ DEFAULT_ROLES = [
     {
         "role_key": "recruitment_administrator",
         "display_name": "Recruitment Administrator",
-        "description": "Maintains recruitment-specific operational settings (message templates, interview-stage configuration) -- not platform-wide user/role administration, AI configuration, or Azure infrastructure.",
+        "description": "Maintains recruitment-specific operational settings (message templates, interview-stage configuration, job description approval/publishing) -- not platform-wide user/role administration, AI configuration, or Azure infrastructure.",
         "is_system": True,
-        "permission_ids": ["interviews.manage", "comms.config.read", "comms.templates.manage"],
+        "permission_ids": ["interviews.manage", "comms.config.read", "comms.templates.manage", "jds.read", "jds.create", "jds.approve"],
     },
     {
         "role_key": "ai_configuration_administrator",
@@ -378,6 +391,14 @@ PAGES = [
         "description": "Recruiter-facing reports: stage funnel, performance ratings, this recruiter's bulk-proposal status.",
     },
     {
+        "page_id": "jd_management", "name": "Job Descriptions", "route": "jd-management",
+        "module": "Job Description Management", "route_type": "page", "is_protected": True,
+        "required_permission": "jds.read",
+        "description": "Create, upload, AI-generate, edit, submit, approve, publish, and archive job descriptions "
+                        "(jd_management.py) -- publishing is the only action that makes a JD live for candidate "
+                        "matching (synced into jd_folder/, which jd_manager.py's existing scoring pipeline reads).",
+    },
+    {
         "page_id": "user_management", "name": "Users", "route": "users",
         "module": "User Management", "route_type": "page", "is_protected": True,
         "required_permission": "users.read",
@@ -458,12 +479,36 @@ PAGES = [
                         "never a separate authorization table. See persona_catalogue.py.",
     },
     {
+        "page_id": "recruitment_ops_dashboard", "name": "Recruitment Operations", "route": "recruitment-ops",
+        "module": "Analytics and Reports", "route_type": "page", "is_protected": True,
+        "required_permission": "analytics.read",
+        "description": "Recruitment Operations Manager's team-wide pipeline-throughput and workload view "
+                        "(see frontend/src/components/RecruitmentOpsDashboard.jsx) -- reuses analytics.read "
+                        "(the closest existing 'view reporting' permission) rather than inventing a new "
+                        "permission for this reporting page. Per sync_pages()'s secure-defaults rule, this "
+                        "page starts with NO granted access until an admin runs Sync on the Page Access "
+                        "Management console and explicitly grants it (recruitment_ops_manager, admin).",
+    },
+    {
         "page_id": "candidate_portal", "name": "Candidate Portal", "route": "portal",
         "module": "Resume Upload and Parsing", "route_type": "page", "is_protected": True,
         "required_permission": None,
         "description": "Candidate self-service: submit an application, check status by email. "
                         "Gated by the 'candidate' role directly, not an operation permission -- "
                         "see the Candidate role's docstring in DEFAULT_ROLES above.",
+    },
+    {
+        "page_id": "patch_notes", "name": "Patch Notes", "route": "patch-notes",
+        "module": "Analytics and Reports", "route_type": "page", "is_protected": True,
+        "required_permission": "analytics.read",
+        "description": "Hand-maintained, honest record of what's actually been built in CDPI and "
+                        "what hasn't yet -- kept in sync with docs/fde/IMPLEMENTATION_STATUS.md and "
+                        "docs/fde/IMPLEMENTATION_BACKLOG.md. Reuses analytics.read (the closest "
+                        "existing 'view reporting' permission already held by most staff roles) "
+                        "rather than inventing a new permission for a purely informational page. "
+                        "Per sync_pages()'s own secure-defaults rule, this page starts with NO "
+                        "granted access until an admin runs Sync on the Page Access Management "
+                        "console and explicitly grants it to the roles that should see it.",
     },
 ]
 PAGE_IDS = [p["page_id"] for p in PAGES]

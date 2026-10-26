@@ -66,6 +66,16 @@ var MOCK_INTERVIEWS = {
 };
 
 var MOCK_AUDIT_LOG = [];
+var MOCK_JDS = [];
+var MOCK_JD_AUDIT_LOG = [];
+function _mockFindJd(jdId) {
+  var jd = MOCK_JDS.filter(function (j) { return j.jd_id === jdId; })[0];
+  if (!jd) { var err = new Error("JD '" + jdId + "' not found."); err.status = 404; throw err; }
+  return jd;
+}
+function _mockJdAudit(jdId, action, actor) {
+  MOCK_JD_AUDIT_LOG.push({ id: "mock-jd-audit-" + MOCK_JD_AUDIT_LOG.length, jd_id: jdId, action: action, actor: actor, logged_at: new Date().toISOString() });
+}
 var MOCK_BULK_DECISIONS = [];
 
 // ---------------------------------------------------------------------------
@@ -125,6 +135,10 @@ var MOCK_PERMISSIONS = {
   "comms.test.send": { label: "Send test communications", description: "Run a connection test or send a labeled test message to an explicitly chosen recipient.", module: "Communications Configuration" },
   "comms.templates.manage": { label: "Manage message templates", description: "Create draft template versions and activate/roll back which version is live.", module: "Communications Configuration" },
   "comms.delivery.read": { label: "View delivery log", description: "View real delivery/submission records for sent communications.", module: "Communications Configuration" },
+  "tokenomics.config.write": { label: "Configure token-usage budgets", description: "Set/activate the real monthly token-usage budget and warning threshold (F-02). Viewing cost/usage data already uses analytics.read.", module: "AI Observability" },
+  "feedback.read": { label: "View candidate feedback", description: "View post-hiring-decision candidate experience feedback submissions and aggregate scores (F-03), kept separate from hiring evaluation data.", module: "Candidate Feedback" },
+  "llm_cache.manage": { label: "Manage the LLM response cache", description: "Clear the local resume-processing LLM response cache (F-18). Viewing stats already uses analytics.read.", module: "AI Observability" },
+  "model_routing.manage": { label: "Configure model routing", description: "Set which model each of 6 previously-hardcoded LLM call sites uses (F-17). Viewing already uses analytics.read.", module: "AI Observability" },
 };
 var MOCK_PERMISSION_IDS = Object.keys(MOCK_PERMISSIONS);
 
@@ -135,7 +149,7 @@ var MOCK_ROLES = [
   { id: "recruiter", role_key: "recruiter", display_name: "Recruiter", is_system: true,
     description: "Screens candidates, manages interview stages, proposes (but cannot approve) bulk decisions.",
     permission_ids: ["candidates.read", "candidates.update", "resumes.upload", "jds.read",
-      "interviews.read", "interviews.manage", "documents.verify", "analytics.read", "screening.propose"] },
+      "interviews.read", "interviews.manage", "documents.verify", "analytics.read", "screening.propose", "feedback.read"] },
   { id: "interviewer", role_key: "interviewer", display_name: "Interviewer", is_system: true,
     description: "Views candidates and interview timelines, records stage feedback.",
     permission_ids: ["candidates.read", "interviews.read", "interviews.manage"] },
@@ -270,6 +284,9 @@ var MOCK_PAGES_CATALOG = [
   { page_id: "candidate_portal", name: "Candidate Portal", route: "portal", module: "Resume Upload and Parsing",
     route_type: "page", is_protected: true, required_permission: null,
     description: "Candidate self-service: submit an application, check status. Gated by the 'candidate' role directly." },
+  { page_id: "patch_notes", name: "Patch Notes", route: "patch-notes", module: "Analytics and Reports",
+    route_type: "page", is_protected: true, required_permission: "analytics.read",
+    description: "Hand-maintained, honest record of what's actually been built in CDPI and what hasn't yet." },
 ];
 var MOCK_PAGE_IDS = MOCK_PAGES_CATALOG.map(function (p) { return p.page_id; });
 
@@ -471,6 +488,46 @@ var MOCK_RAG_CONFIG_HISTORY = [];
 function _mockRecordRagConfigChange(operation, actor, safeSummary) {
   MOCK_RAG_CONFIG_HISTORY.push({
     id: "rch-" + Math.random().toString(36).slice(2, 10), operation: operation, actor: actor,
+    safe_summary: safeSummary || {}, recorded_at: new Date().toISOString(),
+  });
+}
+
+// F-17 (model routing, minimal slice): mirrors model_routing.py's real
+// ROUTABLE_LABELS/DEFAULT_MODELS exactly (not a second invented list).
+var MOCK_ROUTABLE_LABELS = [
+  "chat_candidate_qa", "interview_questions_generation", "interview_bot_answer_scoring",
+  "rag_groundedness_judge", "ai_match_quality_judge", "jd_generation", "jd_document_extraction",
+];
+var MOCK_DEFAULT_MODELS = {};
+MOCK_ROUTABLE_LABELS.forEach(function (l) { MOCK_DEFAULT_MODELS[l] = "gpt-3.5-turbo"; });
+var MOCK_MODEL_ROUTING_CONFIG = { id: "active", routes: {}, updated_by: null, updated_at: null };
+var MOCK_MODEL_ROUTING_HISTORY = [];
+
+// F-02 (Tokenomics calculator, minimal slice): real Draft -> Activate ->
+// History lifecycle for a budget/warning-threshold config, same pattern
+// as MOCK_RAG_ACTIVE_CONFIG above. No budget set by default (never
+// fabricates an "ok" status with nothing configured).
+var MOCK_TOKENOMICS_DEFAULT_CONFIG = { monthly_budget_usd: null, warning_threshold_pct: 80 };
+var MOCK_TOKENOMICS_ACTIVE_CONFIG = null;
+var MOCK_TOKENOMICS_DRAFT_CONFIG = null;
+var MOCK_TOKENOMICS_CONFIG_HISTORY = [];
+
+function _mockValidateTokenomicsConfig(config) {
+  var errors = [];
+  var budget = config && config.monthly_budget_usd;
+  if (budget !== null && budget !== undefined && (typeof budget !== "number" || budget <= 0)) {
+    errors.push("monthly_budget_usd must be null (disabled) or a positive number.");
+  }
+  var threshold = config && config.warning_threshold_pct;
+  if (typeof threshold !== "number" || !Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
+    errors.push("warning_threshold_pct must be an integer 1-100.");
+  }
+  return errors;
+}
+
+function _mockRecordTokenomicsConfigChange(operation, actor, safeSummary) {
+  MOCK_TOKENOMICS_CONFIG_HISTORY.push({
+    id: "tch-" + Math.random().toString(36).slice(2, 10), operation: operation, actor: actor,
     safe_summary: safeSummary || {}, recorded_at: new Date().toISOString(),
   });
 }
@@ -893,6 +950,20 @@ window.CDPI_MOCK_API = {
     return mockDelay({ candidate_id: candidateId, count: interviews.length, interviews: interviews });
   },
 
+  assignInterviewer: function (candidateId, usernames) {
+    try { _mockRequirePermission("interviews.assign"); } catch (e) { return Promise.reject(e); }
+    return loadCandidates().then(function (all) {
+      var found = all.filter(function (c) { return c.candidate_id === candidateId; })[0];
+      if (!found) {
+        var err = new Error("Candidate '" + candidateId + "' not found.");
+        err.status = 404;
+        return Promise.reject(err);
+      }
+      found.assigned_interviewer_usernames = usernames;
+      return mockDelay({ candidate_id: candidateId, assigned_interviewer_usernames: usernames });
+    });
+  },
+
   getCandidateByEmail: function (email) {
     return loadCandidates().then(function (all) {
       var found = all.filter(function (c) { return c.Email === email; })[0];
@@ -984,6 +1055,28 @@ window.CDPI_MOCK_API = {
     return mockDelay({ candidate_id: candidateId, stage: stage, status: "recorded" });
   },
 
+  generateInterviewQuestions: function (candidateId, jdId) {
+    try { _mockRequirePermission("interviews.manage"); } catch (e) { return Promise.reject(e); }
+    if (!candidateId || !jdId) {
+      var err = new Error("'candidateId' and 'jdId' are required."); err.status = 400; return Promise.reject(err);
+    }
+    // Same discipline as generateJdWithAi() above -- mock mode cannot make
+    // a real, grounded AI call, so it honestly says so rather than
+    // fabricating a convincing-looking question set.
+    return Promise.reject(new Error("Mock mode cannot generate real, grounded interview questions -- switch config.js to \"real\" mode to use AI-assisted question generation."));
+  },
+
+  // F-07/F-09 (candidate chatbot, minimal slice): same mock-mode honesty
+  // discipline as generateInterviewQuestions/generateJdWithAi above --
+  // no real grounded AI answer is fabricated.
+  chatCandidateQa: function (candidateId, question) {
+    try { _mockRequirePermission("candidates.read"); } catch (e) { return Promise.reject(e); }
+    if (!candidateId || !question) {
+      var err = new Error("'candidateId' and 'question' are required."); err.status = 400; return Promise.reject(err);
+    }
+    return Promise.reject(new Error("Mock mode cannot generate a real, grounded chat answer -- switch config.js to \"real\" mode to ask about a real candidate."));
+  },
+
   reviewCandidate: function (candidateId, decision, reviewer, notes) {
     try { _mockRequirePermission("candidates.update"); } catch (e) { return Promise.reject(e); }
     return loadCandidates().then(function (all) {
@@ -1046,6 +1139,135 @@ window.CDPI_MOCK_API = {
         { jd_id: "data_analyst", jd_filename: "data_analyst.txt", title: "Data Analyst" },
       ],
     });
+  },
+
+  listJdRecords: function (status) {
+    try {
+      _mockRequirePermission("jds.read");
+      var jds = status ? MOCK_JDS.filter(function (j) { return j.status === status; }) : MOCK_JDS;
+      return mockDelay({ count: jds.length, jds: jds.slice().sort(function (a, b) { return b.created_at.localeCompare(a.created_at); }) });
+    } catch (e) { return Promise.reject(e); }
+  },
+  getJdRecord: function (jdId) {
+    try {
+      _mockRequirePermission("jds.read");
+      var jd = _mockFindJd(jdId);
+      return mockDelay({ jd: jd, audit_log: MOCK_JD_AUDIT_LOG.filter(function (e) { return e.jd_id === jdId; }) });
+    } catch (e) { return Promise.reject(e); }
+  },
+  createJd: function (fields) {
+    try {
+      var user = _mockRequirePermission("jds.create");
+      if (!(fields.title || "").trim()) throw new Error("'title' is required.");
+      var jd = Object.assign({}, fields, {
+        jd_id: "mock-jd-" + (MOCK_JDS.length + 1) + "-" + Date.now(),
+        status: "draft", source: fields.source || "manual",
+        created_by: user.username, created_at: new Date().toISOString(),
+      });
+      jd.id = jd.jd_id;
+      MOCK_JDS.push(jd);
+      _mockJdAudit(jd.jd_id, "created", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  updateJd: function (jdId, fields) {
+    try {
+      var user = _mockRequirePermission("jds.create");
+      var jd = _mockFindJd(jdId);
+      if (["draft", "rejected"].indexOf(jd.status) === -1) throw new Error("JD is '" + jd.status + "' -- only draft/rejected JDs can be edited.");
+      Object.assign(jd, fields, { updated_by: user.username, updated_at: new Date().toISOString() });
+      _mockJdAudit(jdId, "updated", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  submitJd: function (jdId) {
+    try {
+      var user = _mockRequirePermission("jds.create");
+      var jd = _mockFindJd(jdId);
+      if (["draft", "rejected"].indexOf(jd.status) === -1) throw new Error("Cannot submit a JD that is '" + jd.status + "'.");
+      if (!jd.title || !jd.description) throw new Error("Cannot submit for approval -- missing required field(s): title, description.");
+      jd.status = "pending_approval"; jd.submitted_by = user.username; jd.submitted_at = new Date().toISOString();
+      _mockJdAudit(jdId, "submit", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  approveJd: function (jdId) {
+    try {
+      var user = _mockRequirePermission("jds.approve");
+      var jd = _mockFindJd(jdId);
+      if (jd.status !== "pending_approval") throw new Error("Cannot approve a JD that is '" + jd.status + "'.");
+      jd.status = "approved"; jd.approved_by = user.username; jd.approved_at = new Date().toISOString();
+      _mockJdAudit(jdId, "approve", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  rejectJd: function (jdId, reason) {
+    try {
+      var user = _mockRequirePermission("jds.approve");
+      if (!(reason || "").trim()) throw new Error("A rejection reason is required.");
+      var jd = _mockFindJd(jdId);
+      if (jd.status !== "pending_approval") throw new Error("Cannot reject a JD that is '" + jd.status + "'.");
+      jd.status = "rejected"; jd.rejected_by = user.username; jd.rejected_at = new Date().toISOString(); jd.rejection_reason = reason;
+      _mockJdAudit(jdId, "reject", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  publishJd: function (jdId) {
+    try {
+      var user = _mockRequirePermission("jds.approve");
+      var jd = _mockFindJd(jdId);
+      if (jd.status !== "approved") throw new Error("Cannot publish a JD that is '" + jd.status + "'.");
+      jd.status = "published"; jd.published_at = new Date().toISOString();
+      _mockJdAudit(jdId, "publish", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  archiveJd: function (jdId) {
+    try {
+      var user = _mockRequirePermission("jds.approve");
+      var jd = _mockFindJd(jdId);
+      if (jd.status !== "published") throw new Error("Cannot archive a JD that is '" + jd.status + "'.");
+      jd.status = "archived"; jd.archived_by = user.username; jd.archived_at = new Date().toISOString();
+      _mockJdAudit(jdId, "archive", user.username);
+      return mockDelay(jd);
+    } catch (e) { return Promise.reject(e); }
+  },
+  uploadJdDocument: function () {
+    try {
+      _mockRequirePermission("jds.create");
+      return mockDelay({
+        extracted_fields: {}, extraction_succeeded: false, source_document_blob_path: null,
+        detail: "Mock mode cannot run real PDF extraction or AI field parsing -- switch config.js to \"real\" mode to upload and extract an actual JD document.",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+  generateJdWithAi: function () {
+    try {
+      _mockRequirePermission("jds.create");
+      return Promise.reject(new Error("Mock mode cannot make a real AI call -- switch config.js to \"real\" mode to use AI-assisted JD generation."));
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getObservabilitySnapshot: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      return mockDelay({
+        id: null, collected_at: null, sources: {},
+        detail: "Mock mode has no persisted snapshot store -- switch config.js to \"real\" mode and click Refresh to collect and persist a real snapshot.",
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+  refreshObservability: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      return Promise.reject(new Error("Mock mode cannot collect real telemetry -- switch config.js to \"real\" mode to run a real refresh."));
+    } catch (e) { return Promise.reject(e); }
+  },
+  getObservabilityRefreshHistory: function () {
+    try {
+      _mockRequirePermission("observability.read");
+      return mockDelay({ count: 0, history: [] });
+    } catch (e) { return Promise.reject(e); }
   },
 
   listAuditLog: function (action) {
@@ -1156,6 +1378,168 @@ window.CDPI_MOCK_API = {
   // _cost_breakdown() -- the functions below mirror that logic, not a
   // second invented shape).
   // ---------------------------------------------------------------------
+  // F-02 (Tokenomics calculator, minimal slice): real Draft -> Activate
+  // -> History budget config + a real-time status check against the
+  // illustrative mock LLM-call total above. Mock mode has no real
+  // per-call timestamps to filter to "this calendar month" against, so
+  // the whole illustrative total is treated as the current period's
+  // spend -- clearly a demo simplification, not a claim about real data.
+  getTokenomicsConfig: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      return mockDelay({
+        active: MOCK_TOKENOMICS_ACTIVE_CONFIG || Object.assign({}, MOCK_TOKENOMICS_DEFAULT_CONFIG, { id: "active", config_version: 0 }),
+        draft: MOCK_TOKENOMICS_DRAFT_CONFIG,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  saveTokenomicsConfigDraft: function (config) {
+    try {
+      var actor = _mockRequirePermission("tokenomics.config.write");
+      var errors = _mockValidateTokenomicsConfig(config);
+      if (errors.length) { var err = new Error(errors.join(" ")); err.status = 400; throw err; }
+      MOCK_TOKENOMICS_DRAFT_CONFIG = Object.assign({ id: "draft", lifecycle_status: "draft", created_by: actor.username, created_at: new Date().toISOString() }, config);
+      _mockRecordTokenomicsConfigChange("draft_saved", actor.username, config);
+      return mockDelay(MOCK_TOKENOMICS_DRAFT_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  activateTokenomicsConfig: function () {
+    try {
+      var actor = _mockRequirePermission("tokenomics.config.write");
+      if (!MOCK_TOKENOMICS_DRAFT_CONFIG) { var err = new Error("No draft tokenomics config exists to activate."); err.status = 404; throw err; }
+      MOCK_TOKENOMICS_ACTIVE_CONFIG = Object.assign({}, MOCK_TOKENOMICS_DRAFT_CONFIG, { id: "active", lifecycle_status: "active", activated_by: actor.username, activated_at: new Date().toISOString() });
+      MOCK_TOKENOMICS_DRAFT_CONFIG = null;
+      _mockRecordTokenomicsConfigChange("activated", actor.username, MOCK_TOKENOMICS_ACTIVE_CONFIG);
+      return mockDelay(MOCK_TOKENOMICS_ACTIVE_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getTokenomicsConfigHistory: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      var history = MOCK_TOKENOMICS_CONFIG_HISTORY.slice().sort(function (a, b) { return (a.recorded_at || "") < (b.recorded_at || "") ? 1 : -1; });
+      return mockDelay({ count: history.length, history: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getTokenomicsStatus: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      var llm = _mockLlmObservabilitySummary();
+      var usage = {
+        period: new Date().toISOString().slice(0, 7), call_count: llm.total_calls,
+        total_tokens: llm.total_tokens, total_cost_usd: llm.total_cost_usd,
+        unknown_cost_call_count: 0, by_label: llm.by_label,
+      };
+      var config = MOCK_TOKENOMICS_ACTIVE_CONFIG || MOCK_TOKENOMICS_DEFAULT_CONFIG;
+      var budget = config.monthly_budget_usd;
+      var budgetStatus;
+      if (budget === null || budget === undefined) {
+        budgetStatus = { configured: false, status: "not_configured", budget_usd: null, spent_usd: usage.total_cost_usd, percent_used: null, unknown_cost_call_count: 0 };
+      } else {
+        var pct = Math.round((usage.total_cost_usd / budget) * 10000) / 100;
+        var threshold = config.warning_threshold_pct || MOCK_TOKENOMICS_DEFAULT_CONFIG.warning_threshold_pct;
+        var status = pct >= 100 ? "exceeded" : (pct >= threshold ? "warning" : "ok");
+        budgetStatus = { configured: true, status: status, budget_usd: budget, spent_usd: usage.total_cost_usd, percent_used: pct, unknown_cost_call_count: 0 };
+      }
+      return mockDelay({ usage: usage, budget: budgetStatus });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  // F-03 (candidate feedback, minimal slice): mock mode has no real
+  // candidate-facing submission flow (no candidate auth persona exists
+  // in this app at all -- see candidate_feedback.py's module docstring),
+  // so this returns a small, clearly-illustrative set of already-
+  // submitted/pending records rather than wiring up a submission form
+  // nothing else in mock mode can trigger.
+  listCandidateFeedback: function (jdId) {
+    try {
+      _mockRequirePermission("feedback.read");
+      var records = MOCK_CANDIDATE_FEEDBACK.filter(function (r) { return !jdId || r.jd_id === jdId; });
+      var submitted = records.filter(function (r) { return r.status === "submitted" && r.ratings; });
+      var categoryAverages = {};
+      ["application_process", "communication", "interview_scheduling", "interview_rounds", "interviewer_interactions", "transparency", "overall_experience"].forEach(function (c) {
+        var values = submitted.map(function (r) { return r.ratings[c]; }).filter(function (v) { return typeof v === "number"; });
+        categoryAverages[c] = values.length ? Math.round((values.reduce(function (a, b) { return a + b; }, 0) / values.length) * 100) / 100 : null;
+      });
+      return mockDelay({
+        count: records.length, records: records,
+        summary: {
+          requested_count: records.length, submitted_count: submitted.length,
+          pending_count: records.length - submitted.length,
+          response_rate: records.length ? Math.round((submitted.length / records.length) * 10000) / 10000 : null,
+          category_averages: categoryAverages,
+        },
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  // F-18 (LLM caching, minimal slice): illustrative mock stats -- mock
+  // mode never actually calls a real LLM, so there is no real cache to
+  // report on; this is clearly-labeled demo data, not a claim about a
+  // real process-local cache file.
+  getLlmCacheStats: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      return mockDelay({
+        cache: {
+          entry_count: 2, total_hit_count: 5,
+          by_label: { resume_chunk_summarization: { entry_count: 2, hit_count: 5 } },
+          oldest_entry_age_seconds: 86400,
+        },
+        estimated_savings_usd_this_month: 0.0096,
+        cache_hit_call_count_this_month: 5,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  clearLlmCache: function () {
+    try {
+      _mockRequirePermission("llm_cache.manage");
+      return mockDelay({ status: "cleared", removed_count: 2 });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  // F-17 (model routing, minimal slice): mock mode never calls a real
+  // model, so routing has no observable effect here -- this is the
+  // config surface only, clearly illustrative.
+  getModelRoutingConfig: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      return mockDelay({
+        routable_labels: MOCK_ROUTABLE_LABELS.slice(),
+        default_models: MOCK_DEFAULT_MODELS,
+        routes: Object.assign({}, MOCK_MODEL_ROUTING_CONFIG.routes),
+        updated_by: MOCK_MODEL_ROUTING_CONFIG.updated_by, updated_at: MOCK_MODEL_ROUTING_CONFIG.updated_at,
+      });
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  saveModelRoutingConfig: function (routes) {
+    try {
+      var actor = _mockRequirePermission("model_routing.manage");
+      var errors = [];
+      Object.keys(routes || {}).forEach(function (label) {
+        if (MOCK_ROUTABLE_LABELS.indexOf(label) === -1) errors.push("'" + label + "' is not a routable label.");
+        else if (!routes[label] || typeof routes[label] !== "string") errors.push("Model for '" + label + "' must be a non-empty string.");
+      });
+      if (errors.length) { var err = new Error(errors.join(" ")); err.status = 400; throw err; }
+      MOCK_MODEL_ROUTING_CONFIG = { id: "active", routes: Object.assign({}, routes), updated_by: actor.username, updated_at: new Date().toISOString() };
+      MOCK_MODEL_ROUTING_HISTORY.push({ id: "mrh-" + Math.random().toString(36).slice(2, 10), actor: actor.username, routes: Object.assign({}, routes), recorded_at: new Date().toISOString() });
+      return mockDelay(MOCK_MODEL_ROUTING_CONFIG);
+    } catch (e) { return Promise.reject(e); }
+  },
+
+  getModelRoutingConfigHistory: function () {
+    try {
+      _mockRequirePermission("analytics.read");
+      var history = MOCK_MODEL_ROUTING_HISTORY.slice().sort(function (a, b) { return (a.recorded_at || "") < (b.recorded_at || "") ? 1 : -1; });
+      return mockDelay({ count: history.length, history: history });
+    } catch (e) { return Promise.reject(e); }
+  },
+
   aiObservabilitySummary: function () {
     try { _mockRequirePermission("observability.read"); } catch (e) { return Promise.reject(e); }
     var spans = MOCK_AI_TRACES;
@@ -2152,6 +2536,19 @@ function _mockLlmObservabilitySummary() {
 // multi-stage shape ResumeParser.py now produces end to end; the rest
 // are standalone single-span traces, same as a call site that doesn't
 // pass a trace_id gets in the real backend.
+// F-03 (candidate feedback, minimal slice): illustrative mock data only
+// -- mock mode has no real review-decision flow wired to auto-create
+// these the way the real backend's _maybe_request_feedback() does.
+var MOCK_CANDIDATE_FEEDBACK = [
+  { id: "cand-a1b2c3", candidate_id: "cand-a1b2c3", jd_id: "ml_developer", status: "submitted",
+    requested_at: "2026-10-18T10:00:00Z", requested_reason: "decision:approve",
+    submitted_at: "2026-10-19T08:30:00Z", comment: "Interview scheduling was smooth, communication could be faster.",
+    ratings: { application_process: 4, communication: 3, interview_scheduling: 5, interview_rounds: 4, interviewer_interactions: 5, transparency: 4, overall_experience: 4 } },
+  { id: "cand-d4e5f6", candidate_id: "cand-d4e5f6", jd_id: "ml_developer", status: "requested",
+    requested_at: "2026-10-20T09:00:00Z", requested_reason: "decision:reject",
+    submitted_at: null, comment: null, ratings: null },
+];
+
 var MOCK_AI_TRACES = [
   // trace-rp-1: one resume parsed successfully, full pipeline.
   { trace_id: "trace-rp-1", span_id: "span-1a", correlation_id: "cand-a1b2c3", workflow: "resume_parsing", stage: "document_extraction", status: "succeeded", duration_ms: 180.2, metadata: {}, error: null, logged_at: "2026-10-19T09:15:00Z" },

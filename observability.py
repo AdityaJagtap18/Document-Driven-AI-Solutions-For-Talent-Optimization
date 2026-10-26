@@ -183,6 +183,7 @@ def record_llm_call(
     prompt_version: str = None,
     cost_source: str = "langchain_openai_callback",
     workflow: str = "llm",
+    cache_hit: bool = False,
 ) -> dict:
     """Always writes one JSON line to logs/llm_observability.jsonl, and also
     emits to Application Insights (as a structured log record) if
@@ -196,7 +197,15 @@ def record_llm_call(
     from. trace_id/parent_span_id/correlation_id let this LLM call join a
     larger multi-stage trace (e.g. ResumeParser.py's per-resume run) --
     all optional and None by default, fully backward compatible with
-    every call site that doesn't pass them."""
+    every call site that doesn't pass them.
+
+    cache_hit (F-18, LLM caching, minimal slice): True when
+    llm_utils.cached_call_with_retry() served this call from the local
+    response cache instead of making a real model call -- the real model
+    was never invoked, so cost_usd/tokens/latency are genuinely 0, not
+    estimated. Lets tokenomics.py and the AI Observability Center
+    distinguish "avoided a real call" from "a real call that happened to
+    cost $0," instead of building a second, parallel cache-events log."""
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "label": label,
@@ -212,6 +221,7 @@ def record_llm_call(
         "error": error,
         "retries": retries,
         "prompt_version": prompt_version,
+        "cache_hit": cache_hit,
     }
 
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -298,6 +308,29 @@ def record_ai_trace(
             print(f"[WARN] Application Insights emit failed (local log entry was still written): {e}")
 
     return record
+
+
+def record_injection_flag(sample: str = None, trace_id: str = None, correlation_id: str = None) -> dict:
+    """Thin sibling of record_llm_call(), for F-10's Task 3 (Phase 1
+    Implementation Contract): rag_config.sanitize_for_prompt() calls this
+    itself, once, whenever its injection-phrase regex actually matches
+    something in a given call -- a call that flags nothing never produces
+    a record. Before this, a flagged phrase was only visible by reading
+    the mutated prompt string itself; this makes "how many injection
+    attempts have been flagged" a real, queryable question (filter
+    ai_traces.jsonl / the AI Observability Center's trace view for
+    workflow="security") without inventing a second logging subsystem --
+    reuses record_ai_trace()'s existing JSONL/Cosmos/App Insights path.
+
+    `sample` is the matched KNOWN phrase template itself (e.g. "Ignore
+    all previous instructions") -- never the surrounding candidate-
+    specific text, so this never puts raw resume/answer content into
+    telemetry, consistent with every other call site in this module."""
+    return record_ai_trace(
+        workflow="security", stage="prompt_injection_flagged", status="succeeded",
+        metadata={"sample": sample} if sample else {},
+        trace_id=trace_id, correlation_id=correlation_id,
+    )
 
 
 def run_connectivity_test() -> dict:

@@ -4,6 +4,7 @@ from pathlib import Path
 from langchain.schema import HumanMessage
 
 from llm_utils import call_with_retry, get_chat_llm, using_azure_openai
+from rag_config import sanitize_for_prompt
 from secrets_loader import get_secret
 
 # === CONFIG ===
@@ -17,6 +18,41 @@ llm = get_chat_llm(
     temperature=0.5, max_tokens=1000, model="gpt-3.5-turbo",
     model_kwargs={"response_format": {"type": "json_object"}},
 )
+
+
+def build_scoring_prompt(answers):
+    """`answers` holds two untrusted-input vectors: the resume-derived
+    question text (already sanitized once at generation time -- see
+    generate_questions.py -- but sanitized again here, defense in depth,
+    since this is a fresh prompt) and the candidate's own free-typed
+    answer, which is untrusted input in its own right. Both are
+    sanitized before interpolation (see rag_config.py's docstring for
+    exactly what this does and doesn't protect against). The original,
+    unsanitized text is still what gets written to the QnA transcript
+    files -- only what reaches the LLM prompt is sanitized."""
+    sanitized_answers = [
+        {"question": sanitize_for_prompt(a["question"]), "answer": sanitize_for_prompt(a["answer"])}
+        for a in answers
+    ]
+    return f"""
+You are a technical interviewer. Score the following candidate's answers out of 10, with brief justification for each.
+
+Return a JSON object with this exact shape:
+{{
+  "scores": [
+    {{
+      "question": "...",
+      "answer": "...",
+      "score": ...,
+      "feedback": "..."
+    }},
+    ...
+  ]
+}}
+
+Candidate Responses:
+{json.dumps(sanitized_answers, indent=2)}
+"""
 
 
 def run_interview_for_candidate(candidate_folder: Path):
@@ -45,25 +81,7 @@ def run_interview_for_candidate(candidate_folder: Path):
 
         answers.append({"question": question, "answer": answer})
 
-    scoring_prompt = f"""
-You are a technical interviewer. Score the following candidate's answers out of 10, with brief justification for each.
-
-Return a JSON object with this exact shape:
-{{
-  "scores": [
-    {{
-      "question": "...",
-      "answer": "...",
-      "score": ...,
-      "feedback": "..."
-    }},
-    ...
-  ]
-}}
-
-Candidate Responses:
-{json.dumps(answers, indent=2)}
-"""
+    scoring_prompt = build_scoring_prompt(answers)
 
     print("\nScoring in progress...")
 

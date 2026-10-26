@@ -14,25 +14,29 @@
  */
 function RecruiterReports(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, auditEntries: [], stages: [], bulkDecisions: [] });
-  var data = state[0];
-  var setData = state[1];
-
-  React.useEffect(function () {
-    Promise.all([api.listAuditLog(), api.getPipelineConfig(), api.listBulkDecisions()])
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("recruiter_reports", function () {
+    return Promise.all([api.listAuditLog(), api.getPipelineConfig(), api.listBulkDecisions()])
       .then(function (results) {
-        setData({
-          loading: false, error: null,
-          auditEntries: results[0].entries, stages: results[1].stages, bulkDecisions: results[2].decisions,
-        });
-      })
-      .catch(function (err) {
-        setData({ loading: false, error: err.message, auditEntries: [], stages: [], bulkDecisions: [] });
+        return { auditEntries: results[0].entries, stages: results[1].stages, bulkDecisions: results[2].decisions };
       });
-  }, []);
+  });
+  var meta = snapshot.state;
+  var data = meta.data || { auditEntries: [], stages: [], bulkDecisions: [] };
 
-  if (data.loading) return <div className="view"><h2>Reports</h2><p className="muted">Loading…</p></div>;
-  if (data.error) return <div className="view"><h2>Reports</h2><div className="banner banner-error">{data.error}</div></div>;
+  // F-03 (candidate feedback, minimal slice): a separate fetch, and
+  // deliberately not fatal to the rest of this page if it fails (e.g.
+  // a role without feedback.read) -- the operational pipeline reports
+  // above are this page's primary purpose. Same snapshot treatment as
+  // everything else on this page.
+  var feedbackSnapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("recruiter_reports_feedback", function () {
+    return api.listCandidateFeedback();
+  });
+  var feedback = feedbackSnapshot.state.data
+    ? { loading: false, error: feedbackSnapshot.state.error, records: feedbackSnapshot.state.data.records, summary: feedbackSnapshot.state.data.summary }
+    : { loading: feedbackSnapshot.state.loading, error: feedbackSnapshot.state.error, records: [], summary: null };
+
+  if (meta.loading && !meta.data) return <div className="view"><h2>Reports</h2><p className="muted">Loading…</p></div>;
+  if (meta.error && !meta.data) return <div className="view"><h2>Reports</h2><div className="banner banner-error">{meta.error}</div></div>;
 
   var stageUpdates = data.auditEntries.filter(function (e) { return e.action === "stage_update"; });
   var reviewEntries = data.auditEntries.filter(function (e) { return e.action === "human_review_approve" || e.action === "human_review_reject"; });
@@ -109,11 +113,18 @@ function RecruiterReports(props) {
   return (
     <div className="view">
       <h2>Reports</h2>
-      <p className="muted">
-        Your operational view — where candidates sit in the hiring-stage pipeline, how they're performing,
-        and the status of your bulk-decision proposals. Candidate-pool analytics (score distributions, skills,
-        etc.) are the Admin's separate Reports view.
-      </p>
+      <div className="toolbar">
+        <p className="muted">
+          Your operational view — where candidates sit in the hiring-stage pipeline, how they're performing,
+          and the status of your bulk-decision proposals. Candidate-pool analytics (score distributions, skills,
+          etc.) are the Admin's separate Reports view. Showing the snapshot from{" "}
+          {meta.lastUpdated ? new Date(meta.lastUpdated).toLocaleString() : "just now"} — click Refresh for current data.
+        </p>
+        <button className="btn" onClick={function () { snapshot.refresh(); feedbackSnapshot.refresh(); }} disabled={meta.loading}>
+          {meta.loading ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+      {meta.error && meta.data && <div className="banner-error-inline">Refresh failed: {meta.error} (showing the last snapshot)</div>}
       <div className="chart-grid">
         <ChartCard title="Stage Funnel" wide>
           {noStageData ? <p className="muted">No stages recorded yet.</p> : <ChartCanvas config={funnelConfig} />}
@@ -128,6 +139,80 @@ function RecruiterReports(props) {
           {noReviewData ? <p className="muted">No individual reviews recorded yet.</p> : <ChartCanvas config={reviewConfig} />}
         </ChartCard>
       </div>
+
+      <CandidateFeedbackSection feedback={feedback} />
     </div>
+  );
+}
+
+var FEEDBACK_CATEGORY_LABELS = {
+  application_process: "Application Process", communication: "Communication",
+  interview_scheduling: "Interview Scheduling", interview_rounds: "Interview Rounds",
+  interviewer_interactions: "Interviewer Interactions", transparency: "Transparency",
+  overall_experience: "Overall Experience",
+};
+
+/**
+ * F-03 (candidate feedback, minimal slice). Candidate experience
+ * feedback is deliberately shown here, NOT blended into the hiring
+ * evaluation charts above -- per the feature's own "keep feedback
+ * separate from hiring evaluation" requirement, this section reads
+ * from a wholly separate backend container and API call.
+ */
+function CandidateFeedbackSection(props) {
+  var feedback = props.feedback;
+  if (feedback.loading) return null;
+  if (feedback.error) {
+    // Most likely cause: this role doesn't have feedback.read (e.g. a
+    // custom role) -- shown quietly, not as a page-breaking error, since
+    // the operational reports above are this page's primary content.
+    return <p className="muted">Candidate feedback unavailable: {feedback.error}</p>;
+  }
+  var summary = feedback.summary;
+  var records = feedback.records;
+
+  return (
+    <React.Fragment>
+      <h3 className="subsection-heading">Candidate Experience Feedback</h3>
+      <p className="muted">
+        Collected after a final hiring decision is recorded -- kept separate from scoring/evaluation data so
+        experience feedback never influences hiring decisions.
+      </p>
+      <div className="stat-row">
+        <StatTile label="Requests Sent" value={summary.requested_count} tone="neutral" />
+        <StatTile label="Submitted" value={summary.submitted_count} tone="good" />
+        <StatTile label="Pending" value={summary.pending_count} tone="neutral" />
+        <StatTile label="Response Rate" value={summary.response_rate !== null ? (summary.response_rate * 100).toFixed(1) + "%" : "—"} tone="neutral" />
+      </div>
+      <div className="table-card">
+        <table className="candidate-table">
+          <thead><tr><th>Category</th><th>Average Rating (1-5)</th></tr></thead>
+          <tbody>
+            {Object.keys(FEEDBACK_CATEGORY_LABELS).map(function (c) {
+              var avg = summary.category_averages[c];
+              return <tr key={c}><td>{FEEDBACK_CATEGORY_LABELS[c]}</td><td>{avg === null || avg === undefined ? "No submissions yet" : avg}</td></tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="table-card">
+        <table className="candidate-table">
+          <thead><tr><th>Candidate</th><th>Status</th><th>Requested</th><th>Comment</th></tr></thead>
+          <tbody>
+            {records.map(function (r) {
+              return (
+                <tr key={r.id || r.candidate_id}>
+                  <td className="muted">{r.candidate_id}</td>
+                  <td><span className={"badge " + (r.status === "submitted" ? "badge-good" : "badge-neutral")}>{r.status}</span></td>
+                  <td className="muted">{r.requested_at ? new Date(r.requested_at).toLocaleDateString() : "—"}</td>
+                  <td>{r.comment || "—"}</td>
+                </tr>
+              );
+            })}
+            {records.length === 0 && <tr><td colSpan={4} className="muted">No feedback requests yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </React.Fragment>
   );
 }

@@ -75,20 +75,11 @@ function outcomeBadgeClass(outcome) {
 
 function CommsOverviewTab(props) {
   var api = props.api;
-  var state = React.useState({ loading: true, error: null, data: null });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("comms_config_overview", function () { return api.getCommsConfig(); });
+  var data = { loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error, data: snapshot.state.data };
+  var load = snapshot.refresh;
 
-  function load() {
-    setData({ loading: true, error: null, data: null });
-    api.getCommsConfig()
-      .then(function (result) { setData({ loading: false, error: null, data: result }); })
-      .catch(function (err) { setData({ loading: false, error: err.message, data: null }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
-
-  if (data.error) return <div className="banner banner-error">{data.error}</div>;
+  if (data.error && !data.data) return <div className="banner banner-error">{data.error}</div>;
   if (data.loading) return <p className="muted">Loading…</p>;
 
   return (
@@ -513,21 +504,15 @@ function CommsPoliciesTab(props) {
 function CommsHistoryTab(props) {
   var api = props.api;
   var canActivate = props.canActivate;
-  var state = React.useState({ loading: true, error: null, history: [] });
-  var data = state[0];
-  var setData = state[1];
+  var snapshot = CDPI_REPORT_SNAPSHOT.useReportSnapshot("comms_config_history", function () { return api.getCommsConfigHistory(50); });
+  var data = {
+    loading: snapshot.state.loading && !snapshot.state.data, error: snapshot.state.error,
+    history: (snapshot.state.data && snapshot.state.data.history) || [],
+  };
+  var load = snapshot.refresh;
   var rollbackState = React.useState({ busy: false, error: null });
   var rollback = rollbackState[0];
   var setRollback = rollbackState[1];
-
-  function load() {
-    setData(function (d) { return Object.assign({}, d, { loading: true, error: null }); });
-    api.getCommsConfigHistory(50)
-      .then(function (result) { setData({ loading: false, error: null, history: result.history }); })
-      .catch(function (err) { setData(function (d) { return Object.assign({}, d, { loading: false, error: err.message }); }); });
-  }
-
-  React.useEffect(function () { load(); }, []);
 
   function handleRollback(historyId) {
     if (!window.confirm("Roll back to this configuration snapshot? This creates a new DRAFT -- you'll need to review and activate it explicitly.")) return;

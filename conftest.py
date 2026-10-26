@@ -69,6 +69,19 @@ def _default_iam_fixtures(monkeypatch):
         repositories, "get_role",
         lambda key: _FIXTURE_ADMIN_ROLE if key == "admin" else None,
     )
+    # F-17 (model routing, minimal slice): model_routing.get_runtime_
+    # routing_config() is now called on every real chat/interview-
+    # question/judge/JD-generation LLM call site (see model_routing.py),
+    # so it's reached by many existing tests that never mocked it before
+    # this feature existed -- same "repositories.* must stay mocked to
+    # avoid a real, slow Cosmos/Key-Vault round trip in every test" gap
+    # class as the rate-limiter bug this engagement already found and
+    # fixed once. Defaulting to None here (-> no routing override, every
+    # label falls back to its real hardcoded default) keeps every
+    # existing test's assertions on model="gpt-3.5-turbo" correct
+    # unchanged; a test that specifically wants to exercise routing
+    # overrides this with its own monkeypatch.
+    monkeypatch.setattr(repositories, "get_model_routing_config", lambda: None)
 
 
 def _fixture_token():

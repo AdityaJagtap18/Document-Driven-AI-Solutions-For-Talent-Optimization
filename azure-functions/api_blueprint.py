@@ -28,6 +28,7 @@ to real Entra ID auth is explicit follow-up work, not done here.
 """
 
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -45,6 +46,13 @@ import azure_integrations  # noqa: E402
 import secrets_registry  # noqa: E402
 import rag_config  # noqa: E402
 import rag_preview  # noqa: E402
+import rag_evaluation  # noqa: E402
+import ai_evaluation  # noqa: E402
+import candidate_erasure  # noqa: E402
+import tokenomics  # noqa: E402
+import candidate_feedback  # noqa: E402
+import llm_cache  # noqa: E402
+import model_routing  # noqa: E402
 import comms_config  # noqa: E402
 import email_adapter  # noqa: E402
 import model_pricing  # noqa: E402
@@ -54,6 +62,9 @@ import llm_utils  # noqa: E402
 import az_cli  # noqa: E402
 import ephemeral_test_runner  # noqa: E402
 import secrets_loader  # noqa: E402
+import jd_management  # noqa: E402
+import observability_snapshots  # noqa: E402
+import chat_guardrails  # noqa: E402
 
 bp = func.Blueprint()
 
@@ -292,8 +303,14 @@ def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     Candidates' own per-JD scores live in the "JD Matches" column written
     by ResumeMEtrics.py (see jd_manager.py) — not exposed by this endpoint,
     since that data isn't in candidate.schema.json yet (CSV/scoring_history
-    only); filtering candidates by jd_id is follow-up work once it is."""
-    auth_result = require_permission(req, "jds.read")
+    only); filtering candidates by jd_id is follow-up work once it is.
+
+    Also the real data source behind the candidate-facing Application
+    Form's 'Applying for' dropdown (CandidatePortal.jsx) -- accepts
+    EITHER jds.read (staff) or the narrower jds.read.public (candidate),
+    so granting the candidate role list access here never also opens the
+    staff Job Descriptions management page (gated by jds.read alone)."""
+    auth_result = require_any_permission(req, ["jds.read", "jds.read.public"])
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
     sys.path.insert(0, str(_repo_root))
@@ -306,10 +323,291 @@ def list_jds_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     })
 
 
+# ---------------------------------------------------------------------------
+# Job Description Management (manage/jds/*) -- the canonical Cosmos-backed
+# JD record and its create/upload/AI-generate/edit/approve/publish/archive
+# lifecycle (jd_management.py). Distinct from GET /jds above, which stays
+# unchanged (reads jd_folder/*.txt for the existing resume-scoring
+# pipeline) -- publish_jd() is the only bridge between the two.
+# ---------------------------------------------------------------------------
+def _jd_not_found(jd_id):
+    return _error_response(f"JD '{jd_id}' not found.", status_code=404)
+
+
+@bp.route(route="manage/jds", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_jd_records_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Job Description Management page's list view -- every JD regardless
+    of status (unlike GET /jds, which only reflects published ones via
+    jd_folder/). ?status= filters to one lifecycle state."""
+    auth_result = require_permission(req, "jds.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    status = req.params.get("status")
+    if status and status not in jd_management.STATUSES:
+        return _error_response(f"'status' must be one of {jd_management.STATUSES}.", status_code=400)
+    try:
+        jds = repositories.list_jd_records(status=status)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(jds), "jds": jds})
+
+
+@bp.route(route="manage/jds/{jd_id}", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_jd_record_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "jds.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        jd = repositories.get_jd(jd_id)
+        if jd is None:
+            return _jd_not_found(jd_id)
+        history = repositories.list_jd_audit_log(jd_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"jd": jd, "audit_log": history})
+
+
+@bp.route(route="manage/jds", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def create_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Create a new draft JD -- manual entry. Body: any of jd_management.
+    TEXT_FIELDS/LIST_FIELDS/openings_count. 'title' is the only hard
+    requirement at creation time (more fields are required before SUBMIT,
+    see submit_jd_endpoint)."""
+    auth_result = require_permission(req, "jds.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    try:
+        jd = jd_management.create_jd(body, created_by=auth_result["username"])
+    except jd_management.JdValidationError as e:
+        return _error_response(str(e), status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd, status_code=201)
+
+
+@bp.route(route="manage/jds/{jd_id}", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def update_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Edit a draft (or a rejected JD being corrected) -- rejected with a
+    clear error for any other status, backend-enforced regardless of what
+    the UI shows."""
+    auth_result = require_permission(req, "jds.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    try:
+        jd = jd_management.update_jd(jd_id, body, updated_by=auth_result["username"])
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except jd_management.JdValidationError as e:
+        return _error_response(str(e), status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/{jd_id}/submit", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def submit_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "jds.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        jd = jd_management.submit_jd(jd_id, submitted_by=auth_result["username"])
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except jd_management.JdValidationError as e:
+        return _error_response(str(e), status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/{jd_id}/approve", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def approve_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "jds.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        jd = jd_management.approve_jd(jd_id, approved_by=auth_result["username"])
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/{jd_id}/reject", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def reject_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "jds.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    try:
+        jd = jd_management.reject_jd(jd_id, rejected_by=auth_result["username"], reason=body.get("reason", ""))
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except jd_management.JdValidationError as e:
+        return _error_response(str(e), status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/{jd_id}/publish", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def publish_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The only action that makes a JD live for candidate matching --
+    writes jd_folder/{jd_id}.txt, which the existing resume-scoring
+    pipeline (jd_manager.py) picks up on its next run."""
+    auth_result = require_permission(req, "jds.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        jd = jd_management.publish_jd(jd_id, published_by=auth_result["username"])
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/{jd_id}/archive", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def archive_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Removes jd_folder/{jd_id}.txt (so the scoring pipeline stops
+    considering it) -- never deletes the JD record, any candidate, or any
+    scoring history already computed against it."""
+    auth_result = require_permission(req, "jds.approve")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.route_params.get("jd_id")
+    try:
+        jd = jd_management.archive_jd(jd_id, archived_by=auth_result["username"])
+    except jd_management.JdTransitionError as e:
+        return _error_response(str(e), status_code=409)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(jd)
+
+
+@bp.route(route="manage/jds/upload", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def upload_jd_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Upload an existing JD PDF, extract its text (PyPDF2, same generic
+    utility ResumeParser.py uses), then run it through the real LLM-based
+    field extractor. Returns the extracted DRAFT fields for the user to
+    review/edit -- nothing is saved until the user explicitly creates the
+    JD from this draft (POST /manage/jds with source="uploaded")."""
+    auth_result = require_permission(req, "jds.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    import base64
+
+    file_b64 = body.get("file_base64")
+    filename = (body.get("filename") or "").strip()
+    if not file_b64:
+        return _error_response("'file_base64' is required.", status_code=400)
+    if not filename.lower().endswith(".pdf"):
+        return _error_response("'filename' must end in '.pdf' -- only PDF JD uploads are supported.", status_code=400)
+    try:
+        file_bytes = base64.b64decode(file_b64)
+    except Exception:
+        return _error_response("'file_base64' is not valid base64.", status_code=400)
+    if len(file_bytes) > 10 * 1024 * 1024:
+        return _error_response("File too large (max 10MB).", status_code=400)
+
+    blob_path = None
+    try:
+        import blob_store
+        blob_path = blob_store.upload_resume_bytes("raw-resumes", f"jd-uploads/{filename}", file_bytes)
+    except Exception as e:
+        logging.warning(f"JD upload: Blob Storage unavailable, continuing without persisting the source document ({e})")
+
+    try:
+        text = jd_management.extract_text_from_jd_document(file_bytes)
+    except Exception as e:
+        return _error_response(f"Could not extract text from the uploaded file: {str(e)[:500]}", status_code=422)
+    if not text:
+        return _json_response({
+            "extracted_fields": {}, "extraction_succeeded": False, "source_document_blob_path": blob_path,
+            "detail": "No text could be extracted from this PDF (it may be a scanned image with no selectable text).",
+        })
+    try:
+        fields = jd_management.parse_extracted_jd_text(text)
+    except Exception as e:
+        return _json_response({
+            "extracted_fields": {}, "extraction_succeeded": False, "source_document_blob_path": blob_path,
+            "detail": f"Text was extracted, but AI field parsing failed: {str(e)[:500]}",
+        })
+    return _json_response({"extracted_fields": fields, "extraction_succeeded": True, "source_document_blob_path": blob_path})
+
+
+@bp.route(route="manage/jds/generate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def generate_jd_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """AI-assisted JD generation from structured inputs -- a real,
+    billable LLM call (never run automatically). Returns a DRAFT; nothing
+    is saved until the user explicitly creates the JD from it."""
+    auth_result = require_permission(req, "jds.create")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    if not (body.get("title") or "").strip():
+        return _error_response("'title' is required to generate a JD.", status_code=400)
+    try:
+        result = jd_management.generate_jd_with_ai(body)
+    except Exception as e:
+        return _error_response(f"AI generation failed: {str(e)[:500]}", status_code=502)
+    return _json_response(result)
+
+
+def _is_scoped_interviewer(user: dict) -> bool:
+    """True when the caller must be record-scoped to only their assigned
+    candidates: holds the 'interviewer' role and NONE of the broader
+    roles that already have legitimate team-wide candidate visibility.
+    An account with both 'interviewer' and e.g. 'recruiter' is a
+    recruiter for authorization purposes -- scoping only ever narrows a
+    user who is *purely* an interviewer. See auth.py's interviews.assign
+    permission and the 'interviewer' role's own docstring, which
+    previously documented this as a known, unmodeled gap."""
+    roles = set(user.get("role_keys", []))
+    if "interviewer" not in roles:
+        return False
+    broader = {"admin", "recruiter", "recruitment_ops_manager", "hiring_manager"}
+    return not (roles & broader)
+
+
+def _interviewer_may_access(user: dict, candidate: dict) -> bool:
+    if not _is_scoped_interviewer(user):
+        return True
+    return user["username"] in (candidate.get("assigned_interviewer_usernames") or [])
+
+
 @bp.route(route="candidates", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
 def list_candidates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin Dashboard: list candidates, optionally filtered by
-    ?ranking_tier=Recommended%20for%20Fast-Track (etc)."""
+    ?ranking_tier=Recommended%20for%20Fast-Track (etc). A caller who is
+    purely an 'interviewer' (see _is_scoped_interviewer) only ever gets
+    back the candidates assigned to them -- the record-level scoping this
+    role's own docstring used to flag as missing."""
     auth_result = require_permission(req, "candidates.read")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
@@ -318,6 +616,8 @@ def list_candidates_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         candidates = repositories.list_candidates(ranking_tier=ranking_tier)
     except Exception as e:
         return _cosmos_unavailable_response(e)
+    if _is_scoped_interviewer(auth_result):
+        candidates = [c for c in candidates if auth_result["username"] in (c.get("assigned_interviewer_usernames") or [])]
     return _json_response({"count": len(candidates), "candidates": candidates})
 
 
@@ -333,6 +633,8 @@ def get_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         return _cosmos_unavailable_response(e)
     if candidate is None:
         return _error_response(f"Candidate '{candidate_id}' not found.", status_code=404)
+    if not _interviewer_may_access(auth_result, candidate):
+        return _error_response("Forbidden: you are not assigned to this candidate.", status_code=403)
     return _json_response(candidate)
 
 
@@ -343,10 +645,212 @@ def get_candidate_interviews_endpoint(req: func.HttpRequest) -> func.HttpRespons
         return auth_result
     candidate_id = req.route_params.get("candidate_id")
     try:
+        candidate = repositories.get_candidate(candidate_id)
+        if candidate is not None and not _interviewer_may_access(auth_result, candidate):
+            return _error_response("Forbidden: you are not assigned to this candidate.", status_code=403)
         transcripts = repositories.list_interview_transcripts(candidate_id)
     except Exception as e:
         return _cosmos_unavailable_response(e)
     return _json_response({"candidate_id": candidate_id, "count": len(transcripts), "interviews": transcripts})
+
+
+@bp.route(route="candidates/{candidate_id}/assign-interviewer", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def assign_interviewer_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Sets the full list of interviewer usernames assigned to a
+    candidate -- the real enforcement point behind _is_scoped_interviewer
+    above. Body: {"usernames": ["persona_interviewer", ...]}. Gated by
+    interviews.assign, deliberately NOT held by the interviewer role
+    itself (see that permission's description in auth.py)."""
+    auth_result = require_permission(req, "interviews.assign")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+    usernames = body.get("usernames")
+    if not isinstance(usernames, list) or not all(isinstance(u, str) for u in usernames):
+        return _error_response("'usernames' must be a list of strings.", status_code=400)
+    try:
+        for username in usernames:
+            target = repositories.get_user_by_username(username)
+            if target is None or "interviewer" not in target.get("role_keys", []):
+                return _error_response(f"'{username}' is not an active interviewer account.", status_code=400)
+        candidate = repositories.assign_interviewers(candidate_id, usernames, auth_result["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if candidate is None:
+        return _error_response(f"Candidate '{candidate_id}' not found.", status_code=404)
+    return _json_response({"candidate_id": candidate_id, "assigned_interviewer_usernames": usernames})
+
+
+@bp.route(route="manage/chat/candidate-qa", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def chat_candidate_qa_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-08 (Phase 1 Implementation Contract, Task 4): backend-enforced,
+    role-based chat Q&A about one candidate record. Gated by the EXISTING
+    candidates.read permission -- no new permission or role invented, same
+    scope get_candidate_endpoint already grants. See chat_guardrails.py's
+    module docstring for why this is staff-facing, not candidate-facing:
+    this app has no authenticated candidate persona to scope a chat
+    session to, and building one would be rebuilding authentication,
+    which is explicitly out of scope for this task.
+
+    Body: {"candidate_id": "...", "question": "..."}. Authorization is
+    fully resolved here, in Python, before any prompt is built or any LLM
+    is called -- the model is never the authorization boundary."""
+    auth_result = require_permission(req, "candidates.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    candidate_id = (body.get("candidate_id") or "").strip()
+    question = (body.get("question") or "").strip()
+    if not candidate_id or not question:
+        return _error_response("'candidate_id' and 'question' are required.", status_code=400)
+
+    try:
+        scoping_candidate = repositories.get_candidate(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if scoping_candidate is not None and not _interviewer_may_access(auth_result, scoping_candidate):
+        return _error_response("Forbidden: you are not assigned to this candidate.", status_code=403)
+
+    try:
+        context = chat_guardrails.resolve_chat_context(candidate_id)
+    except chat_guardrails.ChatNotFoundError:
+        return _error_response(f"Candidate '{candidate_id}' not found.", status_code=404)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    prompt = chat_guardrails.build_chat_prompt(question, context)
+    trace_id = observability.new_trace_id()
+    try:
+        from langchain.schema import HumanMessage
+
+        with observability.trace_stage("chat", "candidate_qa", trace_id=trace_id, metadata={"has_question": True}):
+            routed_model, _ = model_routing.resolve_model("chat_candidate_qa", model_routing.get_runtime_routing_config())
+            llm = llm_utils.get_chat_llm(temperature=0.2, max_tokens=500, model=routed_model)
+            response = llm_utils.call_with_retry(
+                llm, [HumanMessage(content=prompt)],
+                label="chat_candidate_qa", model=routed_model, trace_id=trace_id,
+            )
+            answer = response.content
+    except Exception as e:
+        # Never a 500 with an internal stack trace or raw prompt/candidate
+        # text leaked into the error body -- a short, generic message only,
+        # same discipline as every other LLM-call error path in this repo
+        # (generate_questions.py/interview_bot.py print a local message,
+        # never echo the prompt or exception internals back to a caller).
+        return _error_response(f"Chat answer generation failed: {str(e)[:200]}", status_code=502)
+
+    return _json_response({"candidate_id": candidate_id, "answer": answer})
+
+
+@bp.route(route="manage/interview-questions/generate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def generate_interview_questions_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-06 (Phase 1 Implementation Contract, Task 6): the real,
+    integrated counterpart to the standalone generate_questions.py CLI
+    script -- questions generated against a real Cosmos candidate record
+    and a real active job description, gated by the EXISTING
+    interviews.manage permission (already held by recruiter/interviewer/
+    recruitment_ops_manager/admin -- no new permission or role).
+
+    Body: {"candidate_id": "...", "jd_id": "..."}. jd_id must be one of
+    the currently active JDs GET /jds already lists (jd_manager.py reads
+    jd_folder/*.txt directly -- the same real source that endpoint uses,
+    not a separate list invented here).
+
+    Real integration gap this closes: generate_questions.py previously
+    only worked against a local PDF file on disk, with no JD grounding,
+    no permission check, and no API/frontend surface. Real limitation
+    this does NOT close (documented, not silently papered over): the
+    candidate's "resume" side of the grounding is their already-
+    extracted, already-verified structured profile (Name, Profile
+    Summary, Top Matching Keywords, Missing Keywords, Candidate Type,
+    Resume Strength Score, JD Match) -- not the original raw PDF text.
+    candidate.jd_id is declared in candidate.schema.json but never
+    populated by the real ResumeParser.py/ResumeMEtrics.py ingestion
+    pipeline (confirmed by repo-wide search), and raw resume text isn't
+    persisted anywhere queryable by candidate_id (only its Blob path
+    is) -- so the caller must explicitly choose which active JD to
+    generate against, the same choice a recruiter already makes when
+    picking which role's candidate rankings to view."""
+    auth_result = require_permission(req, "interviews.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    candidate_id = (body.get("candidate_id") or "").strip()
+    jd_id = (body.get("jd_id") or "").strip()
+    if not candidate_id or not jd_id:
+        return _error_response("'candidate_id' and 'jd_id' are required.", status_code=400)
+
+    try:
+        candidate = repositories.get_candidate(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if candidate is None:
+        return _error_response(f"Candidate '{candidate_id}' not found.", status_code=404)
+
+    sys.path.insert(0, str(_repo_root))
+    import jd_manager
+
+    jds = jd_manager.list_jds(_repo_root / "jd_folder")
+    jd = next((j for j in jds if j["jd_id"] == jd_id), None)
+    if jd is None:
+        return _error_response(f"Job description '{jd_id}' not found among active JDs.", status_code=404)
+
+    try:
+        # Lazy import, deliberately not at module load time: generate_questions.py
+        # raises at IMPORT time if no OpenAI/Azure OpenAI key is configured
+        # (see that module's own top-of-file check) -- importing it eagerly
+        # at the top of this file would make the ENTIRE Functions host fail
+        # to start whenever that key is missing, not just this one endpoint
+        # fail to serve. Deferring the import confines that failure to
+        # exactly the request that needs it.
+        import generate_questions
+    except RuntimeError as e:
+        return _error_response(str(e), status_code=503)
+
+    resume_context = generate_questions.build_resume_context(candidate)
+    prompt = generate_questions.build_grounded_questions_prompt(resume_context, jd["text"])
+    trace_id = observability.new_trace_id()
+    try:
+        from langchain.schema import HumanMessage
+
+        with observability.trace_stage("interview_prep", "question_generation", trace_id=trace_id, correlation_id=candidate_id, metadata={"jd_id": jd_id}):
+            routed_model, _ = model_routing.resolve_model("interview_questions_generation", model_routing.get_runtime_routing_config())
+            llm = llm_utils.get_chat_llm(temperature=0.7, max_tokens=800, model=routed_model)
+            response = llm_utils.call_with_retry(
+                llm, [HumanMessage(content=prompt)],
+                label="interview_questions_generation", model=routed_model, trace_id=trace_id, correlation_id=candidate_id,
+            )
+            questions = generate_questions.parse_and_validate_questions(response.content)
+    except ValueError as e:
+        # The LLM call itself succeeded, but its response didn't parse into
+        # anything usable -- a distinct, narrower failure than "the LLM call
+        # failed," surfaced as its own 502 rather than silently returning an
+        # empty/garbled question list as if generation had succeeded.
+        return _error_response(f"Question generation produced no usable output: {e}", status_code=502)
+    except Exception as e:
+        # Same no-internal-detail-leaked discipline as chat_candidate_qa_endpoint
+        # -- never the raw prompt, candidate profile, or exception internals.
+        return _error_response(f"Question generation failed: {str(e)[:200]}", status_code=502)
+
+    return _json_response({
+        "candidate_id": candidate_id, "jd_id": jd_id, "jd_title": jd["title"],
+        "questions": questions, "count": len(questions),
+        "generated_at": datetime.now(timezone.utc).isoformat(), "model": "gpt-3.5-turbo",
+    })
 
 
 @bp.route(route="candidates/by-email/{email}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
@@ -516,12 +1020,19 @@ def submit_application_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 @bp.route(route="candidates/{candidate_id}/review", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Human Review Queue action. Body: {"decision": "approve"|"reject",
-    "reviewer": "...", "notes": "..."}. Logs to the immutable audit_log
-    (FDE Stage 25 evidence) rather than just overwriting ranking_tier with
-    no trace of who decided what or why."""
+    "notes": "..."}. Logs to the immutable audit_log (FDE Stage 25
+    evidence) rather than just overwriting ranking_tier with no trace of
+    who decided what or why.
+
+    'reviewer' is the AUTHENTICATED caller's own username, never taken
+    from the request body -- a client-supplied name here would let any
+    account attribute a decision to someone else in the audit trail. Any
+    'reviewer' the client still sends is silently ignored (old frontend
+    builds keep working; new ones no longer offer the field to edit)."""
     auth_result = require_permission(req, "candidates.update")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
+    reviewer = auth_result["username"]
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -529,13 +1040,10 @@ def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         return _error_response("Request body must be JSON.", status_code=400)
 
     decision = body.get("decision")
-    reviewer = body.get("reviewer")
     notes = body.get("notes", "")
 
     if decision not in ("approve", "reject"):
         return _error_response("'decision' must be 'approve' or 'reject'.", status_code=400)
-    if not reviewer:
-        return _error_response("'reviewer' is required.", status_code=400)
 
     try:
         candidate = repositories.get_candidate(candidate_id)
@@ -560,11 +1068,34 @@ def review_candidate_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     # Meta API error, a missing/invalid phone number) must not be reported
     # back as if the review itself failed. Logged either way, never raises.
     whatsapp_status = _notify_candidate_whatsapp(candidate, decision)
+    feedback_status = _maybe_request_feedback(candidate, decision)
 
     return _json_response({
         "candidate_id": candidate_id, "decision": decision, "status": "recorded",
         "whatsapp_notification": whatsapp_status,
+        "feedback_request": feedback_status,
     })
+
+
+def _maybe_request_feedback(candidate: dict, decision: str) -> str:
+    """F-03 (candidate feedback, minimal slice): best-effort, automatic
+    feedback-request trigger -- called right after a real final hiring
+    decision is recorded (review_candidate_endpoint / bulk-decision
+    approval), the one real "hiring process complete" signal this repo
+    has (see candidate_feedback.py's module docstring). Deliberately
+    OUTSIDE the caller's own try/except for the SAME reason
+    _notify_candidate_whatsapp is: the decision itself has already been
+    recorded successfully, so a feedback-request failure must never be
+    reported back as if the review failed. create_feedback_request() is
+    itself idempotent, so this is also safe to call on retries."""
+    candidate_id = candidate.get("candidate_id") or candidate.get("id")
+    if not candidate_feedback.is_eligible_for_feedback_request(candidate):
+        return "skipped: not a terminal decision"
+    try:
+        repositories.create_feedback_request(candidate_id, reason=f"decision:{decision}", jd_id=candidate.get("jd_id"))
+        return "requested"
+    except Exception as e:
+        return f"failed: {e}"
 
 
 def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
@@ -617,11 +1148,92 @@ def _notify_candidate_whatsapp(candidate: dict, decision: str) -> str:
     return result
 
 
+# ---------------------------------------------------------------------------
+# F-03 (candidate feedback, minimal slice). Candidate-facing endpoints
+# below are PUBLIC (no permission check) -- same precedent as
+# submit_application_endpoint/get_candidate_by_email_endpoint: this repo
+# has no real candidate login, so candidate_id itself (an opaque,
+# server-generated UUID, never guessable) is the only real "identity" a
+# candidate-facing call can use. Documented, not hidden. The dashboard
+# endpoint below IS permission-gated (feedback.read), since that's a
+# staff-facing view across every candidate's feedback.
+# ---------------------------------------------------------------------------
+@bp.route(route="candidates/{candidate_id}/feedback", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_candidate_feedback_request_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Lets the candidate-facing form check whether there's a real
+    feedback request waiting and whether it's already been submitted --
+    returns only the fields a candidate needs (never requested_reason/
+    jd_id, which are internal)."""
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        doc = repositories.get_feedback_request(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if doc is None:
+        return _error_response("No feedback request exists for this candidate.", status_code=404)
+    return _json_response({
+        "candidate_id": candidate_id, "status": doc["status"],
+        "categories": candidate_feedback.FEEDBACK_CATEGORIES,
+        "rating_min": candidate_feedback.RATING_MIN, "rating_max": candidate_feedback.RATING_MAX,
+    })
+
+
+@bp.route(route="candidates/{candidate_id}/feedback", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def submit_candidate_feedback_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Body: {"ratings": {"application_process": 1-5, ...all categories},
+    "comment": "..." (optional)}. One-way: submitting twice for the same
+    candidate_id fails with 409, it never overwrites the first
+    submission."""
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    errors = candidate_feedback.validate_feedback_submission(body)
+    if errors:
+        return _error_response("; ".join(errors), status_code=400)
+
+    try:
+        doc = repositories.submit_feedback(
+            candidate_id, body["ratings"], candidate_feedback.sanitize_comment(body.get("comment")),
+        )
+    except ValueError as e:
+        status = 404 if "No feedback request exists" in str(e) else 409
+        return _error_response(str(e), status_code=status)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"candidate_id": candidate_id, "status": doc["status"], "submitted_at": doc["submitted_at"]})
+
+
+@bp.route(route="manage/candidate-feedback", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def list_candidate_feedback_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Recruiter/Admin dashboard: every feedback request + its submission
+    (if any), plus an aggregate summary. Optional `?jd_id=...` filter --
+    the real filter this repo's candidate schema actually supports
+    (department/time-period filtering are deferred -- no "department"
+    field exists anywhere in the real candidate/JD schema)."""
+    auth_result = require_permission(req, "feedback.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    jd_id = req.params.get("jd_id")
+    try:
+        records = repositories.list_feedback(jd_id=jd_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({
+        "count": len(records), "records": records,
+        "summary": candidate_feedback.summarize_feedback(records),
+    })
+
+
 @bp.route(route="bulk-decisions", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter proposes a bulk accept/reject on a batch of screening-
     phase candidates. Body: {"decision": "approve"|"reject",
-    "candidate_ids": ["...", ...], "proposed_by": "...", "notes": "..." (optional)}.
+    "candidate_ids": ["...", ...], "notes": "..." (optional)}.
+    'proposed_by' is always the authenticated caller's own username, same
+    as review_candidate_endpoint's 'reviewer' -- never client-supplied.
 
     Does NOT touch any candidate record -- the AI/scoring pipeline only
     ever produces a recommendation (ranking_tier), and a recruiter acting
@@ -634,6 +1246,7 @@ def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     auth_result = require_permission(req, "screening.propose")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
+    proposed_by = auth_result["username"]
     try:
         body = req.get_json()
     except ValueError:
@@ -641,15 +1254,12 @@ def propose_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
     decision = body.get("decision")
     candidate_ids = body.get("candidate_ids")
-    proposed_by = body.get("proposed_by")
     notes = body.get("notes", "")
 
     if decision not in ("approve", "reject"):
         return _error_response("'decision' must be 'approve' or 'reject'.", status_code=400)
     if not candidate_ids or not isinstance(candidate_ids, list):
         return _error_response("'candidate_ids' must be a non-empty list.", status_code=400)
-    if not proposed_by:
-        return _error_response("'proposed_by' is required.", status_code=400)
 
     try:
         doc = repositories.create_bulk_decision(decision, candidate_ids, proposed_by, notes)
@@ -701,7 +1311,8 @@ def _apply_bulk_decision(decision_id: str, decision: str, candidate_ids: list, r
                 "notes": proposal_notes,
             })
             whatsapp_status = _notify_candidate_whatsapp(candidate, decision)
-            results.append({"candidate_id": candidate_id, "status": "applied", "whatsapp_notification": whatsapp_status})
+            feedback_status = _maybe_request_feedback(candidate, decision)
+            results.append({"candidate_id": candidate_id, "status": "applied", "whatsapp_notification": whatsapp_status, "feedback_request": feedback_status})
         except Exception as e:
             results.append({"candidate_id": candidate_id, "status": f"failed: {e}"})
     return results
@@ -710,20 +1321,14 @@ def _apply_bulk_decision(decision_id: str, decision: str, candidate_ids: list, r
 @bp.route(route="bulk-decisions/{decision_id}/approve", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def approve_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Admin approves a pending bulk proposal -- this is the ONLY place a
-    bulk accept/reject actually takes effect on candidate records. Body:
-    {"reviewed_by": "..."}."""
+    bulk accept/reject actually takes effect on candidate records.
+    'reviewed_by' is always the authenticated caller's own username, same
+    as review_candidate_endpoint's 'reviewer' -- never client-supplied."""
     auth_result = require_permission(req, "screening.approve")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
+    reviewed_by = auth_result["username"]
     decision_id = req.route_params.get("decision_id")
-    try:
-        body = req.get_json()
-    except ValueError:
-        return _error_response("Request body must be JSON.", status_code=400)
-
-    reviewed_by = body.get("reviewed_by")
-    if not reviewed_by:
-        return _error_response("'reviewed_by' is required.", status_code=400)
 
     try:
         pending = repositories.get_bulk_decision(decision_id)
@@ -749,20 +1354,18 @@ def approve_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 def reject_bulk_decision_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Admin rejects a pending bulk proposal -- no candidate is touched,
     the proposal is just marked rejected (kept for the audit trail, not
-    deleted). Body: {"reviewed_by": "...", "notes": "..." (optional, why
-    it was rejected)}."""
+    deleted). Body: {"notes": "..." (optional, why it was rejected)}.
+    'reviewed_by' is always the authenticated caller's own username, same
+    as review_candidate_endpoint's 'reviewer' -- never client-supplied."""
     auth_result = require_permission(req, "screening.approve")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
+    reviewed_by = auth_result["username"]
     decision_id = req.route_params.get("decision_id")
     try:
         body = req.get_json()
     except ValueError:
-        return _error_response("Request body must be JSON.", status_code=400)
-
-    reviewed_by = body.get("reviewed_by")
-    if not reviewed_by:
-        return _error_response("'reviewed_by' is required.", status_code=400)
+        body = {}
 
     try:
         repositories.mark_bulk_decision_reviewed(
@@ -846,14 +1449,66 @@ def get_candidate_timeline_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"candidate_id": candidate_id, "timeline": timeline})
 
 
+@bp.route(route="candidates/{candidate_id}/erasure", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_candidate_erasure_preview_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-14 (candidate data erasure, minimal slice): read-only discovery
+    -- reports exactly what real data would be erased, retained, or
+    found-but-untouched for this candidate, without erasing anything.
+    See candidate_erasure.py's module docstring for the full real-store
+    inventory this is grounded in."""
+    auth_result = require_permission(req, "candidates.erase")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    candidate_id = req.route_params.get("candidate_id")
+    try:
+        report = candidate_erasure.locate_candidate_data(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(report)
+
+
+@bp.route(route="candidates/{candidate_id}/erasure", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def run_candidate_erasure_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-14 (candidate data erasure, minimal slice): runs the REAL,
+    irreversible Cosmos-scoped erasure. Requires an explicit
+    {"confirm": true} body field -- a bare POST with no confirmation is
+    refused with 400, so this can never be triggered by an accidental
+    empty-body request. The action itself is audited via
+    _audit_admin_action() (candidate_id + real per-container erased
+    counts, never the candidate's actual PII), same as every other
+    consequential admin action in this file."""
+    auth_result = require_permission(req, "candidates.erase")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    candidate_id = req.route_params.get("candidate_id")
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    if not body.get("confirm"):
+        return _error_response("This is a real, irreversible deletion. Resend with {\"confirm\": true} to proceed.", status_code=400)
+
+    try:
+        report = candidate_erasure.erase_candidate(candidate_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("candidate_data_erased", actor, candidate_id=candidate_id, erased=report["erased"])
+    return _json_response(report)
+
+
 PERFORMANCE_RATINGS = ["Excellent", "Good", "Average", "Poor"]
 
 
 @bp.route(route="candidates/{candidate_id}/stage", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
 def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Recruiter/Admin sets a candidate's current hiring stage AND records
-    how they did there. Body: {"stage": "Technical Exam", "updated_by": "...",
-    "notes": "...", "performance": "Good" (optional, one of PERFORMANCE_RATINGS)}.
+    how they did there. Body: {"stage": "Technical Exam", "notes": "...",
+    "performance": "Good" (optional, one of PERFORMANCE_RATINGS)}.
+    'updated_by' is always the authenticated caller's own username, never
+    client-supplied -- same as review_candidate_endpoint's 'reviewer'.
 
     This is the real point of the stage timeline, not just a progress
     tracker: a recruiter isn't only approving/rejecting a resume once,
@@ -890,6 +1545,7 @@ def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse
     auth_result = require_permission(req, "interviews.manage")
     if isinstance(auth_result, func.HttpResponse):
         return auth_result
+    updated_by = auth_result["username"]
     candidate_id = req.route_params.get("candidate_id")
     try:
         body = req.get_json()
@@ -897,14 +1553,11 @@ def advance_candidate_stage_endpoint(req: func.HttpRequest) -> func.HttpResponse
         return _error_response("Request body must be JSON.", status_code=400)
 
     stage = body.get("stage")
-    updated_by = body.get("updated_by")
     notes = body.get("notes")
     performance = body.get("performance")
 
     if not stage:
         return _error_response("'stage' is required.", status_code=400)
-    if not updated_by:
-        return _error_response("'updated_by' is required.", status_code=400)
     if not notes or not notes.strip():
         return _error_response("'notes' is required -- record how the candidate actually did at this stage.", status_code=400)
     if performance and performance not in PERFORMANCE_RATINGS:
@@ -1253,6 +1906,221 @@ def observability_summary_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
 
 # ---------------------------------------------------------------------------
+# Tokenomics budget configuration (F-02, minimal slice) -- same real
+# Draft -> Activate -> History console pattern as RAG/Communications
+# configuration above, applied to the one real gap the roadmap
+# identified: a configurable monthly budget + warning threshold, checked
+# against real, period-scoped usage data. Viewing reuses the EXISTING
+# analytics.read permission (same cost/usage data every other
+# observability view already uses); only the write/activate path needs
+# the new tokenomics.config.write permission.
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/tokenomics-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_tokenomics_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        active = repositories.get_active_tokenomics_config() or dict(tokenomics.DEFAULT_CONFIG, id="active", config_version=0)
+        draft = repositories.get_draft_tokenomics_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"active": active, "draft": draft})
+
+
+@bp.route(route="manage/tokenomics-config", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def save_tokenomics_config_draft_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "tokenomics.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    errors = tokenomics.validate_config(body)
+    if errors:
+        return _error_response("; ".join(errors), status_code=400)
+
+    try:
+        saved = repositories.save_draft_tokenomics_config(body, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(saved)
+
+
+@bp.route(route="manage/tokenomics-config/activate", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def activate_tokenomics_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "tokenomics.config.write")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        saved = repositories.activate_tokenomics_config(actor["username"])
+    except ValueError as e:
+        return _error_response(str(e), status_code=404)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(saved)
+
+
+@bp.route(route="manage/tokenomics-config/history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_tokenomics_config_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        history = repositories.list_tokenomics_config_history()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
+
+
+@bp.route(route="manage/tokenomics/status", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_tokenomics_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real, period-scoped (current UTC calendar month) usage + budget
+    check -- distinct from observability_summary_endpoint above, which is
+    all-time and has no budget concept. Never fabricates a status: no
+    active budget configured returns "not_configured" honestly, not a
+    fake "ok"."""
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        records = _read_jsonl(observability.LOG_PATH)
+        active_config = repositories.get_active_tokenomics_config() or tokenomics.DEFAULT_CONFIG
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    usage = tokenomics.compute_monthly_usage(records)
+    budget_status = tokenomics.check_budget_status(usage, active_config)
+    return _json_response({"usage": usage, "budget": budget_status})
+
+
+# ---------------------------------------------------------------------------
+# F-18 (LLM caching, minimal slice) -- real stats on the local, exact-
+# match response cache wrapped around ResumeParser.py's two cacheable
+# call sites (see llm_cache.py's module docstring for exactly which, and
+# why only those two). Viewing reuses analytics.read; clearing needs the
+# new llm_cache.manage permission (destructive -- discards real cache
+# state, though never any candidate data, since the cache only ever
+# holds already-persisted resume-processing output).
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/llm-cache/stats", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_llm_cache_stats_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Real cache stats, plus an ESTIMATED cost/token savings figure --
+    clearly labeled as an estimate, computed from this month's real
+    historical average cost/tokens per cacheable label (from the same
+    llm_observability.jsonl tokenomics.py reads), never a fabricated
+    number. If a label has no real non-cache-hit calls yet this month to
+    average, its estimate is reported as null, not a guessed value."""
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        cache_stats = llm_cache.stats()
+        records = _read_jsonl(observability.LOG_PATH)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    usage = tokenomics.compute_monthly_usage(records)
+    estimated_savings_usd = 0.0
+    any_estimate_available = False
+    for label, label_cache_stats in cache_stats["by_label"].items():
+        usage_label_stats = usage["by_label"].get(label)
+        real_calls = (usage_label_stats["calls"] - usage_label_stats["cache_hit_calls"]) if usage_label_stats else 0
+        if usage_label_stats and real_calls > 0:
+            avg_cost = usage_label_stats["cost_usd"] / real_calls
+            estimated_savings_usd += avg_cost * label_cache_stats["hit_count"]
+            any_estimate_available = True
+
+    return _json_response({
+        "cache": cache_stats,
+        "estimated_savings_usd_this_month": round(estimated_savings_usd, 6) if any_estimate_available else None,
+        "cache_hit_call_count_this_month": usage["cache_hit_call_count"],
+    })
+
+
+@bp.route(route="manage/llm-cache/clear", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def clear_llm_cache_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "llm_cache.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    removed_count = llm_cache.clear()
+    try:
+        repositories.append_audit_log({"candidate_id": "_system", "action": "llm_cache_cleared", "actor": actor["username"], "removed_count": removed_count})
+    except Exception:
+        pass  # the cache was already really cleared -- an audit-log failure must not be reported as if the clear itself failed
+    return _json_response({"status": "cleared", "removed_count": removed_count})
+
+
+# ---------------------------------------------------------------------------
+# F-17 (model routing, minimal slice) -- a centralized, admin-configurable
+# model override for the 6 real LLM call sites that have no admin
+# control today (see model_routing.py's module docstring for exactly
+# which, and why resume_chunk_summarization/resume_merge_structured_
+# extraction are deliberately excluded -- they already have one, via the
+# RAG Configuration Console).
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/model-routing-config", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_model_routing_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        doc = repositories.get_model_routing_config()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    routes = (doc or {}).get("routes", {})
+    return _json_response({
+        "routable_labels": sorted(model_routing.ROUTABLE_LABELS),
+        "default_models": model_routing.DEFAULT_MODELS,
+        "routes": routes,
+        "updated_by": (doc or {}).get("updated_by"), "updated_at": (doc or {}).get("updated_at"),
+    })
+
+
+@bp.route(route="manage/model-routing-config", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
+def save_model_routing_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Body: {"routes": {"chat_candidate_qa": "gpt-4o-mini", ...}} -- a
+    whole-replace of the routing map, same semantics as
+    update_pipeline_config_endpoint. An omitted label simply keeps using
+    its real hardcoded default (model_routing.DEFAULT_MODELS)."""
+    auth_result = require_permission(req, "model_routing.manage")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    routes = body.get("routes")
+    errors = model_routing.validate_routing_config(routes if routes is not None else {})
+    if errors:
+        return _error_response("; ".join(errors), status_code=400)
+
+    try:
+        saved = repositories.save_model_routing_config(routes or {}, actor["username"])
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(saved)
+
+
+@bp.route(route="manage/model-routing-config/history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_model_routing_config_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    auth_result = require_permission(req, "analytics.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        history = repositories.list_model_routing_config_history()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
+
+
+# ---------------------------------------------------------------------------
 # Admin Panel: User Management (/admin/users*) and Role & Permission
 # Management (/admin/roles*, /admin/permissions). Every endpoint below is
 # gated by require_permission() -- there is no separate/looser path into
@@ -1391,6 +2259,30 @@ def update_role_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
     _audit_admin_action("role_updated", actor, role_key=role_key)
     return _json_response(doc)
+
+
+@bp.route(route="manage/roles/sync", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def sync_roles_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Reconciles every is_system role's permission_ids/display_name/
+    description against the current auth.DEFAULT_ROLES -- see
+    repositories.sync_default_roles()'s docstring for the real gap this
+    closes: ensure_default_roles() only ever INSERTS a role that doesn't
+    exist in Cosmos yet, so a system role seeded before a later code
+    change (e.g. recruiter gaining jds.create) silently kept its stale
+    permission_ids forever until something re-upserted it. Same pattern
+    as sync_pages_endpoint -- safe to call any time, never touches a
+    non-system (admin-created custom) role."""
+    auth_result = require_permission(req, "roles.update")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    try:
+        updated = repositories.sync_default_roles()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    for role_key in updated:
+        _audit_admin_action("role_synced", actor, role_key=role_key)
+    return _json_response({"updated": updated})
 
 
 @bp.route(route="manage/users", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
@@ -1576,6 +2468,61 @@ def set_user_status_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
     _audit_admin_action("user_status_changed", actor, target_user_id=user_id, new_status=new_status)
     return _json_response(_safe_user(updated))
+
+
+@bp.route(route="manage/users/{user_id}", methods=["DELETE"], auth_level=func.AuthLevel.FUNCTION)
+def delete_user_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Permanently deletes a user account. Requires users.disable (reused
+    rather than inventing a separate users.delete -- whoever can already
+    disable an account can already deny it all access; hard-delete is a
+    stricter version of the same administrative action). Requires an
+    explicit {"confirm": true} body field, same irreversible-action
+    convention as run_candidate_erasure_endpoint.
+
+    Same two safeguards as set_user_status_endpoint, since a hard delete
+    is strictly more severe than a disable: a user cannot delete their
+    own account, and the last active Admin account can never be deleted."""
+    auth_result = require_permission(req, "users.disable")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+    user_id = req.route_params.get("user_id")
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    if not body.get("confirm"):
+        return _error_response("This is a real, irreversible deletion. Resend with {\"confirm\": true} to proceed.", status_code=400)
+
+    if user_id == actor["id"]:
+        return _error_response("You cannot delete your own account.", status_code=403)
+
+    try:
+        user = repositories.get_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    if user is None:
+        return _error_response(f"User '{user_id}' not found.", status_code=404)
+
+    if "admin" in user.get("role_keys", []):
+        try:
+            remaining = repositories.count_active_users_with_role("admin", exclude_user_id=user_id)
+        except Exception as e:
+            return _cosmos_unavailable_response(e)
+        if remaining < 1:
+            return _error_response(
+                "Can't delete the last active Admin account. Promote another account to Admin first.",
+                status_code=409,
+            )
+
+    try:
+        repositories.delete_user(user_id)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    _audit_admin_action("user_deleted", actor, target_user_id=user_id, target_username=user.get("username"))
+    return _json_response({"user_id": user_id, "status": "deleted"})
 
 
 @bp.route(route="manage/users/{user_id}/roles", methods=["PUT"], auth_level=func.AuthLevel.FUNCTION)
@@ -2278,6 +3225,79 @@ def observability_report_export_endpoint(req: func.HttpRequest) -> func.HttpResp
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=observability_request_volume.csv"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Unified Observability snapshot persistence (observability_snapshots.py).
+# Core principle: GET /manage/observability/snapshot is a pure, fast
+# Cosmos read -- it NEVER calls a real source. Only an explicit POST
+# .../refresh collects real data (and persists it). A failed refresh
+# never erases a previous source's last-known-good result; see that
+# module's run_refresh() docstring.
+# ---------------------------------------------------------------------------
+@bp.route(route="manage/observability/snapshot", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def get_observability_snapshot_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The dashboard's default data source -- reads the latest persisted
+    snapshot only, no live Azure/local calls. Returns an honest 'no
+    refresh has ever run' shape if none exists yet, never a fabricated
+    empty-but-successful snapshot."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        snapshot = observability_snapshots.get_snapshot()
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(snapshot)
+
+
+@bp.route(route="manage/observability/refresh", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def refresh_observability_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """The ONLY action that queries real sources (Azure Monitor, Azure
+    Readiness/az CLI, local JSONL traces, comms delivery) -- opening the
+    dashboard never triggers this. Body (optional): {"hours": 24,
+    "source_ids": [...]} -- omit source_ids to refresh every real source
+    ('Refresh All'); pass one or more to refresh only those (per-section
+    refresh)."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    hours = body.get("hours", 24.0)
+    try:
+        hours = float(hours)
+    except (TypeError, ValueError):
+        return _error_response("'hours' must be a number.", status_code=400)
+    if hours <= 0 or hours > 168:
+        return _error_response("'hours' must be between 0 (exclusive) and 168.", status_code=400)
+    source_ids = body.get("source_ids")
+    try:
+        snapshot = observability_snapshots.run_refresh(triggered_by=auth_result["username"], hours=hours, source_ids=source_ids)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response(snapshot)
+
+
+@bp.route(route="manage/observability/refresh-history", methods=["GET"], auth_level=func.AuthLevel.FUNCTION)
+def observability_refresh_history_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Persistent refresh-history table -- real past refresh_run records,
+    not frontend memory (survives a page reload or backend restart).
+    ?limit= caps how many, default 20, max 100."""
+    auth_result = require_permission(req, "observability.read")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    try:
+        limit = min(max(int(req.params.get("limit", 20)), 1), 100)
+    except ValueError:
+        return _error_response("'limit' must be an integer.", status_code=400)
+    try:
+        history = repositories.list_observability_refresh_history(limit=limit)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+    return _json_response({"count": len(history), "history": history})
 
 
 # ---------------------------------------------------------------------------
@@ -3623,6 +4643,212 @@ def preview_rag_config_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         included_generation=include_generation,
     )
     return _json_response(result)
+
+
+_rag_evaluation_last_run = {}  # actor_id -> monotonic seconds, per-process only -- separate
+# store from _rag_preview_last_run above (see _rate_limited()'s own docstring
+# for why: this is a heavier, multi-LLM-call operation with its own cooldown,
+# and must not share state with -- or be tripped by -- the plain preview endpoint.
+_RAG_EVALUATION_MIN_INTERVAL_SECONDS = 30
+
+
+@bp.route(route="manage/rag-evaluation/run", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def run_rag_evaluation_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-19 (RAG evaluation framework) -- minimal slice. Reuses the
+    EXISTING rag.preview.run permission (no new permission/role) since
+    this is the same real-cost, admin-triggered "run a real check against
+    the real pipeline" operation preview_rag_config_endpoint already is,
+    just evaluating against known golden questions instead of one
+    free-typed JD. See rag_evaluation.py's module docstring for the full
+    scope statement (this is NOT the full F-19 framework).
+
+    Body: {"top_k": optional int (default 5), "similarity_threshold":
+    optional float (default 0.0), "include_groundedness": optional bool
+    (default false) -- the groundedness check makes two additional REAL,
+    billable LLM calls (one generation, one judge) on top of retrieval,
+    so it is opt-in, same cost-consciousness as include_generation on the
+    plain preview endpoint above. Its own, longer-cooldown rate limit
+    reflects that real cost."""
+    auth_result = require_permission(req, "rag.preview.run")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    top_k = int(body.get("top_k") or 5)
+    similarity_threshold = float(body.get("similarity_threshold") or 0.0)
+    include_groundedness = bool(body.get("include_groundedness", False))
+
+    if _rate_limited(actor["id"], _RAG_EVALUATION_MIN_INTERVAL_SECONDS, store=_rag_evaluation_last_run):
+        return _error_response(
+            f"Evaluation run too recently -- wait at least {_RAG_EVALUATION_MIN_INTERVAL_SECONDS}s between runs.",
+            status_code=429,
+        )
+
+    try:
+        retrieval_evaluation = rag_evaluation.run_retrieval_evaluation(top_k=top_k, similarity_threshold=similarity_threshold)
+    except Exception as e:
+        return _error_response(f"Retrieval evaluation failed: {str(e)[:300]}", status_code=502)
+
+    groundedness_evaluation = None
+    if include_groundedness:
+        groundedness_evaluation = _run_groundedness_evaluation()
+
+    _audit_admin_action(
+        "rag_evaluation_run", actor, top_k=top_k, question_count=retrieval_evaluation["total"],
+        hit_rate=retrieval_evaluation["hit_rate"], included_groundedness=include_groundedness,
+    )
+    return _json_response({"retrieval_evaluation": retrieval_evaluation, "groundedness_evaluation": groundedness_evaluation})
+
+
+def _run_groundedness_evaluation() -> dict:
+    """Runs the ONE groundedness case (RAGEVAL-002 -- see rag_evaluation.
+    GOLDEN_QUESTIONS) through the real retrieval -> real generation ->
+    real judge path. Never fabricates a score: any real failure along
+    the way (no index, generation failure, malformed judge response) is
+    returned as a distinct error, not coerced into a fake score."""
+    case = next(q for q in rag_evaluation.GOLDEN_QUESTIONS if q["id"] == "RAGEVAL-002")
+    try:
+        retrieval = rag_preview.run_retrieval_preview(case["query"], 3, 0.0)
+    except Exception as e:
+        return {"error": f"Retrieval step failed: {str(e)[:300]}"}
+    if retrieval["insufficient_evidence"]:
+        return {"error": "Skipped -- no retrieved evidence passed the similarity threshold."}
+
+    active_config = repositories.get_active_rag_config() or rag_config.DEFAULT_CONFIG
+    chunk_prompt = rag_config.get_active_prompt_template("resume_chunk_summarization")
+    merge_prompt = rag_config.get_active_prompt_template("resume_merge_structured_extraction")
+    try:
+        generation = rag_preview.run_generation_preview(
+            case["query"], retrieval["chunks"], chunk_prompt, merge_prompt, active_config.get("generation", rag_config.DEFAULT_CONFIG["generation"]),
+        )
+    except Exception as e:
+        return {"error": f"Generation step failed: {str(e)[:300]}"}
+
+    from langchain.schema import HumanMessage
+
+    sources = [c["metadata"].get("chunk_text", "") for c in retrieval["chunks"]]
+    judge_prompt = rag_evaluation.build_groundedness_judge_prompt(sources, generation["final_response"])
+    try:
+        routed_model, _ = model_routing.resolve_model("rag_groundedness_judge", model_routing.get_runtime_routing_config())
+        llm = llm_utils.get_chat_llm(temperature=0.0, max_tokens=300, model=routed_model, model_kwargs={"response_format": {"type": "json_object"}})
+        response = llm_utils.call_with_retry(llm, [HumanMessage(content=judge_prompt)], label="rag_groundedness_judge", model=routed_model)
+        judged = rag_evaluation.parse_judge_response(response.content)
+    except rag_evaluation.GroundednessJudgeError as e:
+        return {"error": f"Judge response was unusable: {e}"}
+    except Exception as e:
+        return {"error": f"Judge call failed: {str(e)[:300]}"}
+
+    return {"question_id": case["id"], "groundedness_score": judged["groundedness_score"], "rationale": judged["rationale"]}
+
+
+_ai_evaluation_last_run = {}  # actor_id -> monotonic seconds, per-process only -- own store,
+# same reasoning as _rag_evaluation_last_run above: this is a separate, also
+# potentially real-LLM-call-bearing evaluation family and must not share a
+# rate-limit window with the plain RAG preview or the RAG evaluation run.
+_AI_EVALUATION_MIN_INTERVAL_SECONDS = 30
+
+
+@bp.route(route="manage/ai-evaluation/run", methods=["POST"], auth_level=func.AuthLevel.FUNCTION)
+def run_ai_evaluation_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """F-21 (AI evaluation/QA framework) -- minimal slice. Reuses the
+    EXISTING rag.preview.run permission, same admin-triggered "run a
+    real check against the real pipeline" family F-19's evaluation
+    endpoint already is -- no new permission/role. See ai_evaluation.py's
+    module docstring for the full scope statement (this is NOT the full
+    F-21 framework).
+
+    Body: {"candidate_id": optional str, "jd_id": optional str,
+    "include_match_quality": optional bool (default false)}.
+
+    Always runs the structured-output gate against every real candidate
+    currently in Cosmos (or, if `candidate_id` is given with no
+    `include_match_quality`, against just that one candidate). The
+    match-quality judge call is opt-in and requires BOTH candidate_id and
+    jd_id (same real-record-lookup pattern generate_interview_questions_
+    endpoint already uses) -- it makes a real, billable LLM call, so it
+    is never run implicitly."""
+    auth_result = require_permission(req, "rag.preview.run")
+    if isinstance(auth_result, func.HttpResponse):
+        return auth_result
+    actor = auth_result
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        body = {}
+    candidate_id = (body.get("candidate_id") or "").strip() or None
+    jd_id = (body.get("jd_id") or "").strip() or None
+    include_match_quality = bool(body.get("include_match_quality", False))
+
+    if include_match_quality and not (candidate_id and jd_id):
+        return _error_response("'candidate_id' and 'jd_id' are both required when 'include_match_quality' is true.", status_code=400)
+
+    if _rate_limited(actor["id"], _AI_EVALUATION_MIN_INTERVAL_SECONDS, store=_ai_evaluation_last_run):
+        return _error_response(
+            f"Evaluation run too recently -- wait at least {_AI_EVALUATION_MIN_INTERVAL_SECONDS}s between runs.",
+            status_code=429,
+        )
+
+    gate_candidate_ids = [candidate_id] if (candidate_id and not include_match_quality) else None
+    try:
+        structured_output_gate = ai_evaluation.run_structured_output_gate(candidate_ids=gate_candidate_ids)
+    except Exception as e:
+        return _error_response(f"Structured-output gate failed: {str(e)[:300]}", status_code=502)
+
+    match_quality_evaluation = None
+    if include_match_quality:
+        match_quality_evaluation = _run_match_quality_evaluation(candidate_id, jd_id)
+
+    _audit_admin_action(
+        "ai_evaluation_run", actor, candidate_count=structured_output_gate["total"],
+        pass_rate=structured_output_gate["pass_rate"], included_match_quality=include_match_quality,
+    )
+    return _json_response({"structured_output_gate": structured_output_gate, "match_quality_evaluation": match_quality_evaluation})
+
+
+def _run_match_quality_evaluation(candidate_id: str, jd_id: str) -> dict:
+    """Runs the LLM-as-judge candidate-job match-quality check on ONE
+    real candidate against ONE real, currently-active JD -- same real-
+    record-lookup pattern generate_interview_questions_endpoint already
+    uses (never a fabricated candidate or JD). Reuses rag_evaluation.
+    parse_judge_response/GroundednessJudgeError directly (see
+    ai_evaluation.py's module docstring) rather than duplicating the
+    judge-response validation logic."""
+    try:
+        candidate = repositories.get_candidate(candidate_id)
+    except Exception as e:
+        return {"error": f"Candidate lookup failed: {str(e)[:300]}"}
+    if candidate is None:
+        return {"error": f"Candidate '{candidate_id}' not found."}
+
+    sys.path.insert(0, str(_repo_root))
+    import jd_manager
+
+    jds = jd_manager.list_jds(_repo_root / "jd_folder")
+    jd = next((j for j in jds if j["jd_id"] == jd_id), None)
+    if jd is None:
+        return {"error": f"Job description '{jd_id}' not found among active JDs."}
+
+    profile = {k: candidate.get(k) for k in ("Name", "Profile Summary", "Top Matching Keywords", "Missing Keywords", "JD Match")}
+    judge_prompt = ai_evaluation.build_match_quality_judge_prompt(profile, jd["text"], candidate.get("JD Match"))
+
+    from langchain.schema import HumanMessage
+
+    try:
+        routed_model, _ = model_routing.resolve_model("ai_match_quality_judge", model_routing.get_runtime_routing_config())
+        llm = llm_utils.get_chat_llm(temperature=0.0, max_tokens=300, model=routed_model, model_kwargs={"response_format": {"type": "json_object"}})
+        response = llm_utils.call_with_retry(llm, [HumanMessage(content=judge_prompt)], label="ai_match_quality_judge", model=routed_model)
+        judged = rag_evaluation.parse_judge_response(response.content)
+    except rag_evaluation.GroundednessJudgeError as e:
+        return {"error": f"Judge response was unusable: {e}"}
+    except Exception as e:
+        return {"error": f"Judge call failed: {str(e)[:300]}"}
+
+    return {"candidate_id": candidate_id, "jd_id": jd_id, "match_quality_score": judged["groundedness_score"], "rationale": judged["rationale"]}
 
 
 # ---------------------------------------------------------------------------
