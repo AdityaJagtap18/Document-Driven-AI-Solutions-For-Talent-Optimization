@@ -137,6 +137,12 @@ function App() {
   var tabState = React.useState(null);
   var tab = tabState[0];
   var setTab = tabState[1];
+  // Mobile only (<=900px, see styles.css): the sidebar becomes a
+  // slide-in drawer instead of a permanently-hidden element with no way
+  // to reach it -- this is what that drawer's open/closed state is.
+  var sidebarOpenState = React.useState(false);
+  var sidebarOpen = sidebarOpenState[0];
+  var setSidebarOpen = sidebarOpenState[1];
 
   function signOut() {
     storeSession(null);
@@ -208,10 +214,14 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={function () { setSidebarOpen(false); }} />}
+      <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
         <div className="sidebar-brand">
           <div className="sidebar-brand-mark">C</div>
           <div className="sidebar-brand-name">CDPI</div>
+          <button className="sidebar-close" onClick={function () { setSidebarOpen(false); }} aria-label="Close menu">
+            <IconClose />
+          </button>
         </div>
 
         <div>
@@ -226,7 +236,7 @@ function App() {
                       <button
                         key={item.tab}
                         className={"sidebar-link" + (item.tab === activeTab ? " sidebar-link-active" : "")}
-                        onClick={function () { setTab(item.tab); }}
+                        onClick={function () { setTab(item.tab); setSidebarOpen(false); }}
                       >
                         <Icon /> {item.label}
                       </button>
@@ -254,6 +264,9 @@ function App() {
 
       <div className="app-body">
         <header className="topbar">
+          <button className="topbar-menu-btn" onClick={function () { setSidebarOpen(true); }} aria-label="Open menu">
+            <IconMenu />
+          </button>
           <div className="topbar-title">{activeItem ? activeItem.label : "CDPI"}</div>
           <div className="topbar-right">
             <div className="topbar-mode">API: <strong>{window.CDPI_CONFIG.mode}</strong></div>

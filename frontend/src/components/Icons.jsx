@@ -132,3 +132,21 @@ function IconKey(props) {
     </svg>
   );
 }
+
+/** Mobile-only: opens/closes the sidebar drawer (see App.jsx's
+ * "sidebar-open" state and styles.css's <=900px rules). */
+function IconMenu(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function IconClose(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
