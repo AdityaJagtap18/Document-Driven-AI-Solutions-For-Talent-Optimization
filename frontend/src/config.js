@@ -6,7 +6,7 @@
  * based on `mode` alone.
  */
 window.CDPI_CONFIG = {
-  mode: "real", // "mock" | "real" -- real Functions host at localhost:7071 once it's running (see docs/fde/DECISIONS_AND_BLOCKERS.md for a known local-startup auth issue)
-  baseUrl: "http://localhost:7071",
+  mode: "real", // "mock" | "real" -- real backend live on the Hostinger KVM VPS, served via the hostinger-deploy/wsgi_app.py adapter behind nginx+gunicorn
+  baseUrl: "https://api.adityajagtap.com",
   functionKey: "",
 };
