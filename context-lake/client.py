@@ -207,9 +207,22 @@ def get_cosmos_database():
 def get_container(name: str):
     """Returns a Cosmos DB container client, creating the container if it doesn't exist.
     `name` must be one of COSMOS_CONTAINERS (candidates, interview_transcripts,
-    scoring_history, audit_log) — see ../context-lake/README.md for what each holds."""
+    scoring_history, audit_log) — see ../context-lake/README.md for what each holds.
+
+    The Azure report/snapshot containers (local_json_store.LOCAL_JSON_CONTAINERS --
+    observability_snapshots, observability_refresh_results, integration_instances,
+    integration_health_checks, integration_config_history) are served from a local
+    JSON file on disk instead: these containers exist specifically so the Azure
+    Observability Report / Service Hub / Readiness dashboards can persist a snapshot
+    and serve it back WITHOUT depending on Azure (Cosmos) being configured or
+    reachable -- routing them through Cosmos anyway would defeat that purpose."""
     if name not in COSMOS_CONTAINERS:
         raise ValueError(f"Unknown container '{name}'. Known containers: {list(COSMOS_CONTAINERS)}")
+
+    import local_json_store
+    if name in local_json_store.LOCAL_JSON_CONTAINERS:
+        return local_json_store.LocalJSONContainer(name)
+
     from azure.cosmos import PartitionKey
 
     db = get_cosmos_database()
