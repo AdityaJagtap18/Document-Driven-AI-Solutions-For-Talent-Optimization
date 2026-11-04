@@ -28,4 +28,12 @@ jobs:
           python -m compileall -q . -x "(\.git|__pycache__|build|dist)"
 
       - name: Run test suite
+        # OPENAI_API_KEY: a fake placeholder, not a real key. generate_questions.py/
+        # interview_bot.py/voicebot/voice_bot.py raise at IMPORT time if no LLM
+        # provider (Ollama/OpenAI/Azure OpenAI) is configured at all -- this repo's
+        # tests mock every real LLM call site (get_chat_llm/call_with_retry etc.),
+        # never making a real OpenAI request, so a fake key is enough to satisfy
+        # that import-time guard without needing a real secret in CI.
+        env:
+          OPENAI_API_KEY: sk-test-placeholder-not-a-real-key
         run: pytest tests/ -v --cov=. --cov-report=term-missing --cov-config=.coveragerc
