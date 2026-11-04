@@ -26,6 +26,11 @@ function setAuthToken(token) {
   _authToken = token;
 }
 
+/** `options.timeoutMs`, when given, aborts the request if it hasn't
+ * completed in that many milliseconds -- for an action like a real-data
+ * refresh that can otherwise hang indefinitely on an unreachable Azure
+ * endpoint. The resulting error carries `isTimeout: true` so a caller can
+ * tell "took too long" apart from a real server error response. */
 async function cdpiRequest(path, options) {
   options = options || {};
   var cfg = window.CDPI_CONFIG;
@@ -40,11 +45,29 @@ async function cdpiRequest(path, options) {
     headers.Authorization = "Bearer " + _authToken;
   }
 
-  var response = await fetch(url.toString(), Object.assign(
-    {},
-    options,
-    { headers: headers }
-  ));
+  var fetchOptions = Object.assign({}, options, { headers: headers });
+  delete fetchOptions.timeoutMs;
+
+  var timeoutHandle = null;
+  if (options.timeoutMs) {
+    var controller = new AbortController();
+    fetchOptions.signal = controller.signal;
+    timeoutHandle = setTimeout(function () { controller.abort(); }, options.timeoutMs);
+  }
+
+  var response;
+  try {
+    response = await fetch(url.toString(), fetchOptions);
+  } catch (e) {
+    if (e && e.name === "AbortError") {
+      var timeoutError = new Error("Request to " + path + " timed out after " + options.timeoutMs + "ms.");
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
+    throw e;
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
 
   var body = await response.json().catch(function () { return {}; });
   if (!response.ok) {
@@ -497,7 +520,15 @@ window.CDPI_REAL_API = {
     return cdpiRequest("/api/manage/observability/snapshot");
   },
   refreshObservability: function (hours, sourceIds) {
-    return cdpiRequest("/api/manage/observability/refresh", { method: "POST", body: JSON.stringify({ hours: hours, source_ids: sourceIds }) });
+    // Client-side safety net on top of the backend's own per-source 10s
+    // timeout (observability_snapshots.py's _SOURCE_TIMEOUT_SECONDS) --
+    // this one guards the HTTP call itself (e.g. the backend becoming
+    // completely unreachable), not any single Azure source, so it's set
+    // longer than 10s to avoid aborting a normal multi-source refresh
+    // that's simply working through several sources sequentially.
+    return cdpiRequest("/api/manage/observability/refresh", {
+      method: "POST", body: JSON.stringify({ hours: hours, source_ids: sourceIds }), timeoutMs: 60000,
+    });
   },
   getObservabilityRefreshHistory: function (limit) {
     return cdpiRequest("/api/manage/observability/refresh-history" + (limit ? "?limit=" + encodeURIComponent(limit) : ""));

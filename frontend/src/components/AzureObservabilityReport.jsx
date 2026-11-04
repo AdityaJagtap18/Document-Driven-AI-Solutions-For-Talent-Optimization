@@ -153,6 +153,9 @@ function AzureObservabilityReport(props) {
   var refreshingState = React.useState(false);
   var refreshing = refreshingState[0];
   var setRefreshing = refreshingState[1];
+  var refreshFailureState = React.useState(null);
+  var refreshFailure = refreshFailureState[0];
+  var setRefreshFailure = refreshFailureState[1];
   var exportingState = React.useState(false);
   var exporting = exportingState[0];
   var setExporting = exportingState[1];
@@ -197,15 +200,31 @@ function AzureObservabilityReport(props) {
   var error = pageSnapshot.state.error;
 
   /** The ONLY action that collects real data -- explicit user click,
-   * never automatic. */
+   * never automatic. The backend already caps each individual source at
+   * a 10s timeout (observability_snapshots.py's _SOURCE_TIMEOUT_SECONDS)
+   * and keeps that source's last-known-good data on a timeout/failure
+   * rather than erasing it -- so EITHER a timeout from this request, OR
+   * any other Azure/network error, is handled the same honest way here:
+   * never block the page on an alert(), just re-read whatever snapshot
+   * is already persisted (the same data the page was already showing, or
+   * a partially-updated one if some sources did succeed before the
+   * failure) so the dashboard keeps showing real, if possibly stale,
+   * results instead of an error state. */
   function refreshAll() {
     setRefreshing(true);
+    setRefreshFailure(null);
     api.refreshObservability(hours)
+      .catch(function (err) {
+        setRefreshFailure(err.isTimeout
+          ? "The refresh request timed out -- showing the last successfully collected data below."
+          : "The refresh could not complete (" + err.message + ") -- showing the last successfully collected data below.");
+        return null;
+      })
       .then(function () {
         window.CDPI_AZURE_CACHE.invalidatePrefix("azure-readiness:"); // keep Azure Readiness/Service Hub pages consistent with this real refresh
-        return pageSnapshot.refresh(); // re-reads what the refresh just persisted, updating this page's own snapshot too
+        return pageSnapshot.refresh(); // re-reads whatever is persisted -- the same last-good snapshot if the refresh above failed before persisting anything new
       })
-      .catch(function (err) { window.alert(err.message); })
+      .catch(function () { /* even the re-read failed -- pageSnapshot's own error state already covers this */ })
       .then(function () { setRefreshing(false); });
   }
 
@@ -271,6 +290,12 @@ function AzureObservabilityReport(props) {
           ? <React.Fragment>Showing data collected {new Date(snapshot.collected_at).toLocaleString()} ({snapshot.succeeded_count} succeeded, {snapshot.failed_count} failed, {snapshot.skipped_count} not configured) -- opening this page never re-queries Azure; click "Refresh All" to collect current data.</React.Fragment>
           : <React.Fragment>No refresh has ever been run. Click "Refresh All" to collect real data for the first time.</React.Fragment>}
       </p>
+
+      {refreshFailure && (
+        <p className="muted" style={{ fontSize: "0.82rem", color: "#b45309" }}>
+          {refreshFailure}
+        </p>
+      )}
 
       {showHistory && (
         <div className="chart-card" style={{ marginBottom: 16 }}>

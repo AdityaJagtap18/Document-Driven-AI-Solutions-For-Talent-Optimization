@@ -27,6 +27,7 @@ pairs are not W3C traceparent-propagated across a service mesh, since
 there is no service mesh here)."""
 
 import sys
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,7 +38,7 @@ sys.path.insert(0, str(_REPO_ROOT / "context-lake"))
 
 import repositories  # noqa: E402
 
-_SOURCE_TIMEOUT_SECONDS = 25
+_SOURCE_TIMEOUT_SECONDS = 10
 
 
 def _now():
@@ -45,25 +46,48 @@ def _now():
 
 
 def _collect_one(source_id: str, fetch_fn):
-    """Runs one source's real collection, never letting an exception
-    escape -- a broken source becomes a recorded FAILED result, not a
-    crashed refresh. Real wall-clock duration recorded for real (useful
-    for spotting a source that's gone slow, not just failed outright)."""
+    """Runs one source's real collection, never letting an exception OR a
+    hang escape -- a broken or unreachable Azure source becomes a recorded
+    FAILED result after _SOURCE_TIMEOUT_SECONDS, not a crashed or
+    indefinitely-stuck refresh. Runs fetch_fn on a daemon thread (never
+    joined past the timeout, so one hung Azure call can't block the rest
+    of the refresh, or this process's shutdown) and simply stops waiting
+    on it once the timeout elapses; the stale thread finishes in the
+    background and its result is discarded. Real wall-clock duration
+    recorded for real (useful for spotting a source that's gone slow, not
+    just failed outright)."""
     import time
 
     started = time.monotonic()
-    try:
-        data = fetch_fn()
-        status = "not_configured" if isinstance(data, dict) and data.get("_not_configured") else "success"
-        return {
-            "source_id": source_id, "status": status, "data": data,
-            "error": None, "duration_ms": round((time.monotonic() - started) * 1000, 1),
-        }
-    except Exception as e:
+    result_box = {}
+
+    def _run():
+        try:
+            result_box["data"] = fetch_fn()
+        except Exception as e:
+            result_box["error"] = e
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=_SOURCE_TIMEOUT_SECONDS)
+    duration_ms = round((time.monotonic() - started) * 1000, 1)
+
+    if thread.is_alive():
         return {
             "source_id": source_id, "status": "failed", "data": None,
-            "error": str(e)[:500], "duration_ms": round((time.monotonic() - started) * 1000, 1),
+            "error": f"Timed out after {_SOURCE_TIMEOUT_SECONDS}s waiting on this source "
+                     "(likely an unreachable or slow Azure call) -- showing last known good "
+                     "data instead.",
+            "duration_ms": duration_ms,
         }
+    if "error" in result_box:
+        return {
+            "source_id": source_id, "status": "failed", "data": None,
+            "error": str(result_box["error"])[:500], "duration_ms": duration_ms,
+        }
+    data = result_box.get("data")
+    status = "not_configured" if isinstance(data, dict) and data.get("_not_configured") else "success"
+    return {"source_id": source_id, "status": status, "data": data, "error": None, "duration_ms": duration_ms}
 
 
 def _azure_sources(hours: float):
