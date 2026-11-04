@@ -6,7 +6,7 @@ import json
 import shutil
 from pathlib import Path
 from PyPDF2 import PdfReader
-from langchain.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
 from llm_utils import call_with_retry, get_chat_llm, resolve_llm_provider
 from rag_config import sanitize_for_prompt

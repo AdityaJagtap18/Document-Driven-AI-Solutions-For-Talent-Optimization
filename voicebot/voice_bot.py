@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from azure_speech_utils import speak, listen
 import openai
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 import os
 import json as jsonlib
 import uuid

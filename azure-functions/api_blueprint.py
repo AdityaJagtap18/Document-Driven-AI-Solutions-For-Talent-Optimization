@@ -730,7 +730,7 @@ def chat_candidate_qa_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     prompt = chat_guardrails.build_chat_prompt(question, context)
     trace_id = observability.new_trace_id()
     try:
-        from langchain.schema import HumanMessage
+        from langchain_core.messages import HumanMessage
 
         with observability.trace_stage("chat", "candidate_qa", trace_id=trace_id, metadata={"has_question": True}):
             routed_model, _ = model_routing.resolve_model("chat_candidate_qa", model_routing.get_runtime_routing_config())
@@ -825,7 +825,7 @@ def generate_interview_questions_endpoint(req: func.HttpRequest) -> func.HttpRes
     prompt = generate_questions.build_grounded_questions_prompt(resume_context, jd["text"])
     trace_id = observability.new_trace_id()
     try:
-        from langchain.schema import HumanMessage
+        from langchain_core.messages import HumanMessage
 
         with observability.trace_stage("interview_prep", "question_generation", trace_id=trace_id, correlation_id=candidate_id, metadata={"jd_id": jd_id}):
             routed_model, _ = model_routing.resolve_model("interview_questions_generation", model_routing.get_runtime_routing_config())
@@ -4763,7 +4763,7 @@ def _run_groundedness_evaluation() -> dict:
     except Exception as e:
         return {"error": f"Generation step failed: {str(e)[:300]}"}
 
-    from langchain.schema import HumanMessage
+    from langchain_core.messages import HumanMessage
 
     sources = [c["metadata"].get("chunk_text", "") for c in retrieval["chunks"]]
     judge_prompt = rag_evaluation.build_groundedness_judge_prompt(sources, generation["final_response"])
@@ -4871,7 +4871,7 @@ def _run_match_quality_evaluation(candidate_id: str, jd_id: str) -> dict:
     profile = {k: candidate.get(k) for k in ("Name", "Profile Summary", "Top Matching Keywords", "Missing Keywords", "JD Match")}
     judge_prompt = ai_evaluation.build_match_quality_judge_prompt(profile, jd["text"], candidate.get("JD Match"))
 
-    from langchain.schema import HumanMessage
+    from langchain_core.messages import HumanMessage
 
     try:
         routed_model, _ = model_routing.resolve_model("ai_match_quality_judge", model_routing.get_runtime_routing_config())
