@@ -25,11 +25,12 @@ EMBEDDING_DIMENSIONS = 1536
 
 
 def _require_key():
-    if llm_utils.using_azure_openai():
-        return  # Azure OpenAI uses AZURE_OPENAI_API_KEY, checked by get_embedding_client_and_model() itself
+    provider = llm_utils.resolve_llm_provider()
+    if provider in ("ollama", "azure_openai"):
+        return  # Ollama needs no real API key; Azure OpenAI's key is checked by get_embedding_client_and_model() itself
     key = get_secret("OPENAI_API_KEY")
     if not key:
-        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example), configure AZURE_KEY_VAULT_URL, or set AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT/AZURE_OPENAI_EMBEDDING_DEPLOYMENT to use Azure OpenAI instead.")
+        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example), set OLLAMA_MODEL/OLLAMA_EMBEDDING_MODEL for a free/local Ollama model, configure AZURE_KEY_VAULT_URL, or set AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT/AZURE_OPENAI_EMBEDDING_DEPLOYMENT to use Azure OpenAI instead.")
     os.environ["OPENAI_API_KEY"] = key  # OpenAI() client reads this from the environment implicitly
 
 

@@ -8,16 +8,15 @@ from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain.schema import HumanMessage
 
-from llm_utils import call_with_retry, get_chat_llm, using_azure_openai
+from llm_utils import call_with_retry, get_chat_llm, resolve_llm_provider
 from rag_config import sanitize_for_prompt
 from secrets_loader import get_secret
 
 # === Config ===
-if not using_azure_openai():
-    _openai_key = get_secret("OPENAI_API_KEY")
-    if not _openai_key:
-        raise RuntimeError("OPENAI_API_KEY not set. Add it to your .env file (see .env.example), configure AZURE_KEY_VAULT_URL, or set AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT to use Azure OpenAI instead.")
-    os.environ["OPENAI_API_KEY"] = _openai_key
+if resolve_llm_provider() == "openai":
+    os.environ["OPENAI_API_KEY"] = get_secret("OPENAI_API_KEY")
+elif resolve_llm_provider() == "none":
+    raise RuntimeError("No LLM provider configured. Set OLLAMA_MODEL to use a free/local Ollama model, OPENAI_API_KEY for plain OpenAI, or AZURE_OPENAI_ENDPOINT/AZURE_OPENAI_API_KEY/AZURE_OPENAI_CHAT_DEPLOYMENT for Azure OpenAI.")
 parsed_folder = Path("ParsedReadyForQuestions")
 output_folder = Path("OutputResume_Folder")
 interview_data_root = Path("InterviewData")

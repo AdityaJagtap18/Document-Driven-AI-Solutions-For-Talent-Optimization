@@ -289,7 +289,7 @@ def generate_jd_with_ai(inputs: dict) -> dict:
     {...}} -- fields are a DRAFT; nothing is persisted by this function."""
     import json
 
-    from llm_utils import get_chat_llm, call_with_retry, using_azure_openai
+    from llm_utils import get_chat_llm, call_with_retry, resolve_llm_provider
 
     trace_id = observability.new_trace_id()
     prompt = (
@@ -316,7 +316,7 @@ def generate_jd_with_ai(inputs: dict) -> dict:
         raise ValueError("The AI response did not contain a parseable JSON object.")
     fields = json.loads(content[start:end + 1])
     metadata = {
-        "provider": "azure_openai" if using_azure_openai() else "openai",
+        "provider": resolve_llm_provider(),
         "model": getattr(llm, "deployment_name", None) or getattr(llm, "model_name", None) or "unknown",
         "trace_id": trace_id,
         "generated_at": _now(),

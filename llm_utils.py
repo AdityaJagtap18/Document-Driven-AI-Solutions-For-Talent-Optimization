@@ -34,13 +34,64 @@ def _azure_openai_config():
     }
 
 
+def _ollama_chat_config():
+    """Reads OLLAMA_MODEL (and optional OLLAMA_BASE_URL, defaulting to the
+    standard local Ollama server address) via secrets_loader. Returns None
+    when OLLAMA_MODEL isn't set -- Ollama is opt-in, never assumed just
+    because a local server happens to be running."""
+    from secrets_loader import get_secret
+
+    model = get_secret("OLLAMA_MODEL")
+    if not model:
+        return None
+    return {
+        "model": model,
+        "base_url": get_secret("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
+    }
+
+
+def _ollama_embedding_config():
+    """Reads OLLAMA_EMBEDDING_MODEL -- kept separate from OLLAMA_MODEL
+    since embedding and chat are typically different pulled models.
+    Returns None when not set."""
+    from secrets_loader import get_secret
+
+    model = get_secret("OLLAMA_EMBEDDING_MODEL")
+    if not model:
+        return None
+    return {"model": model}
+
+
+def resolve_llm_provider() -> str:
+    """Single source of truth for which provider chat/embedding calls go
+    to, in priority order: Ollama (free/local, if OLLAMA_MODEL is set) >
+    plain OpenAI (if OPENAI_API_KEY is set) > Azure OpenAI (if fully
+    configured) > "none". Every provider-selection decision in this repo
+    (get_chat_llm, get_embedding_client_and_model, and the preflight key
+    checks in generate_questions.py/interview_bot.py/voicebot/voice_bot.py/
+    semantic-library/embeddings.py) goes through this function so they
+    can never disagree about which provider is actually active."""
+    from secrets_loader import get_secret
+
+    if _ollama_chat_config() is not None:
+        return "ollama"
+    if get_secret("OPENAI_API_KEY"):
+        return "openai"
+    if _azure_openai_config() is not None:
+        return "azure_openai"
+    return "none"
+
+
 def using_azure_openai() -> bool:
-    """True if this process will route chat/embedding calls to Azure
-    OpenAI instead of plain OpenAI -- the single source of truth both
-    get_chat_llm() and semantic-library/embeddings.py's provider
-    selection use, so "is Azure actually selected" is never computed two
-    different ways that could disagree."""
-    return _azure_openai_config() is not None
+    """True only if Azure OpenAI is the ACTIVE provider under the
+    Ollama > OpenAI > Azure priority order (not merely "configured") --
+    kept for existing call sites/metadata labeling that check this."""
+    return resolve_llm_provider() == "azure_openai"
+
+
+def using_ollama() -> bool:
+    """True if Ollama is the active provider (see resolve_llm_provider)."""
+    return resolve_llm_provider() == "ollama"
 
 
 def get_chat_llm(model: str = None, temperature: float = 0, max_tokens: int = None, **kwargs):
@@ -57,11 +108,26 @@ def get_chat_llm(model: str = None, temperature: float = 0, max_tokens: int = No
     which may or may not match the underlying model's own name) rather
     than the `model` string rag_config.py's per-step config carries;
     `model` is still passed through for Azure too (used for tokenizer
-    selection) but does not change which deployment is called."""
-    azure_cfg = _azure_openai_config()
-    if azure_cfg is not None:
+    selection) but does not change which deployment is called.
+
+    Provider priority is Ollama (free/local) > plain OpenAI > Azure
+    OpenAI, per resolve_llm_provider() -- when Ollama is active, this
+    returns a `ChatOpenAI` pointed at the local Ollama server's
+    OpenAI-compatible endpoint (Ollama needs no real API key, so a
+    placeholder is sent) rather than a separate Ollama client library."""
+    provider = resolve_llm_provider()
+    if provider == "ollama":
+        from langchain_openai import ChatOpenAI
+
+        ollama_cfg = _ollama_chat_config()
+        return ChatOpenAI(
+            base_url=ollama_cfg["base_url"], api_key="ollama",
+            model=model or ollama_cfg["model"], temperature=temperature, max_tokens=max_tokens, **kwargs,
+        )
+    if provider == "azure_openai":
         from langchain_openai import AzureChatOpenAI
 
+        azure_cfg = _azure_openai_config()
         return AzureChatOpenAI(
             azure_endpoint=azure_cfg["endpoint"], api_key=azure_cfg["api_key"],
             api_version=azure_cfg["api_version"], azure_deployment=azure_cfg["chat_deployment"],
@@ -85,9 +151,26 @@ def get_embedding_client_and_model(default_model: str):
     RuntimeError if Azure is otherwise configured but
     AZURE_OPENAI_EMBEDDING_DEPLOYMENT specifically is missing -- silently
     falling back to the chat deployment (a different model family) would
-    produce garbage embeddings, worse than failing loudly."""
-    azure_cfg = _azure_openai_config()
-    if azure_cfg is not None:
+    produce garbage embeddings, worse than failing loudly. Same priority
+    as get_chat_llm(): Ollama (needs OLLAMA_EMBEDDING_MODEL set
+    separately -- also typically a different pulled model than chat) >
+    plain OpenAI > Azure OpenAI."""
+    provider = resolve_llm_provider()
+    if provider == "ollama":
+        ollama_cfg = _ollama_chat_config()
+        embedding_cfg = _ollama_embedding_config()
+        if embedding_cfg is None:
+            raise RuntimeError(
+                "Ollama is configured for chat (OLLAMA_MODEL) but OLLAMA_EMBEDDING_MODEL is not "
+                "set -- required separately since it's typically a different pulled model "
+                "(e.g. nomic-embed-text)."
+            )
+        from openai import OpenAI
+
+        client = OpenAI(base_url=ollama_cfg["base_url"], api_key="ollama")
+        return client, embedding_cfg["model"]
+    if provider == "azure_openai":
+        azure_cfg = _azure_openai_config()
         if not azure_cfg["embedding_deployment"]:
             raise RuntimeError(
                 "Azure OpenAI is configured for chat (AZURE_OPENAI_CHAT_DEPLOYMENT) but "

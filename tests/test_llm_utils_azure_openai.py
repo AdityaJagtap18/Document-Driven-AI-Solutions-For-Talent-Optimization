@@ -27,6 +27,13 @@ _AZURE_ENV = {
 
 
 def _set_azure_env(monkeypatch, **overrides):
+    # Azure OpenAI is now the LOWEST-priority provider (Ollama > plain
+    # OpenAI > Azure, see llm_utils.resolve_llm_provider()), so any test
+    # that wants Azure actually selected must also clear whatever
+    # higher-priority provider happens to be configured in this
+    # environment (e.g. a real OPENAI_API_KEY picked up from .env).
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     for key, value in {**_AZURE_ENV, **overrides}.items():
         monkeypatch.setenv(key, value)
 
@@ -123,6 +130,65 @@ class TestGetEmbeddingClientAndModel:
         monkeypatch.delenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", raising=False)
         with pytest.raises(RuntimeError, match="AZURE_OPENAI_EMBEDDING_DEPLOYMENT"):
             llm_utils.get_embedding_client_and_model("text-embedding-3-small")
+
+
+class TestOllamaProvider:
+    """Ollama is the highest-priority provider: resolve_llm_provider()
+    picks it over plain OpenAI or Azure OpenAI whenever OLLAMA_MODEL is
+    set, per the user's explicit "prefer Ollama first, OpenAI fallback"
+    choice."""
+
+    def test_golden_not_configured_when_ollama_model_unset(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+        assert llm_utils._ollama_chat_config() is None
+        assert llm_utils.using_ollama() is False
+
+    def test_golden_resolve_llm_provider_prefers_ollama_over_openai_and_azure(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")
+        monkeypatch.setenv("OPENAI_API_KEY", "fake-openai-key")
+        _set_azure_env(monkeypatch)
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")  # _set_azure_env clears it; re-set after
+        assert llm_utils.resolve_llm_provider() == "ollama"
+        assert llm_utils.using_ollama() is True
+        assert llm_utils.using_azure_openai() is False
+
+    def test_golden_resolve_llm_provider_prefers_openai_over_azure_when_no_ollama(self, monkeypatch):
+        monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "fake-openai-key")
+        assert llm_utils.resolve_llm_provider() == "openai"
+
+    def test_golden_default_base_url_used_when_unset(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")
+        monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+        cfg = llm_utils._ollama_chat_config()
+        assert cfg["base_url"] == "http://localhost:11434/v1"
+
+    def test_golden_get_chat_llm_points_at_ollama_base_url(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        for key in ("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_CHAT_DEPLOYMENT"):
+            monkeypatch.delenv(key, raising=False)
+        llm = llm_utils.get_chat_llm(temperature=0)
+        assert str(llm.openai_api_base).rstrip("/") == "http://localhost:11434/v1"
+        assert llm.model_name == "llama3"
+
+    def test_golden_get_embedding_client_requires_separate_embedding_model(self, monkeypatch):
+        import pytest
+
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")
+        monkeypatch.delenv("OLLAMA_EMBEDDING_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        with pytest.raises(RuntimeError, match="OLLAMA_EMBEDDING_MODEL"):
+            llm_utils.get_embedding_client_and_model("text-embedding-3-small")
+
+    def test_golden_get_embedding_client_and_model_when_configured(self, monkeypatch):
+        monkeypatch.setenv("OLLAMA_MODEL", "llama3")
+        monkeypatch.setenv("OLLAMA_EMBEDDING_MODEL", "nomic-embed-text")
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        client, model = llm_utils.get_embedding_client_and_model("text-embedding-3-small")
+        from openai import OpenAI
+        assert isinstance(client, OpenAI)
+        assert model == "nomic-embed-text"
 
 
 class TestRunAzureOpenAITestRequest:
