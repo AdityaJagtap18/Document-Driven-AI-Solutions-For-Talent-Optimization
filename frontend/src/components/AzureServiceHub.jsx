@@ -430,6 +430,7 @@ function AzureIntegrationDetail(props) {
           {action.result && (
             <div className={"banner " + (action.result.outcome === "healthy" ? "banner-success" : "banner-error")}>
               {action.result.outcome}{action.result.error_category ? " (" + action.result.error_category + ")" : ""}: {action.result.detail}
+              {action.result.status_unchanged && " -- this looks like Azure being unreachable rather than a real problem with this integration, so its stored status was left unchanged above."}
             </div>
           )}
           {!instance.enabled && !action.result && (

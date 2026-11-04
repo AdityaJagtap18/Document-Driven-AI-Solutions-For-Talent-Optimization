@@ -379,6 +379,66 @@ def check_connection(adapter_type: str) -> dict:
         }
 
 
+_CHECK_TIMEOUT_SECONDS = 10
+
+# The categories check_connection() can return that mean "couldn't even
+# reach/hear back from Azure" (a live outage or network blip) as opposed
+# to a REAL, actionable finding about this integration's own
+# configuration/credentials (auth failure, permission denial, bad
+# config) -- see is_connectivity_issue()'s docstring for why these two
+# groups are treated differently.
+_CONNECTIVITY_ISSUE_CATEGORIES = {"timeout", "endpoint_unreachable", "service_unavailable"}
+
+
+def is_connectivity_issue(result: dict) -> bool:
+    """True when a check_connection() result reflects Azure itself being
+    unreachable or too slow to answer -- NOT a real, actionable finding
+    about this integration (a revoked credential, a denied permission, a
+    missing secret). Callers (the Service Hub "Check" button and the
+    Readiness "Validate"/"Validate All" buttons) use this to decide
+    whether to persist the result as the integration's new cached status:
+    a real auth/permission/config problem IS persisted (it's genuinely
+    useful to see "this credential is broken"), but a bare connectivity
+    blip during an Azure outage is NOT -- it would otherwise flip a
+    healthy integration to a scary-looking failure state for a transient
+    reason that has nothing to do with this integration's own setup, and
+    un-flip itself the next time Azure answers normally. The stored
+    status is left exactly as it was; the caller re-reads and returns
+    that unchanged, real, last-known-good record instead."""
+    return result.get("outcome") == "unhealthy" and result.get("error_category") in _CONNECTIVITY_ISSUE_CATEGORIES
+
+
+def check_connection_with_timeout(adapter_type: str, timeout_seconds: float = _CHECK_TIMEOUT_SECONDS) -> dict:
+    """Same real result shape as check_connection(), but never blocks past
+    `timeout_seconds` even if the underlying Azure SDK call hangs with no
+    exception of its own (check_connection()'s own "timeout" error_category
+    only catches a call that raises a timeout-shaped exception; this is
+    the hard ceiling for a call that doesn't). Runs on a daemon thread
+    (same technique as observability_snapshots._collect_one) so a stuck
+    call never blocks this process's shutdown either -- it's simply
+    abandoned and its eventual result (if any) discarded."""
+    import threading
+    import time as _time
+
+    started = _time.monotonic()
+    result_box = {}
+
+    def _run():
+        result_box["result"] = check_connection(adapter_type)
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout_seconds)
+
+    if thread.is_alive():
+        return {
+            "adapter_type": adapter_type, "outcome": "unhealthy", "error_category": "timeout",
+            "detail": f"Timed out after {timeout_seconds}s waiting for a response.",
+            "duration_ms": round((_time.monotonic() - started) * 1000, 1), "checked_at": _now(),
+        }
+    return result_box["result"]
+
+
 def _check_cosmos():
     import client as context_lake_client
     db = context_lake_client.get_cosmos_database()

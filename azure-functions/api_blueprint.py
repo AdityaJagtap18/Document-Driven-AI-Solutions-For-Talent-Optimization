@@ -3687,10 +3687,23 @@ def check_azure_integration_endpoint(req: func.HttpRequest) -> func.HttpResponse
     # outcome is never misreported as a failed trace.
     trace_metadata = {"integration_id": integration_id, "adapter_type": instance["adapter_type"], "config_version": instance.get("config_version")}
     with observability.trace_stage("azure_config", "connection_check", metadata=trace_metadata, correlation_id=integration_id):
-        result = azure_integrations.check_connection(instance["adapter_type"])
+        result = azure_integrations.check_connection_with_timeout(instance["adapter_type"])
         result["integration_id"] = integration_id
         trace_metadata["outcome"] = result["outcome"]
         trace_metadata["error_category"] = result.get("error_category")
+
+    # A bare connectivity blip (Azure unreachable/timed out) never
+    # overwrites this integration's cached status -- see
+    # azure_integrations.is_connectivity_issue()'s docstring. This attempt's
+    # own real outcome is still returned (so the admin sees what just
+    # happened), flagged `status_unchanged` so the frontend knows NOT to
+    # treat it as this integration's new persisted state -- the stored
+    # status/history is left exactly as it was. A real auth/permission/
+    # config finding still persists exactly as before.
+    if azure_integrations.is_connectivity_issue(result):
+        _audit_admin_action("integration_connection_checked", actor, integration_id=integration_id, outcome=result["outcome"], status_unchanged=True)
+        return _json_response(dict(result, status_unchanged=True))
+
     try:
         saved = repositories.record_integration_health_check(integration_id, result)
     except Exception as e:
@@ -4003,8 +4016,20 @@ def azure_readiness_validate_endpoint(req: func.HttpRequest) -> func.HttpRespons
             status_code=429,
         )
 
-    result = azure_integrations.check_connection(instance["adapter_type"])
+    result = azure_integrations.check_connection_with_timeout(instance["adapter_type"])
     result["integration_id"] = integration_id
+
+    # Same rule as the Service Hub Check button: a bare connectivity blip
+    # never overwrites this integration's cached readiness status -- see
+    # azure_integrations.is_connectivity_issue()'s docstring. Returns the
+    # EXISTING, unchanged readiness record (real last-known-good data),
+    # not a fabricated one.
+    if azure_integrations.is_connectivity_issue(result):
+        _audit_admin_action("azure_readiness_validated", actor, integration_id=integration_id, outcome=result["outcome"], status_unchanged=True)
+        record = _readiness_record(instance, az_cli.get_account_status())
+        record["last_check_connectivity_issue"] = result
+        return _json_response(record)
+
     try:
         repositories.record_integration_health_check(integration_id, result)
         instance = repositories.get_integration_instance(integration_id)
@@ -4039,8 +4064,18 @@ def azure_readiness_validate_all_endpoint(req: func.HttpRequest) -> func.HttpRes
         if _rate_limited((actor["id"], instance["id"]), _AZURE_CHECK_MIN_INTERVAL_SECONDS):
             results.append(dict(_readiness_record(instance, az_status), skipped_rate_limited=True))
             continue
-        result = azure_integrations.check_connection(instance["adapter_type"])
+        result = azure_integrations.check_connection_with_timeout(instance["adapter_type"])
         result["integration_id"] = instance["id"]
+
+        # Same rule as the single-instance validate endpoint: a bare
+        # connectivity blip never overwrites this instance's cached
+        # readiness status -- see azure_integrations.is_connectivity_issue().
+        if azure_integrations.is_connectivity_issue(result):
+            record = _readiness_record(instance, az_status)
+            record["last_check_connectivity_issue"] = result
+            results.append(record)
+            continue
+
         try:
             repositories.record_integration_health_check(instance["id"], result)
             instance = repositories.get_integration_instance(instance["id"])
