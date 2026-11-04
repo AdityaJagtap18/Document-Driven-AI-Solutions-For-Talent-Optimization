@@ -1,56 +1,70 @@
-"""Azure AI Document Intelligence client — extracts fields from an
-uploaded certificate/marksheet. Deliberately thin: the actual cross-check
-and confidence-flagging logic lives in document_verification.py (pure,
-fully unit-tested, zero Azure dependency) so that real logic is testable
-even though this file's SDK call is not.
+"""Document field-extraction client — extracts fields from an uploaded
+certificate/marksheet via Azure AI Document Intelligence when configured,
+otherwise local_document_intelligence.py's free/local fallback (see that
+module's docstring for its real accuracy trade-off). Deliberately thin:
+the actual cross-check and confidence-flagging logic lives in
+document_verification.py (pure, fully unit-tested, no dependency on
+either extraction method) so that real logic is testable regardless of
+which extraction path ran.
 
-*** UNTESTED. *** No Azure AI Document Intelligence resource is
-provisioned, and unlike Cosmos DB (which has LocalVectorStore as a local
-stand-in in semantic-library/), there's no meaningful offline equivalent
-to substitute here — OCR against a real scanned/photographed document is
-not something that can be faked locally. Validated only as far as this
-environment allows: the real azure-ai-documentintelligence SDK is
+*** The Azure path is UNTESTED. *** No Azure AI Document Intelligence
+resource is provisioned in this environment. Validated only as far as
+this environment allows: the real azure-ai-documentintelligence SDK is
 installed and its method/model signatures were checked directly
 (DocumentIntelligenceClient.begin_analyze_document(model_id, body, ...),
 AnalyzeDocumentRequest(bytes_source=...), AnalyzeResult.documents[].fields
 with .content/.confidence) — not against a live call or a real document.
+The local fallback path (text-layer PDFs via PyPDF2) IS tested below.
 """
 
 from secrets_loader import get_secret
 from observability import trace_stage
 
 
-def _require_config():
+def _azure_config():
+    """Returns (endpoint, key) if Azure AI Document Intelligence is fully
+    configured, else None -- partial configuration is treated as "not
+    configured," same convention as llm_utils._azure_openai_config()."""
     endpoint = get_secret("DOCUMENT_INTELLIGENCE_ENDPOINT")
     key = get_secret("DOCUMENT_INTELLIGENCE_KEY")
-    missing = [n for n, v in [("DOCUMENT_INTELLIGENCE_ENDPOINT", endpoint), ("DOCUMENT_INTELLIGENCE_KEY", key)] if not v]
-    if missing:
-        raise RuntimeError(
-            f"Missing required secret(s): {', '.join(missing)}. "
-            "Add them to your .env file (see .env.example) or Key Vault, once Azure AI Document "
-            "Intelligence is provisioned — see "
-            "docs/azure-provisioning/phase5-document-intelligence-whatsapp.md."
-        )
+    if not (endpoint and key):
+        return None
     return endpoint, key
 
 
-def analyze_document(file_bytes: bytes, model_id: str = "prebuilt-document") -> dict:
-    """Runs Document Intelligence on the given file bytes, returns a
-    simplified {field_name: {"value": str, "confidence": float}} dict —
-    not the raw SDK AnalyzeResult object, so document_verification.py's
-    pure functions stay decoupled from the SDK's object model.
+def analyze_document(file_bytes: bytes, model_id: str = "prebuilt-document") -> tuple:
+    """Extracts fields from the given file bytes, returns
+    (fields, extraction_method) where fields is a simplified
+    {field_name: {"value": str, "confidence": float}} dict — not the raw
+    SDK AnalyzeResult object, so document_verification.py's pure
+    functions stay decoupled from any one extraction method's object
+    model — and extraction_method is "azure_document_intelligence" or
+    "local_text_extraction" (so a caller can be honest with its own
+    caller about which one actually ran, since local extraction is
+    noticeably less reliable -- see local_document_intelligence.py's
+    docstring).
 
-    `model_id` defaults to the generic "prebuilt-document" model (general
-    key-value extraction). A CUSTOM model trained on this project's actual
-    certificate/marksheet formats would extract far more reliably — exam
-    marksheets and degree certificates have fairly standardized per-
-    institution layouts, worth training a custom model on once sample
-    documents are available — but training one needs the user to supply
-    sample documents via Document Intelligence Studio. Noted as a real
-    follow-up, not attempted here (no sample documents exist in this
-    repo to train against, and it can't be done blind)."""
-    with trace_stage("document_verification", "document_extraction", metadata={"model_id": model_id}):
-        endpoint, key = _require_config()
+    Uses Azure AI Document Intelligence's "prebuilt-document" model
+    (general key-value extraction) when DOCUMENT_INTELLIGENCE_ENDPOINT/
+    DOCUMENT_INTELLIGENCE_KEY are both configured; otherwise falls back
+    to local_document_intelligence.analyze_document_locally() so this
+    keeps working with zero Azure dependency and zero cost -- degraded
+    accuracy, honestly documented there, not hidden.
+
+    A CUSTOM Azure model trained on this project's actual certificate/
+    marksheet formats would extract far more reliably than either path
+    here — exam marksheets and degree certificates have fairly
+    standardized per-institution layouts, worth training a custom model
+    on once sample documents are available — but training one needs the
+    user to supply sample documents via Document Intelligence Studio.
+    Noted as a real follow-up, not attempted here."""
+    azure_cfg = _azure_config()
+    with trace_stage("document_verification", "document_extraction", metadata={"model_id": model_id, "method": "azure" if azure_cfg else "local"}):
+        if azure_cfg is None:
+            import local_document_intelligence
+            return local_document_intelligence.analyze_document_locally(file_bytes), "local_text_extraction"
+
+        endpoint, key = azure_cfg
         from azure.ai.documentintelligence import DocumentIntelligenceClient
         from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
         from azure.core.credentials import AzureKeyCredential
@@ -63,4 +77,4 @@ def analyze_document(file_bytes: bytes, model_id: str = "prebuilt-document") -> 
         for document in result.documents or []:
             for name, field in (document.fields or {}).items():
                 fields[name] = {"value": field.content, "confidence": field.confidence}
-        return fields
+        return fields, "azure_document_intelligence"

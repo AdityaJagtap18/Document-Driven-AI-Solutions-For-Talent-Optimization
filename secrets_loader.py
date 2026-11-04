@@ -22,6 +22,40 @@ load_dotenv(_ENV_PATH if _ENV_PATH.exists() else None)
 
 _last_keyvault_error = {}  # vault_url -> {"category": str, "detail": str, "at": iso str} -- sanitized, never a secret value, for Secrets Management / Azure Readiness to surface a REAL auth/permission failure distinctly from "not provisioned" rather than only a printed line a UI never sees.
 
+_KEYVAULT_LOOKUP_TIMEOUT_SECONDS = 10
+
+
+def _run_with_timeout(fn, timeout_seconds: float):
+    """Runs fn() on a daemon thread and waits up to timeout_seconds --
+    same pattern used for every other Azure touch in this app
+    (local_json_store.py's backup writes, azure_integrations.py's
+    connection checks, observability_snapshots.py's source collection).
+    A Key Vault network hang (not a clean exception -- those already
+    fall through below) would otherwise block get_secret() forever,
+    which would block login and every other request since secrets are
+    looked up on essentially every request path, not just at startup.
+    Raises TimeoutError on timeout so callers can fall back the same way
+    they already fall back on any other Key Vault exception; the hung
+    call keeps running in the background and its result is discarded."""
+    import threading
+
+    result_box = {}
+
+    def _run():
+        try:
+            result_box["value"] = fn()
+        except Exception as e:
+            result_box["error"] = e
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout_seconds)
+    if thread.is_alive():
+        raise TimeoutError(f"Key Vault lookup did not respond within {timeout_seconds}s.")
+    if "error" in result_box:
+        raise result_box["error"]
+    return result_box.get("value")
+
 
 def _record_keyvault_error(vault_url: str, category: str, detail: str) -> None:
     from datetime import datetime, timezone
@@ -54,6 +88,8 @@ def _categorize_keyvault_error(exception: Exception) -> str:
     problem is the whole point of this function existing."""
     from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceNotFoundError, ServiceRequestError
 
+    if isinstance(exception, TimeoutError):
+        return "timeout"
     if isinstance(exception, ResourceNotFoundError):
         return "secret_not_found"
     if isinstance(exception, ClientAuthenticationError):
@@ -82,7 +118,7 @@ def get_secret_with_source(name: str, default=None):
     vault_url = os.environ.get("AZURE_KEY_VAULT_URL")
     if vault_url:
         try:
-            value = _get_from_keyvault(vault_url, name)
+            value = _run_with_timeout(lambda: _get_from_keyvault(vault_url, name), _KEYVAULT_LOOKUP_TIMEOUT_SECONDS)
             if value is not None:
                 return value, "key_vault"
             # SecretClient.get_secret() found a secret document with an
@@ -131,9 +167,12 @@ def get_keyvault_status() -> dict:
 
     start = _time.monotonic()
     try:
-        client = _keyvault_client(vault_url)
-        page = client.list_properties_of_secrets(max_page_size=1)
-        next(iter(page), None)  # one network round-trip, never reads a secret value
+        def _probe():
+            client = _keyvault_client(vault_url)
+            page = client.list_properties_of_secrets(max_page_size=1)
+            next(iter(page), None)  # one network round-trip, never reads a secret value
+
+        _run_with_timeout(_probe, _KEYVAULT_LOOKUP_TIMEOUT_SECONDS)
         return {
             "configured": True, "outcome": "healthy", "error_category": None,
             "detail": "Live Key Vault connectivity check succeeded.",

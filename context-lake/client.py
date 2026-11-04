@@ -234,10 +234,28 @@ def get_blob_service_client():
 
 
 def get_blob_container(name: str):
-    """Returns a Blob container client, creating the container if it doesn't exist.
-    `name` must be one of BLOB_CONTAINERS (raw-resumes, parsed-resumes)."""
+    """Returns this app's container object for `name` (raw-resumes or
+    parsed-resumes).
+
+    Local disk is now PRIMARY for blob storage too, Azure Blob Storage a
+    best-effort BACKUP replica -- see local_blob_store.ReplicatedBlobContainer's
+    docstring for the full read/write model, same architecture as
+    get_container() above for Cosmos. A caller that genuinely needs the
+    raw Azure SDK container (nothing in this repo does, by design) should
+    go through ReplicatedBlobContainer._raw_azure_container() directly
+    rather than bypassing this function."""
     if name not in BLOB_CONTAINERS:
         raise ValueError(f"Unknown blob container '{name}'. Known containers: {BLOB_CONTAINERS}")
+
+    import local_blob_store
+    return local_blob_store.ReplicatedBlobContainer(name)
+
+
+def _raw_blob_container(name: str):
+    """The actual azure-storage-blob ContainerClient, creating the
+    container if it doesn't exist. Only called by
+    local_blob_store.ReplicatedBlobContainer for its best-effort Azure
+    backup write -- never by application code directly."""
     svc = get_blob_service_client()
     container = svc.get_container_client(name)
     if not container.exists():

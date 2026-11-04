@@ -181,6 +181,49 @@ class TestKeyVaultErrorCategorization:
         assert "[WARN]" not in captured.out  # routine case, not a warning-worthy failure
 
 
+class TestKeyVaultTimeoutProtection:
+    """A Key Vault network hang (not a clean exception -- those are
+    covered above) must not block get_secret() forever: every secret
+    lookup goes through this path on essentially every request, so a
+    hung vault would otherwise hang the whole app, not just fail one
+    call."""
+
+    def test_golden_hung_lookup_times_out_and_falls_back_to_env(self, monkeypatch):
+        import time
+
+        monkeypatch.setenv("AZURE_KEY_VAULT_URL", "https://fake-vault.vault.azure.net/")
+        monkeypatch.setenv("SOME_TEST_SECRET", "value-from-env")
+        monkeypatch.setattr(secrets_loader, "_KEYVAULT_LOOKUP_TIMEOUT_SECONDS", 0.2)
+
+        def hang_forever(url, name):
+            time.sleep(5)
+            return "should never be returned"
+        monkeypatch.setattr(secrets_loader, "_get_from_keyvault", hang_forever)
+
+        started = time.monotonic()
+        value, source = secrets_loader.get_secret_with_source("SOME_TEST_SECRET")
+        elapsed = time.monotonic() - started
+
+        assert elapsed < 2.0  # never waited anywhere near the 5s hang
+        assert value == "value-from-env"
+        assert source == "environment"
+        recorded = secrets_loader._last_keyvault_error["https://fake-vault.vault.azure.net/"]
+        assert recorded["category"] == "timeout"
+
+    def test_golden_run_with_timeout_returns_the_real_value_when_fast_enough(self):
+        result = secrets_loader._run_with_timeout(lambda: "fast-value", 10)
+        assert result == "fast-value"
+
+    def test_adversarial_run_with_timeout_reraises_the_real_exception_when_not_a_timeout(self):
+        import pytest
+
+        def raise_value_error():
+            raise ValueError("a real, non-timeout failure")
+
+        with pytest.raises(ValueError, match="a real, non-timeout failure"):
+            secrets_loader._run_with_timeout(raise_value_error, 10)
+
+
 class TestGetKeyvaultStatus:
     def test_golden_not_configured_when_url_unset(self, monkeypatch):
         monkeypatch.delenv("AZURE_KEY_VAULT_URL", raising=False)

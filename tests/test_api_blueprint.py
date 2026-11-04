@@ -1066,10 +1066,10 @@ class TestVerifyDocument:
 
     def test_golden_all_fields_match(self, monkeypatch):
         import document_intelligence_client
-        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: ({
             "Name": {"value": "Priya Sharma", "confidence": 0.98},
             "Degree": {"value": "B.Tech Computer Science", "confidence": 0.91},
-        })
+        }, "azure_document_intelligence"))
         audit_calls = []
         monkeypatch.setattr(repositories, "append_audit_log", lambda e: audit_calls.append(e))
 
@@ -1081,14 +1081,15 @@ class TestVerifyDocument:
         assert body["cross_check"]["mismatches"] == []
         assert body["confidence_flagged_fields"] == []
         assert body["summary"].startswith("OK:")
+        assert body["extraction_method"] == "azure_document_intelligence"
         assert audit_calls[0]["action"] == "document_verification"
 
     def test_golden_mismatch_detected(self, monkeypatch):
         import document_intelligence_client
-        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: ({
             "Name": {"value": "Priya Sharma", "confidence": 0.98},
             "Degree": {"value": "B.Sc Physics", "confidence": 0.91},  # doesn't match claimed
-        })
+        }, "azure_document_intelligence"))
         monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
 
         resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
@@ -1100,10 +1101,10 @@ class TestVerifyDocument:
 
     def test_golden_low_confidence_flagged(self, monkeypatch):
         import document_intelligence_client
-        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: ({
             "Name": {"value": "Priya Sharma", "confidence": 0.98},
             "Degree": {"value": "B.Tech Computer Science", "confidence": 0.3},
-        })
+        }, "azure_document_intelligence"))
         monkeypatch.setattr(repositories, "append_audit_log", lambda e: None)
 
         resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
@@ -1134,24 +1135,26 @@ class TestVerifyDocument:
         assert resp.status_code == 400
 
     def test_adversarial_document_intelligence_unavailable_returns_503(self, monkeypatch):
+        """Both Azure and the local fallback can fail -- e.g. a scanned
+        document with no text layer and no OCR engine installed."""
         import document_intelligence_client
 
         def broken(file_bytes, **kw):
-            raise RuntimeError("Missing required secret(s): DOCUMENT_INTELLIGENCE_ENDPOINT")
+            raise RuntimeError("Tesseract OCR is not installed in this environment")
 
         monkeypatch.setattr(document_intelligence_client, "analyze_document", broken)
 
         resp = api.verify_document_endpoint(_req(method="POST", route_params={"candidate_id": "abc"}, body=self._body()))
         assert resp.status_code == 503
-        assert "DOCUMENT_INTELLIGENCE_ENDPOINT" in json.loads(resp.get_body())["error"]
+        assert "Tesseract" in json.loads(resp.get_body())["error"]
 
     def test_adversarial_audit_log_failure_does_not_break_the_response(self, monkeypatch):
         """The verification result itself (the valuable output) must
         still come back even if writing the audit trail fails."""
         import document_intelligence_client
-        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: {
+        monkeypatch.setattr(document_intelligence_client, "analyze_document", lambda file_bytes, **kw: ({
             "Name": {"value": "Priya Sharma", "confidence": 0.98},
-        })
+        }, "azure_document_intelligence"))
 
         def broken_audit(entry):
             raise RuntimeError("Cosmos DB not configured")

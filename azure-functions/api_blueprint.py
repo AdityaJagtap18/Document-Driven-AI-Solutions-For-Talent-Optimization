@@ -1664,11 +1664,10 @@ def verify_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         import document_intelligence_client
-        extracted = document_intelligence_client.analyze_document(file_bytes)
+        extracted, extraction_method = document_intelligence_client.analyze_document(file_bytes)
     except Exception as e:
         return _error_response(
-            f"Document Intelligence is not available: {e}. "
-            "See docs/azure-provisioning/phase5-document-intelligence-whatsapp.md.",
+            f"Document field extraction failed: {e}",
             status_code=503,
         )
 
@@ -1697,6 +1696,7 @@ def verify_document_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         "cross_check": cross_check,
         "confidence_flagged_fields": flagged,
         "summary": summary,
+        "extraction_method": extraction_method,
     })
 
 

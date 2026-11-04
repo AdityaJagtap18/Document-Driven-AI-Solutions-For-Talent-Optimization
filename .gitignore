@@ -34,6 +34,11 @@ logs/ai_traces.jsonl
 # snapshots, everything), but per-machine runtime state, not source.
 data/local_store/
 
+# Local-disk primary blob storage (context-lake/local_blob_store.py) --
+# real resume files (raw-resumes/parsed-resumes), per-machine runtime
+# state, not source.
+data/local_blobs/
+
 hostinger-deploy/resume_poller_processed.txt
 
 azure-functions/local.settings.json
