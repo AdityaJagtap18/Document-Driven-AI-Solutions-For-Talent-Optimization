@@ -29,10 +29,10 @@ frontend/src/data/candidates.json
 logs/llm_observability.jsonl
 logs/ai_traces.jsonl
 
-# Local-disk persistence for the Azure Observability Report / Service Hub /
-# Readiness snapshots (context-lake/local_json_store.py) -- real collected
-# data, but per-machine runtime state, not source.
-data/local_reports/
+# Local-disk primary data store (context-lake/local_json_store.py) --
+# every container's real, current data (candidates, users, Azure report
+# snapshots, everything), but per-machine runtime state, not source.
+data/local_store/
 
 hostinger-deploy/resume_poller_processed.txt
 

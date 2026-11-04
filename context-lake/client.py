@@ -205,30 +205,23 @@ def get_cosmos_database():
 
 
 def get_container(name: str):
-    """Returns a Cosmos DB container client, creating the container if it doesn't exist.
-    `name` must be one of COSMOS_CONTAINERS (candidates, interview_transcripts,
-    scoring_history, audit_log) — see ../context-lake/README.md for what each holds.
+    """Returns this app's container client for `name` (one of
+    COSMOS_CONTAINERS -- candidates, users, integration_instances, ...).
 
-    The Azure report/snapshot containers (local_json_store.LOCAL_JSON_CONTAINERS --
-    observability_snapshots, observability_refresh_results, integration_instances,
-    integration_health_checks, integration_config_history) are served from a local
-    JSON file on disk instead: these containers exist specifically so the Azure
-    Observability Report / Service Hub / Readiness dashboards can persist a snapshot
-    and serve it back WITHOUT depending on Azure (Cosmos) being configured or
-    reachable -- routing them through Cosmos anyway would defeat that purpose."""
+    Local disk is now PRIMARY for every container, Cosmos a best-effort
+    BACKUP replica -- see local_json_store.ReplicatedContainer's docstring
+    for the full read/write/seed model. This is why the whole app (login,
+    candidates, JDs, the Azure report dashboards, everything) keeps
+    reading and accepting writes through a full Azure/Cosmos outage, not
+    just the report containers this started with. A caller that genuinely
+    needs the raw Cosmos SDK container (nothing in this repo does, by
+    design) should go through ReplicatedContainer._raw_cosmos_container()
+    directly rather than bypassing this function."""
     if name not in COSMOS_CONTAINERS:
         raise ValueError(f"Unknown container '{name}'. Known containers: {list(COSMOS_CONTAINERS)}")
 
     import local_json_store
-    if name in local_json_store.LOCAL_JSON_CONTAINERS:
-        return local_json_store.LocalJSONContainer(name)
-
-    from azure.cosmos import PartitionKey
-
-    db = get_cosmos_database()
-    return db.create_container_if_not_exists(
-        id=name, partition_key=PartitionKey(path=COSMOS_CONTAINERS[name])
-    )
+    return local_json_store.ReplicatedContainer(name)
 
 
 @lru_cache(maxsize=1)
