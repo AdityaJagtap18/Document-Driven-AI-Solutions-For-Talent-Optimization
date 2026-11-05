@@ -50,9 +50,9 @@ def speak(text: str, voice_name: str = "en-US-JennyNeural") -> None:
     synthesis failure (cancellation) rather than failing silently — callers
     in voice_bot.py already wrap LLM/speech calls defensively, same
     fail-soft convention as the rest of that module."""
+    key, region = _require_config()
     import azure.cognitiveservices.speech as speechsdk
 
-    key, region = _require_config()
     speech_config = speechsdk.SpeechConfig(subscription=key, region=region)
     speech_config.speech_synthesis_voice_name = voice_name
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config)
@@ -69,8 +69,6 @@ def listen(save_path: str = None) -> tuple:
     it's a drop-in replacement at call sites. Returns ("", None) on
     no-match or a recognition error (never raises), same fail-soft
     behavior as the function it replaces."""
-    import azure.cognitiveservices.speech as speechsdk
-
     if save_path:
         print("[WARN] azure_speech_utils.listen(): save_path is accepted for "
               "compatibility but not implemented — no audio file will be written.")
@@ -80,6 +78,8 @@ def listen(save_path: str = None) -> tuple:
     except RuntimeError as e:
         print("Speech config error:", e)
         return "", None
+
+    import azure.cognitiveservices.speech as speechsdk
 
     speech_config = speechsdk.SpeechConfig(subscription=key, region=region)
     audio_config = speechsdk.audio.AudioConfig(use_default_microphone=True)

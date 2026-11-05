@@ -113,11 +113,15 @@ class TestGetActiveTemplate:
 # tests this session already established).
 # ---------------------------------------------------------------------------
 class TestEmailAdapter:
-    def test_golden_resolves_real_smtp_config(self):
+    def test_golden_resolves_real_smtp_config(self, monkeypatch):
+        monkeypatch.setenv("SMTP_EMAIL", "bot@example.com")
+        monkeypatch.setenv("SMTP_PASSWORD", "app-password")
+        monkeypatch.setenv("SMTP_SERVER", "smtp.example.com")
+        monkeypatch.setenv("SMTP_PORT", "587")
         config = email_adapter.resolve_smtp_config()
         assert config["missing"] == []
-        assert config["server"]
-        assert config["port"]
+        assert config["server"] == "smtp.example.com"
+        assert config["port"] == 587
 
     def test_golden_test_connectivity_returns_real_outcome_vocabulary(self):
         result = email_adapter.test_connectivity()
