@@ -203,8 +203,8 @@ function App() {
   if (!activeItem) {
     return (
       <div className="login-shell">
-        <div className="login-card">
-          <div className="app-title">CDPI</div>
+        <div className="login-message-card">
+          <div className="sidebar-brand-mark" style={{ color: "white" }}>C</div>
           <p className="muted">Your account doesn't currently have access to any page. Contact an administrator.</p>
           <button className="btn" onClick={signOut}>Sign out</button>
         </div>
@@ -271,11 +271,19 @@ function App() {
           <div className="topbar-right">
             <div className="topbar-mode">API: <strong>{window.CDPI_CONFIG.mode}</strong></div>
             <div className="topbar-version">v{window.CDPI_VERSION}</div>
+            <div className="topbar-divider" />
+            <button className="topbar-icon-btn" aria-label="Notifications" title="Notifications">
+              <IconBell />
+              <span className="topbar-icon-dot" />
+            </button>
+            <button className="topbar-icon-btn" aria-label="Help and support" title="Help and support">
+              <IconHelp />
+            </button>
           </div>
         </header>
 
         <main className="app-main">
-          {activeTab === "dashboard" && <Dashboard api={api} />}
+          {activeTab === "dashboard" && <Dashboard api={api} currentUser={user} onNavigate={setTab} />}
           {activeTab === "reports" && <AdminReports api={api} permissions={permissions} />}
           {activeTab === "pipeline" && <Pipeline api={api} permissions={permissions} currentUser={user} />}
           {activeTab === "review" && <ReviewQueue api={api} permissions={permissions} currentUser={user} />}

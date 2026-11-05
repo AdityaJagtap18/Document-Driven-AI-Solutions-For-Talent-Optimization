@@ -19,9 +19,9 @@
  * dimensions are treated as 0 in the average rather than crashing.
  */
 var CHART_COLORS = {
-  accent: "#6c63f0", good: "#27ad76", bad: "#e2583f", neutral: "#f0974f",
-  blue: "#4f8af7", purple: "#8b7af0", teal: "#2ab6a6", amber: "#f0974f",
-  gray: "#8c89a6",
+  accent: "#6525D9", good: "#16A36A", bad: "#DC5252", neutral: "#E6A23C",
+  blue: "#4F8AF7", purple: "#8B5CF6", teal: "#2ab6a6", amber: "#E6A23C",
+  gray: "#77738C",
 };
 var PALETTE = [CHART_COLORS.accent, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.purple,
   CHART_COLORS.teal, CHART_COLORS.bad, CHART_COLORS.gray, CHART_COLORS.good];
@@ -177,13 +177,13 @@ function AdminReports(props) {
       labels: sorted.map(function (c, i) { return i + 1; }),
       datasets: [{
         label: "Normalized Weighted Score", data: sorted.map(function (c) { return c.normalized_weighted_score; }),
-        borderColor: CHART_COLORS.accent, backgroundColor: "rgba(108,99,240,0.12)", fill: true,
+        borderColor: CHART_COLORS.accent, backgroundColor: "rgba(101,37,217,0.12)", fill: true,
         tension: 0.35, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2.5,
       }],
     },
     options: {
       plugins: { legend: { display: false } },
-      scales: { x: { title: { display: true, text: "Rank" }, grid: { display: false } }, y: { grid: { color: "#f0eefa" } } },
+      scales: { x: { title: { display: true, text: "Rank" }, grid: { display: false } }, y: { grid: { color: "#EAE7F2" } } },
     },
   };
 
@@ -228,8 +228,8 @@ function AdminReports(props) {
     data: {
       labels: dimensions,
       datasets: [
-        { label: tierDisplayLabel("Recommended for Fast-Track"), data: avgByTier("Recommended for Fast-Track"), borderColor: CHART_COLORS.good, backgroundColor: "rgba(31,111,92,0.2)" },
-        { label: tierDisplayLabel("Rejected"), data: avgByTier("Rejected"), borderColor: CHART_COLORS.bad, backgroundColor: "rgba(164,64,47,0.2)" },
+        { label: tierDisplayLabel("Recommended for Fast-Track"), data: avgByTier("Recommended for Fast-Track"), borderColor: CHART_COLORS.good, backgroundColor: "rgba(22,163,106,0.2)" },
+        { label: tierDisplayLabel("Rejected"), data: avgByTier("Rejected"), borderColor: CHART_COLORS.bad, backgroundColor: "rgba(220,82,82,0.2)" },
       ],
     },
   };
