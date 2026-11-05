@@ -1,0 +1,32 @@
+# systemd unit for the real backend running on the Hostinger KVM VPS
+# (api.adityajagtap.com) -- gunicorn serving hostinger-deploy/wsgi_app.py's
+# `application` WSGI callable, with nginx already reverse-proxying HTTPS
+# traffic to it on 127.0.0.1 (see nginx-api.conf.example in this folder
+# for that side, which a Let's Encrypt cert is already issued against).
+#
+# This file documents what should be installed on the VPS -- it is not
+# applied automatically. Install once via SSH:
+#   scp hostinger-deploy/cdpi-backend.service <host>:/etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now cdpi-backend
+# Then every later deploy only needs `systemctl restart cdpi-backend`
+# (see .github/workflows/deploy-backend.yml), not a fresh install.
+#
+# Fill in: <DEPLOY_USER> (a non-root account with access to <APP_DIR>),
+# <APP_DIR> (where this repo is checked out on the VPS, e.g. /opt/cdpi),
+# <VENV_DIR> (a venv with hostinger-deploy/requirements.txt + gunicorn
+# installed, e.g. <APP_DIR>/venv).
+
+[Unit]
+Description=CDPI backend (gunicorn + hostinger-deploy/wsgi_app.py)
+After=network.target
+
+[Service]
+User=<DEPLOY_USER>
+WorkingDirectory=<APP_DIR>/hostinger-deploy
+EnvironmentFile=<APP_DIR>/.env
+ExecStart=<VENV_DIR>/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --timeout 120 wsgi_app:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

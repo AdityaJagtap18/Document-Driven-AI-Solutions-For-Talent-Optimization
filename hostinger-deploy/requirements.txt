@@ -17,6 +17,8 @@
 #                            them, e.g. a VPS)
 
 flask
+gunicorn  # only needed on the KVM VPS path (cdpi-backend.service) -- Passenger
+          # (passenger_wsgi.py) has its own built-in WSGI server, doesn't use this
 azure-functions
 azure-cosmos
 azure-storage-blob
