@@ -4,27 +4,25 @@
 # traffic to it on 127.0.0.1 (see nginx-api.conf.example in this folder
 # for that side, which a Let's Encrypt cert is already issued against).
 #
-# This file documents what should be installed on the VPS -- it is not
-# applied automatically. Install once via SSH:
-#   scp hostinger-deploy/cdpi-backend.service <host>:/etc/systemd/system/
-#   systemctl daemon-reload && systemctl enable --now cdpi-backend
-# Then every later deploy only needs `systemctl restart cdpi-backend`
-# (see .github/workflows/deploy-backend.yml), not a fresh install.
-#
-# Fill in: <DEPLOY_USER> (a non-root account with access to <APP_DIR>),
-# <APP_DIR> (where this repo is checked out on the VPS, e.g. /opt/cdpi),
-# <VENV_DIR> (a venv with hostinger-deploy/requirements.txt + gunicorn
-# installed, e.g. <APP_DIR>/venv).
+# This is a verbatim copy of what's actually installed at
+# /etc/systemd/system/cdpi-backend.service on the VPS (confirmed via SSH,
+# not guessed) -- kept here so a reinstall or a second VPS doesn't have
+# to reconstruct it from scratch. The repo lives at /opt/cdpi-backend,
+# runs as root (not a dedicated deploy user -- a real simplification
+# worth revisiting, not a decision made here), env vars come from the
+# checked-out .env at /opt/cdpi-backend/.env (python-dotenv's own
+# upward search finds it from hostinger-deploy/ as the working
+# directory, same as every other entry point in this repo).
 
 [Unit]
-Description=CDPI backend (gunicorn + hostinger-deploy/wsgi_app.py)
+Description=CDPI Backend (gunicorn + wsgi_app)
 After=network.target
 
 [Service]
-User=<DEPLOY_USER>
-WorkingDirectory=<APP_DIR>/hostinger-deploy
-EnvironmentFile=<APP_DIR>/.env
-ExecStart=<VENV_DIR>/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --timeout 120 wsgi_app:application
+Type=simple
+WorkingDirectory=/opt/cdpi-backend/hostinger-deploy
+Environment=PATH=/opt/cdpi-backend/venv/bin
+ExecStart=/opt/cdpi-backend/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 2 --timeout 120 wsgi_app:application
 Restart=always
 RestartSec=5
 

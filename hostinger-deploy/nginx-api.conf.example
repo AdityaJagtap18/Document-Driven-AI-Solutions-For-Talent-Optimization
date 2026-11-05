@@ -1,11 +1,6 @@
-# Reference copy of the nginx vhost for api.adityajagtap.com on the
-# Hostinger KVM VPS -- this domain is already live with a Let's Encrypt
-# cert (confirmed via `curl -sI https://api.adityajagtap.com`), so this
-# file is DOCUMENTATION of what's presumably already in
-# /etc/nginx/sites-available/ on that box, not something to apply blind.
-# Diff it against the real file over SSH before assuming it matches.
-#
-# Matches cdpi-backend.service's gunicorn bind address (127.0.0.1:8000).
+# Verbatim copy of /etc/nginx/sites-available/cdpi-backend on the
+# Hostinger KVM VPS (confirmed via SSH, not guessed) -- matches
+# cdpi-backend.service's gunicorn bind address (127.0.0.1:8000).
 
 server {
     server_name api.adityajagtap.com;
@@ -18,16 +13,18 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    listen 443 ssl;
-    # ssl_certificate / ssl_certificate_key / certbot's managed_by_certbot
-    # block omitted here -- already issued, don't fill in blind.
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/api.adityajagtap.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/api.adityajagtap.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 }
-
 server {
     if ($host = api.adityajagtap.com) {
         return 301 https://$host$request_uri;
-    }
-    server_name api.adityajagtap.com;
+    } # managed by Certbot
+
     listen 80;
-    return 404;
+    server_name api.adityajagtap.com;
+    return 404; # managed by Certbot
 }

@@ -1,0 +1,46 @@
+name: Deploy frontend (Hostinger shared hosting)
+
+# Only runs after ci.yml's test job has already passed on main (same repo,
+# same commit). Does nothing until the four secrets below are added under
+# Settings -> Secrets and variables -> Actions; until then this workflow
+# exists but every run is a no-op skip. See hostinger-deploy/VPS_DEPLOY.md
+# section 3 for how these were found and what account this uploads to.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets are configured
+        id: check
+        run: |
+          if [ -z "${{ secrets.FRONTEND_SSH_HOST }}" ]; then
+            echo "FRONTEND_SSH_HOST (and friends) not set yet -- skipping deploy. See hostinger-deploy/VPS_DEPLOY.md." >&2
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Uploads over SFTP (the account's own SSH key, never a password --
+      # see VPS_DEPLOY.md's note on why) to the real document root for
+      # app.adityajagtap.com, confirmed via SSH:
+      # domains/adityajagtap.com/public_html/app/
+      - name: SCP frontend/ to shared hosting
+        if: steps.check.outputs.configured == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.FRONTEND_SSH_HOST }}
+          port: ${{ secrets.FRONTEND_SSH_PORT }}
+          username: ${{ secrets.FRONTEND_SSH_USER }}
+          key: ${{ secrets.FRONTEND_SSH_KEY }}
+          source: "frontend/*"
+          target: "domains/adityajagtap.com/public_html/app"
+          strip_components: 1
+          overwrite: true

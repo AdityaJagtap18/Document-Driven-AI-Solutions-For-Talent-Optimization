@@ -8,41 +8,36 @@ everything.
 
 | Piece | Host | Confirmed by |
 |---|---|---|
-| Frontend (`app.adityajagtap.com`) | Hostinger **shared hosting** (hPanel/hcdn), static files | `curl -sI` shows `platform: hostinger`, `Server: hcdn` |
-| Backend (`api.adityajagtap.com`) | Hostinger **KVM VPS**, `82.25.125.164:65002`, nginx + gunicorn running `hostinger-deploy/wsgi_app.py` | `curl -sI` shows `Server: nginx/1.28.3 (Ubuntu)`; see commit `196fdb8` |
+| Frontend (`app.adityajagtap.com`) | Hostinger **shared hosting** (hPanel/hcdn), static files, account `u185188662` | `curl -sI` shows `platform: hostinger`, `Server: hcdn` |
+| Backend (`api.adityajagtap.com`) | Hostinger **KVM VPS**, `187.127.108.141` port `22`, root, nginx + gunicorn running `hostinger-deploy/wsgi_app.py` at `/opt/cdpi-backend` | confirmed live via SSH (`systemctl status cdpi-backend`) |
 
 The generic playbook's Docker/docker-compose shape doesn't apply here --
 this repo has no `Dockerfile` and isn't containerized. The shape below is
 "git pull + restart a systemd service" instead, matching what's already
 running on the VPS.
 
-**Known gap, not hidden:** the VPS's nginx vhost and the gunicorn process
-were set up by hand over SSH in an earlier session -- neither is tracked
-in this repo. `cdpi-backend.service` and `nginx-api.conf.example` in this
-folder are reference copies of what's *presumably* configured; diff them
-against the real files over SSH rather than assuming they match, and
-install `cdpi-backend.service` for real (see its own header) if a
-`systemctl status cdpi-backend` on the VPS comes back empty -- i.e. if
-gunicorn is actually being kept alive some other way (a bare `nohup`, a
-`screen`/`tmux` session, cron `@reboot`), which won't survive a crash or
-reboot as cleanly as systemd would.
+`cdpi-backend.service` and `nginx-api.conf.example` in this folder are
+now verbatim copies of the real files on the VPS (confirmed over SSH,
+not guessed) -- `WorkingDirectory=/opt/cdpi-backend/hostinger-deploy`,
+gunicorn bound to `127.0.0.1:8000`, running as root (a real
+simplification worth revisiting, not a decision made here).
 
-## 1. What's blocking automated backend deploys right now
+**As of this writing the VPS checkout is stale** -- `/opt/cdpi-backend`
+is on `claude/azure-reports-local-download-4d2d85` at commit `13608be`,
+well behind `main` (missing the demo-login feature, the CI fixes, and
+this deploy scaffolding itself). Nothing has auto-deployed there yet;
+see step 2.
 
-A deploy key already exists for this (`~/.ssh/hostinger_kvm`, comment
-`cdpi-backend-kvm`, matching `known_hosts` for `82.25.125.164:65002`),
-but the **SSH username it's authorized for is unknown** -- `root` was
-tried and refused (`Permission denied (publickey,password)`). Find this
-out (check hPanel's VPS page, or however that key was originally
-provisioned) before anything below can actually run. Don't guess
-usernames over SSH -- that reads as credential brute-forcing regardless
-of intent.
-
-Once you have it, add it to:
+## 1. Backend SSH access (confirmed working)
 
 ```bash
-ssh -i ~/.ssh/hostinger_kvm -p 65002 <username>@82.25.125.164 whoami
+ssh -i ~/.ssh/hostinger_kvm -p 22 root@187.127.108.141 whoami
 ```
+
+Note the **port is 22, not 65002** -- 65002 (what `known_hosts` seemed to
+suggest) timed out; plain 22 works. `known_hosts` has a second, unrelated
+entry for `[82.25.125.164]:65002` -- a different host (possibly stale),
+not this VPS.
 
 ## 2. Backend CI/CD (`.github/workflows/deploy-backend.yml`)
 
@@ -53,44 +48,62 @@ variables -> Actions**):
 
 | Secret | Value |
 |---|---|
-| `VPS_HOST` | `82.25.125.164` |
-| `VPS_PORT` | `65002` |
-| `VPS_USER` | *(the username from step 1)* |
+| `VPS_HOST` | `187.127.108.141` |
+| `VPS_PORT` | `22` |
+| `VPS_USER` | `root` |
 | `VPS_SSH_KEY` | private half of `~/.ssh/hostinger_kvm` |
-| `VPS_DEPLOY_PATH` | wherever this repo is checked out on the VPS, e.g. `/opt/cdpi` |
-| `VPS_VENV_DIR` | that checkout's venv, e.g. `/opt/cdpi/venv` |
+| `VPS_DEPLOY_PATH` | `/opt/cdpi-backend` |
+| `VPS_VENV_DIR` | `/opt/cdpi-backend/venv` |
 
 The deploy script itself (`git reset --hard origin/main`, `pip install`,
-`systemctl restart cdpi-backend`) assumes:
-- the repo is already `git clone`d on the VPS at `VPS_DEPLOY_PATH`
-- `cdpi-backend.service` (this folder) is installed and enabled
-- the deploy user can `sudo systemctl restart cdpi-backend` without a
-  password prompt (add a narrow `/etc/sudoers.d/` rule for just that one
-  command, don't give the deploy user full sudo)
+`systemctl restart cdpi-backend`) assumes the repo is already
+`git clone`d at `VPS_DEPLOY_PATH` and `cdpi-backend.service` is
+installed and enabled -- both already true on the real VPS. Since the
+deploy user here is `root`, the `sudo systemctl restart` in the workflow
+is a no-op prefix, not a privilege boundary -- worth narrowing to a
+dedicated deploy user with a scoped `/etc/sudoers.d/` rule later rather
+than deploying as root indefinitely.
 
-None of this has been applied to the real VPS yet -- these are the repo
-side artifacts only. **Do the first deploy manually once (SSH in,
-confirm the service file, confirm the app actually starts) before
-trusting this workflow**, same reasoning as any first deploy: a schema
-or dependency gap that an in-memory test never exercises can leave the
-container "started" but every real request failing.
+**Do the first deploy manually once (confirm the app actually starts,
+check logs) before trusting this workflow** -- same reasoning as any
+first deploy: a schema or dependency gap that an in-memory test never
+exercises can leave the process "running" but every real request
+failing.
 
 ## 3. Frontend deploys (shared hosting, not the VPS)
 
-The frontend is on the separate shared-hosting plan, served via hPanel
--- SSH-based CI/CD doesn't apply the same way. Two realistic options,
-neither set up yet:
+The frontend is on the separate shared-hosting account `u185188662` at
+`82.25.125.164:65002` (confirmed via SSH with `~/.ssh/hostinger_cdpi`,
+comment `cdpi-deploy`) -- a *different* host from the backend VPS, even
+though it's the same IP as what looked like the VPS's `known_hosts`
+entry earlier (coincidence, not the same machine -- the VPS is
+`187.127.108.141`).
 
-- **hPanel's own Git integration** (if this plan has it under
-  Websites -> your site -> Git): point it at this repo's `main` branch
-  and `frontend/` as the document root; hPanel pulls on its own schedule
-  or webhook, no GitHub Actions secret needed.
-- **FTP/SFTP upload from CI** (e.g. `SamKirkland/FTP-Deploy-Action`) if
-  Git integration isn't available on this plan -- needs FTP credentials
-  as a repo secret, uploading `frontend/` on every push to `main`.
+`app.adityajagtap.com`'s real document root is
+`domains/adityajagtap.com/public_html/app/` on that account (confirmed
+via SSH, not guessed) -- a `.ftp-deploy-sync-state.json` file sitting
+there is the telltale sign of a prior deploy via
+`SamKirkland/FTP-Deploy-Action` (or the `ftp-deploy` npm package it
+wraps, run some other way), even though no such workflow is currently
+committed to this repo -- it was removed or never committed, and
+whatever deployed it last did so manually or from a workflow that's
+since gone.
 
-Check hPanel for Git integration before reaching for the FTP action --
-it's zero extra CI surface if it's there.
+`.github/workflows/deploy-frontend.yml` (added in this PR) recreates
+that pipeline as a tracked, repeatable GitHub Actions job: uploads
+`frontend/` to that path over SFTP on every push to `main`, gated the
+same way as the backend workflow (no-ops until secrets exist).
+
+| Secret | Value |
+|---|---|
+| `FRONTEND_SSH_HOST` | `82.25.125.164` |
+| `FRONTEND_SSH_PORT` | `65002` |
+| `FRONTEND_SSH_USER` | `u185188662` |
+| `FRONTEND_SSH_KEY` | private half of `~/.ssh/hostinger_cdpi` |
+
+Never use the account's real login password for this (not done here,
+and not something to put in a GitHub secret either) -- the SSH key is
+the right credential for CI.
 
 ## 4. Verify end-to-end after any deploy
 
