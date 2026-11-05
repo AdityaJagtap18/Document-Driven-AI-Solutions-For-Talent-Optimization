@@ -1227,6 +1227,75 @@ class TestLogin:
         assert resp.status_code == 400
 
 
+_DEMO_ADMIN_USER = {
+    "id": "user-demo-admin-1", "username": "demo_admin", "display_name": "Demo Platform Administrator",
+    "email": "demo+admin@example.invalid", "role_keys": ["admin"], "status": "active", "is_demo_persona": True,
+}
+
+
+class TestDemoLoginOptions:
+    def test_golden_lists_all_12_personas(self):
+        resp = api.demo_login_options_endpoint(_req())
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert len(body["personas"]) == 12
+        ids = [p["persona_id"] for p in body["personas"]]
+        assert "P08" in ids
+        admin_option = [p for p in body["personas"] if p["persona_id"] == "P08"][0]
+        assert admin_option["role_key"] == "admin"
+
+    def test_adversarial_disabled_returns_404(self, monkeypatch):
+        monkeypatch.setenv("DEMO_LOGIN_ENABLED", "false")
+        resp = api.demo_login_options_endpoint(_req())
+        assert resp.status_code == 404
+
+
+class TestDemoLogin:
+    def test_golden_valid_persona_returns_token_and_safe_user(self, monkeypatch):
+        monkeypatch.setattr(repositories, "get_or_create_demo_persona", lambda pid: _DEMO_ADMIN_USER if pid == "P08" else None)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        resp = api.demo_login_endpoint(_req(method="POST", body={"persona_id": "P08"}))
+        assert resp.status_code == 200
+        body = json.loads(resp.get_body())
+        assert "token" in body
+        assert body["user"]["username"] == "demo_admin"
+        assert "password_hash" not in body["user"]
+
+    def test_adversarial_unknown_persona_id_returns_400(self, monkeypatch):
+        def raise_unknown(pid):
+            raise ValueError(f"Unknown persona_id '{pid}'.")
+        monkeypatch.setattr(repositories, "get_or_create_demo_persona", raise_unknown)
+        resp = api.demo_login_endpoint(_req(method="POST", body={"persona_id": "P99"}))
+        assert resp.status_code == 400
+
+    def test_edge_missing_persona_id_returns_400(self):
+        resp = api.demo_login_endpoint(_req(method="POST", body={}))
+        assert resp.status_code == 400
+
+    def test_adversarial_disabled_account_cannot_demo_login(self, monkeypatch):
+        disabled = dict(_DEMO_ADMIN_USER, status="disabled")
+        monkeypatch.setattr(repositories, "get_or_create_demo_persona", lambda pid: disabled)
+        resp = api.demo_login_endpoint(_req(method="POST", body={"persona_id": "P08"}))
+        assert resp.status_code == 403
+
+    def test_adversarial_disabled_feature_returns_404(self, monkeypatch):
+        monkeypatch.setenv("DEMO_LOGIN_ENABLED", "false")
+        resp = api.demo_login_endpoint(_req(method="POST", body={"persona_id": "P08"}))
+        assert resp.status_code == 404
+
+    def test_adversarial_can_never_resolve_an_arbitrary_real_username(self, monkeypatch):
+        """The core safety guarantee: no persona_id value reaches
+        get_user_by_username or any other real-account lookup -- only
+        get_or_create_demo_persona(), which can only ever produce one of
+        the 12 fixed demo_<role_key> accounts."""
+        calls = []
+        monkeypatch.setattr(repositories, "get_user_by_username", lambda u: calls.append(u))
+        monkeypatch.setattr(repositories, "get_or_create_demo_persona", lambda pid: _DEMO_ADMIN_USER)
+        monkeypatch.setattr(repositories, "append_audit_log", lambda entry: None)
+        api.demo_login_endpoint(_req(method="POST", body={"persona_id": "admin"}))
+        assert calls == []
+
+
 class TestRequirePermission:
     """Negative-path coverage of the core authorization gate itself --
     the mechanism every protected endpoint in this file relies on."""

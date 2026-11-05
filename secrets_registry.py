@@ -32,6 +32,9 @@ from secrets_loader import get_secret_with_source, set_env_secret  # noqa: E402
 SECRET_DEFINITIONS = [
     {"key": "JWT_SECRET", "label": "Session signing secret", "secret": True,
      "used_by": ["auth.py"], "description": "Signs/verifies every login session token. Required -- auth.py raises a clear error if missing."},
+    {"key": "DEMO_LOGIN_ENABLED", "label": "Demo login enabled", "secret": False,
+     "used_by": ["azure-functions/api_blueprint.py"],
+     "description": "Defaults to true. The Login screen's one-click 'Login as Admin (Demo)' / Persona Testing feature (POST /auth/demo-login) -- can only ever sign in as one of the 12 fixed, clearly-marked demo persona accounts, never a real one. Set to 'false' to remove it entirely, e.g. before a deployment handles real customer data."},
     {"key": "OLLAMA_MODEL", "label": "Ollama chat model", "secret": False,
      "used_by": ["llm_utils.py"],
      "description": "Free/local LLM via Ollama. When set, takes PRIORITY over OPENAI_API_KEY and Azure OpenAI for chat -- requires a locally running `ollama serve` with this model pulled."},

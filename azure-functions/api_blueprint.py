@@ -260,6 +260,93 @@ def login_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response({"token": token, "user": _safe_user(user)})
 
 
+def _demo_login_enabled() -> bool:
+    """DEMO_LOGIN_ENABLED defaults to "true" (get_secret's default arg)
+    so the one-click Demo Login / Persona Testing feature works out of
+    the box -- this is a convenience feature for showing the product,
+    not a real authorization boundary (see demo_login_endpoint's
+    docstring for why it's still safe to leave on). Set
+    DEMO_LOGIN_ENABLED=false in .env/Key Vault to turn it off entirely,
+    e.g. before pointing a deployment at real customer data where even
+    an unauthenticated "become a demo admin" button isn't wanted."""
+    return (secrets_loader.get_secret("DEMO_LOGIN_ENABLED", "true") or "true").strip().lower() != "false"
+
+
+@bp.route(route="auth/demo-login-options", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def demo_login_options_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """Lists the 12 representative personas (persona_catalogue.PERSONAS)
+    for the Login screen's Persona Testing picker -- ANONYMOUS since this
+    is shown BEFORE anyone is logged in. Only non-sensitive, structural
+    metadata (persona id/display name/role), nothing a real account's
+    data could leak through."""
+    if not _demo_login_enabled():
+        return _error_response("Demo login is disabled on this deployment.", status_code=404)
+    options = [
+        {
+            "persona_id": p["persona_id"], "display_name": p["demo_display_name"],
+            "role_key": p["role_key"], "role_display_name": persona_catalogue._role_for(p).get("display_name", p["role_key"]),
+            "responsibilities": p["responsibilities"],
+        }
+        for p in persona_catalogue.PERSONAS
+    ]
+    return _json_response({"personas": options})
+
+
+@bp.route(route="auth/demo-login", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def demo_login_endpoint(req: func.HttpRequest) -> func.HttpResponse:
+    """One-click login as one of the 12 fixed demo personas -- no
+    password, by design: body is just {"persona_id": "P08"}. ANONYMOUS
+    by necessity, same as POST /auth/login, since the whole point is
+    reaching a logged-in state without typing credentials.
+
+    Why this is safe to leave on (unlike a generic "log in as any
+    account" bypass): get_or_create_demo_persona() can ONLY ever resolve
+    or create one of the 12 accounts persona_catalogue.PERSONAS defines
+    (demo_candidate, demo_admin, ...), each clearly marked
+    is_demo_persona in context-lake/repositories.py -- it has no path to
+    any other username, so this endpoint can never be used to sign in as
+    a real admin, recruiter, or any other actual account, no matter what
+    persona_id is sent. It's still gated by DEMO_LOGIN_ENABLED (see
+    _demo_login_enabled's docstring) for deployments that want it off
+    entirely."""
+    if not _demo_login_enabled():
+        return _error_response("Demo login is disabled on this deployment.", status_code=404)
+
+    try:
+        body = req.get_json()
+    except ValueError:
+        return _error_response("Request body must be JSON.", status_code=400)
+
+    persona_id = (body.get("persona_id") or "").strip()
+    if not persona_id:
+        return _error_response("'persona_id' is required.", status_code=400)
+
+    try:
+        user = repositories.get_or_create_demo_persona(persona_id)
+    except ValueError as e:
+        return _error_response(str(e), status_code=400)
+    except Exception as e:
+        return _cosmos_unavailable_response(e)
+
+    if user.get("status") != "active":
+        return _error_response("This demo account has been disabled.", status_code=403)
+
+    try:
+        token = auth_module.create_token(user)
+    except RuntimeError as e:
+        return _error_response(str(e), status_code=503)
+
+    try:
+        repositories.append_audit_log({
+            "candidate_id": "_system", "action": "demo_login", "username": user["username"],
+            "user_id": user["id"], "persona_id": persona_id,
+        })
+    except Exception:
+        pass
+
+    return _json_response({"token": token, "user": _safe_user(user)})
+
+
 @bp.route(route="auth/me", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def me_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Lets the frontend restore a session on page load/reload -- resolves
