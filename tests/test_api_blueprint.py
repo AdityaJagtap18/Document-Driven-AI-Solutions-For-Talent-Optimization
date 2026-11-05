@@ -6,6 +6,7 @@ a network."""
 
 import base64
 import json
+from datetime import datetime, timezone
 
 import azure.functions as func
 import pytest
@@ -2473,8 +2474,9 @@ class TestGetTokenomicsConfigHistoryEndpoint:
 
 class TestGetTokenomicsStatusEndpoint:
     def test_golden_computes_usage_and_budget_status(self, monkeypatch):
+        this_month = datetime.now(timezone.utc).replace(day=1).isoformat()
         monkeypatch.setattr(api, "_read_jsonl", lambda path: [
-            {"timestamp": "2026-10-01T00:00:00+00:00", "total_tokens": 100, "cost_usd": 5.0, "label": "scoring"},
+            {"timestamp": this_month, "total_tokens": 100, "cost_usd": 5.0, "label": "scoring"},
         ])
         monkeypatch.setattr(repositories, "get_active_tokenomics_config", lambda: {"monthly_budget_usd": 100, "warning_threshold_pct": 80})
         resp = api.get_tokenomics_status_endpoint(_req())
@@ -2694,9 +2696,10 @@ class TestGetLlmCacheStatsEndpoint:
             "by_label": {"resume_chunk_summarization": {"entry_count": 2, "hit_count": 3}},
             "oldest_entry_age_seconds": 120.0,
         })
+        this_month = datetime.now(timezone.utc).replace(day=1)
         monkeypatch.setattr(api, "_read_jsonl", lambda path: [
-            {"timestamp": "2026-10-01T00:00:00+00:00", "label": "resume_chunk_summarization", "total_tokens": 100, "cost_usd": 0.01, "cache_hit": False},
-            {"timestamp": "2026-10-02T00:00:00+00:00", "label": "resume_chunk_summarization", "total_tokens": 0, "cost_usd": 0.0, "cache_hit": True},
+            {"timestamp": this_month.isoformat(), "label": "resume_chunk_summarization", "total_tokens": 100, "cost_usd": 0.01, "cache_hit": False},
+            {"timestamp": this_month.replace(day=2).isoformat(), "label": "resume_chunk_summarization", "total_tokens": 0, "cost_usd": 0.0, "cache_hit": True},
         ])
         resp = api.get_llm_cache_stats_endpoint(_req())
         assert resp.status_code == 200

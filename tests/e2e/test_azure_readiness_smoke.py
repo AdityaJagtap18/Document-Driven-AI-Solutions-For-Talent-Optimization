@@ -66,16 +66,43 @@ def _port_is_open(port):
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+# This test needs window.CDPI_MOCK_API (no real backend credentials
+# involved, see the module docstring), but config.js's checked-in "mode"
+# reflects whatever this deployment is actually pointed at ("real", the
+# production VPS, as of this writing) -- so the server below serves a
+# mock-forced copy of config.js's bytes instead of the real file, every
+# other request still going straight to the real frontend/ directory.
+_MOCK_CONFIG_JS = b"""window.CDPI_CONFIG = {
+  mode: "mock",
+  baseUrl: "",
+  functionKey: "",
+};
+"""
+
+
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):  # noqa: A002
         pass  # keep pytest -v output readable -- no per-request access log
+
+    def do_GET(self):
+        if self.path.split("?", 1)[0] == "/src/config.js":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.send_header("Content-Length", str(len(_MOCK_CONFIG_JS)))
+            self.end_headers()
+            self.wfile.write(_MOCK_CONFIG_JS)
+            return
+        super().do_GET()
 
 
 @pytest.fixture(scope="module")
 def frontend_server():
     """Starts the real documented local-development server (`python -m
     http.server`, same command .claude/launch.json's "frontend" entry
-    runs) against the real frontend/ directory, on a dedicated test port.
+    runs) against the real frontend/ directory, on a dedicated test port
+    -- except config.js, forced to mock mode (see _MOCK_CONFIG_JS above)
+    so this test never depends on whatever mode this deployment's own
+    config.js happens to be checked in with.
     Confirms the server actually answers before yielding -- 'the
     application has started' is verified, not assumed."""
     if _port_is_open(_TEST_PORT):
