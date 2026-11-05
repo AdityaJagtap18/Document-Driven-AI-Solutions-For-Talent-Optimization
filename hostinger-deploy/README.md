@@ -1,5 +1,12 @@
 # Deploying CDPI to Hostinger (Unlimited Web Hosting / shared plan)
 
+**This is the shared-hosting/Passenger path.** The real backend currently
+in production (`api.adityajagtap.com`) instead runs on a separate
+Hostinger KVM VPS via gunicorn+nginx -- see [VPS_DEPLOY.md](VPS_DEPLOY.md)
+for that path and the CI/CD set up around it. The frontend
+(`app.adityajagtap.com`) IS on this shared-hosting plan this file
+describes.
+
 Real constraint this plan works within: Hostinger's shared/Business
 plans have no root/SSH shell and no long-running custom process — but
 they DO support a managed **Python App** (Phusion Passenger, hPanel ->
