@@ -114,6 +114,15 @@ window.CDPI_REAL_API = {
       body: JSON.stringify({ username: username, password: password }),
     });
   },
+  demoLoginOptions: function () {
+    return cdpiRequest("/api/auth/demo-login-options");
+  },
+  demoLogin: function (personaId) {
+    return cdpiRequest("/api/auth/demo-login", {
+      method: "POST",
+      body: JSON.stringify({ persona_id: personaId }),
+    });
+  },
   getMe: function () {
     return cdpiRequest("/api/auth/me");
   },

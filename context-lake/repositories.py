@@ -1311,6 +1311,29 @@ def ensure_default_rag_prompts() -> list:
     return seeded
 
 
+def _new_demo_persona_doc(persona: dict, password_hash: str, created_by: str) -> dict:
+    """Shared shape for a demo persona's user document -- both
+    ensure_demo_personas() (bulk, CLI, real random passwords, used for
+    `--create-demo-personas`) and get_or_create_demo_persona() (single,
+    the one-click Demo Login feature's get-or-create) build the SAME
+    document shape through here, so the two paths can never drift into
+    creating demo accounts that look different depending which one ran
+    first for a given persona."""
+    return {
+        "id": str(uuid.uuid4()),
+        "username": f"demo_{persona['role_key']}",
+        "password_hash": password_hash,
+        "display_name": persona["demo_display_name"],
+        "email": f"demo+{persona['role_key']}@example.invalid",
+        "role_keys": [persona["role_key"]],
+        "status": "active",
+        "is_demo_persona": True,
+        "created_at": _now(),
+        "created_by": created_by,
+        "updated_at": _now(),
+    }
+
+
 def ensure_demo_personas() -> list:
     """OPT-IN ONLY -- unlike every ensure_default_*() above, this is never
     called automatically at bootstrap (see bootstrap_iam.py's
@@ -1342,25 +1365,48 @@ def ensure_demo_personas() -> list:
         if get_user_by_username(username) is not None:
             continue
         password = _secrets.token_urlsafe(16)
-        doc = {
-            "id": str(uuid.uuid4()),
-            "username": username,
-            "password_hash": hash_password(password),
-            "display_name": persona["demo_display_name"],
-            "email": f"demo+{persona['role_key']}@example.invalid",
-            "role_keys": [persona["role_key"]],
-            "status": "active",
-            "is_demo_persona": True,
-            "created_at": _now(),
-            "created_by": "bootstrap_iam.py:--create-demo-personas",
-            "updated_at": _now(),
-        }
+        doc = _new_demo_persona_doc(persona, hash_password(password), "bootstrap_iam.py:--create-demo-personas")
         get_container("users").upsert_item(doc)
         created.append({
             "username": username, "password": password,
             "role_key": persona["role_key"], "persona_id": persona["persona_id"],
         })
     return created
+
+
+def get_or_create_demo_persona(persona_id: str):
+    """Backend for the one-click Demo Login feature (POST /auth/demo-login):
+    returns the `demo_<role_key>` user document for `persona_id`, creating
+    it on first use if ensure_demo_personas()/bootstrap_iam.py was never
+    run. Unlike ensure_demo_personas(), the generated password is
+    immediately discarded (not returned) -- this function's whole point is
+    to hand back an account to log into directly, via a real
+    auth.create_token() call, never via a password a caller would need.
+    Still produces the exact same is_demo_persona-marked document shape
+    (see _new_demo_persona_doc), so an account created this way is
+    indistinguishable from one created by the CLI flag -- there is only
+    ever one kind of demo persona account, created lazily either way.
+
+    Raises ValueError if `persona_id` isn't a real entry in
+    persona_catalogue.PERSONAS -- this must never be able to create or
+    return an arbitrary account by that id, only one of the fixed 12
+    demo personas."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) + "/..")
+    from auth import hash_password  # noqa: E402
+    import secrets as _secrets  # noqa: E402
+    import persona_catalogue  # noqa: E402
+
+    persona = persona_catalogue.PERSONAS_BY_ID.get(persona_id)
+    if persona is None:
+        raise ValueError(f"Unknown persona_id '{persona_id}'.")
+
+    username = f"demo_{persona['role_key']}"
+    existing = get_user_by_username(username)
+    if existing is not None:
+        return existing
+
+    doc = _new_demo_persona_doc(persona, hash_password(_secrets.token_urlsafe(16)), "auth/demo-login")
+    return get_container("users").upsert_item(doc)
 
 
 # ---------------------------------------------------------------------------

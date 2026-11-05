@@ -684,6 +684,33 @@ window.CDPI_MOCK_API = {
     return mockDelay({ token: token, user: _mockSafeUser(user) });
   },
 
+  // Mock mirror of the real Demo Login feature (azure-functions/api_blueprint.py's
+  // POST /auth/demo-login-options|/auth/demo-login) -- mock mode only has the 4
+  // MOCK_USERS roles (not the full 12-persona catalogue, which needs real role
+  // records that don't exist here), so each is reused directly as its own
+  // "persona" with role_key as the persona id -- no password needed, same
+  // no-typed-credentials convenience as the real endpoint.
+  demoLoginOptions: function () {
+    return mockDelay({
+      personas: MOCK_USERS.map(function (u) {
+        return {
+          persona_id: u.role_keys[0], display_name: u.display_name,
+          role_key: u.role_keys[0], role_display_name: (_mockGetRole(u.role_keys[0]) || {}).display_name || u.role_keys[0],
+          responsibilities: "Mock-mode persona -- signs in directly as " + u.username + " (" + u.display_name + ").",
+        };
+      }),
+    });
+  },
+  demoLogin: function (personaId) {
+    var user = MOCK_USERS.filter(function (u) { return u.role_keys[0] === personaId; })[0];
+    if (!user) {
+      var err = new Error("Unknown persona_id '" + personaId + "'."); err.status = 400; return Promise.reject(err);
+    }
+    var token = "mock-token-" + user.id + "-" + Math.random().toString(36).slice(2, 10);
+    MOCK_SESSIONS[token] = user.id;
+    return mockDelay({ token: token, user: _mockSafeUser(user) });
+  },
+
   getMe: function () {
     try {
       var user = _mockRequireAuth();
