@@ -59,12 +59,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "context-lake"))
 
+# "gpt-3.5-turbo" was the original default here but OpenAI has fully
+# retired it (every call started 404ing with "model has been
+# deprecated" on 2026-11-06, discovered while diagnosing why the
+# Candidate Portal's resumes produced no output even with a valid API
+# key) -- gpt-4o-mini is the current comparable-cost replacement. An
+# admin who has activated a different model via the RAG Configuration
+# Console is unaffected; this only changes the fail-soft default.
 DEFAULT_CONFIG = {
     "chunking": {"max_chars": 1500},
     "retrieval": {"top_k": 5, "similarity_threshold": 0.0},
     "generation": {
-        "chunk_summarization": {"model": "gpt-3.5-turbo", "temperature": 0.7, "max_tokens": 1000},
-        "merge_extraction": {"model": "gpt-3.5-turbo", "temperature": 0.3, "max_tokens": 1500},
+        "chunk_summarization": {"model": "gpt-4o-mini", "temperature": 0.7, "max_tokens": 1000},
+        "merge_extraction": {"model": "gpt-4o-mini", "temperature": 0.3, "max_tokens": 1500},
     },
 }
 
