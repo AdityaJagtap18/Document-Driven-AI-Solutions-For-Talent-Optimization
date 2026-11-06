@@ -1005,6 +1005,37 @@ def _stage_timeline_for_candidate(candidate_id: str) -> list:
     ]
 
 
+def _maybe_trigger_inline_resume_processing():
+    """On the Hostinger VPS deployment, kicks off
+    hostinger-deploy/resume_blob_poller.py's run_once() in a background
+    thread right after a resume upload, instead of waiting for its
+    */5-minute cron job -- near-real-time processing on a host with no
+    native blob-trigger event. Gated behind RESUME_PROCESSING_MODE=inline
+    (set only in that deployment's .env) because a real Azure Functions
+    deployment already gets this for free from function_app.py's own
+    event-driven resume_blob_trigger; turning this on there too would
+    process every resume twice. Fails soft and never blocks the HTTP
+    response -- run_once() is idempotent (PROCESSED_LOG-deduped), so the
+    cron job, if still scheduled, is a harmless fallback for anything a
+    crashed thread misses, not a duplicate-processing risk."""
+    if os.environ.get("RESUME_PROCESSING_MODE") != "inline":
+        return
+
+    import threading
+
+    def _run():
+        try:
+            hostinger_dir = _repo_root / "hostinger-deploy"
+            if str(hostinger_dir) not in sys.path:
+                sys.path.insert(0, str(hostinger_dir))
+            import resume_blob_poller
+            resume_blob_poller.run_once()
+        except Exception:
+            logging.getLogger(__name__).exception("Inline resume processing failed.")
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @bp.route(route="applications", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def submit_application_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     """Candidate Self-Service Portal: Submit a new application. ANONYMOUS
@@ -1016,12 +1047,17 @@ def submit_application_endpoint(req: func.HttpRequest) -> func.HttpResponse:
     "cover_note": "..." (optional), "resume_base64": "...",
     "resume_filename": "something.pdf"}.
 
-    Uploads the resume to the raw-resumes Blob container. The existing
-    blob-triggered function (function_app.py's resume_blob_trigger, built
-    in Phase 3) picks it up automatically and runs the normal
-    ResumeParser.py pipeline — no parsing logic is duplicated here. The
-    response is a receipt confirming the file was received, not a parsed
-    result; ResumeParser.py runs asynchronously after this returns 202.
+    Uploads the resume to the raw-resumes Blob container. On a real Azure
+    Functions deployment, the existing blob-triggered function
+    (function_app.py's resume_blob_trigger, built in Phase 3) picks it up
+    automatically and runs the normal ResumeParser.py pipeline — no
+    parsing logic is duplicated here. On the Hostinger VPS deployment
+    (no native blob-trigger event), _maybe_trigger_inline_resume_processing()
+    above kicks the same pipeline off in a background thread right after
+    the upload instead, with its */5-minute cron job as a fallback — see
+    that function's docstring. Either way, the response below is a
+    receipt confirming the file was received, not a parsed result;
+    parsing runs asynchronously after this returns 202.
 
     Every field here is recorded in the audit_log entry below (so there's
     a record of what the applicant actually claimed/submitted), but only
@@ -1078,6 +1114,8 @@ def submit_application_endpoint(req: func.HttpRequest) -> func.HttpResponse:
         blob_store.upload_resume_bytes("raw-resumes", safe_filename, file_bytes)
     except Exception as e:
         return _blob_unavailable_response(e)
+
+    _maybe_trigger_inline_resume_processing()
 
     from candidate_id import candidate_id_for
     cid = candidate_id_for(safe_filename)
