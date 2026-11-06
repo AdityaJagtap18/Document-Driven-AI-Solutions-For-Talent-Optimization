@@ -105,7 +105,42 @@ Never use the account's real login password for this (not done here,
 and not something to put in a GitHub secret either) -- the SSH key is
 the right credential for CI.
 
-## 4. Verify end-to-end after any deploy
+## 4. CDN purge after deploy (`HOSTINGER_API_TOKEN`)
+
+**Why this exists:** on 2026-11-06, `app.adityajagtap.com` went blank
+(white screen, `TypeError: api.demoLoginOptions is not a function`) well
+after a "successful" `deploy-frontend.yml` run. The uploaded
+`apiClient.js` on the origin was actually correct -- some of Hostinger's
+CDN (`hcdn`) edge nodes were just still serving a pre-deploy copy of
+that file (`Cache-Control: public, max-age=604800`, i.e. a 7-day edge
+TTL, with no purge-on-deploy). A newer `Login.jsx` calling a method the
+stale `apiClient.js` didn't have yet crashed the whole app for any
+visitor hitting one of those stale edges. It resolved on its own once
+enough edges happened to revalidate, but that's hours of a
+randomly-blank site, not a fix.
+
+The deploy workflow now purges the CDN right after the SCP upload (see
+`.github/workflows/deploy-frontend.yml`), via Hostinger's cache-clear
+API, gated the same no-op-until-configured way as everything else here:
+
+| Secret | Value |
+|---|---|
+| `HOSTINGER_API_TOKEN` | A Hostinger API token (hPanel -> API Tokens -> create one scoped to this account), used as a Bearer token against `developers.hostinger.com` |
+
+The endpoint used (`DELETE /api/hosting/v1/accounts/{username}/websites/{domain}/cache/clear?directory={dir}`)
+is documented in third-party mirrors of Hostinger's API docs, not
+confirmed against `developers.hostinger.com` directly (no account
+access to that portal from here) -- **verify it still matches Hostinger's
+current API before assuming silence means it worked**, e.g. by checking
+the workflow run's logs for the HTTP status this step prints, or by
+deliberately deploying a version-bumped file and confirming all edges
+serve it immediately rather than over the next 7 days. The purge step is
+best-effort and never fails the deploy job on its own (see the
+`::warning::` in the workflow rather than a hard failure) -- a missing
+token or a failed purge just means edges fall back to self-expiring on
+their own TTL, same as before this existed.
+
+## 5. Verify end-to-end after any deploy
 
 ```bash
 curl -s https://api.adityajagtap.com/api/auth/demo-login-options
