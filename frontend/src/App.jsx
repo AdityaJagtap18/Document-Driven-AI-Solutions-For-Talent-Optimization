@@ -217,8 +217,11 @@ function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={function () { setSidebarOpen(false); }} />}
       <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark">C</div>
-          <div className="sidebar-brand-name">CDPI</div>
+          <div className="sidebar-brand-mark">T</div>
+          <div>
+            <div className="sidebar-brand-name">TalentIQ</div>
+            <div className="sidebar-brand-sub">AI-POWERED TALENT INTELLIGENCE</div>
+          </div>
           <button className="sidebar-close" onClick={function () { setSidebarOpen(false); }} aria-label="Close menu">
             <IconClose />
           </button>
@@ -267,7 +270,7 @@ function App() {
           <button className="topbar-menu-btn" onClick={function () { setSidebarOpen(true); }} aria-label="Open menu">
             <IconMenu />
           </button>
-          <div className="topbar-title">{activeItem ? activeItem.label : "CDPI"}</div>
+          <div className="topbar-title">{activeItem ? activeItem.label : "TalentIQ"}</div>
           <div className="topbar-right">
             <div className="topbar-mode">API: <strong>{window.CDPI_CONFIG.mode}</strong></div>
             <div className="topbar-version">v{window.CDPI_VERSION}</div>
