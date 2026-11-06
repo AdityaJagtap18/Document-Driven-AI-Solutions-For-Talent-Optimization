@@ -114,7 +114,7 @@ def run_generation_preview(jd_text: str, chunks: list, chunk_prompt: dict, merge
         for c in used_chunks:
             chunk_text = c["metadata"].get("chunk_text", "")
             prompt = chunk_prompt["template"].format(text=sanitize_for_prompt(chunk_text), jd=sanitized_jd)
-            summaries.append(llm_chunk.predict(prompt))
+            summaries.append(llm_chunk.invoke(prompt).content)
 
         merge_cfg = generation_config["merge_extraction"]
         llm_merge = get_chat_llm(
@@ -122,7 +122,7 @@ def run_generation_preview(jd_text: str, chunks: list, chunk_prompt: dict, merge
             model_kwargs={"response_format": {"type": "json_object"}},
         )
         merge_text = merge_prompt["template"].format(summaries=sanitize_for_prompt("".join(summaries)), jd=sanitized_jd)
-        final_response = llm_merge.predict(merge_text)
+        final_response = llm_merge.invoke(merge_text).content
         total_tokens = cb.total_tokens
 
     latency_ms = round((time.perf_counter() - start) * 1000, 1)

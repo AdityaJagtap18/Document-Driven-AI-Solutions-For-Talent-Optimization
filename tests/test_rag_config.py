@@ -557,15 +557,21 @@ class TestGenerationPreviewTokenUsageAndSanitization:
 
         captured_prompts = []
 
+        class FakeMessage:
+            def __init__(self, content):
+                self.content = content
+
         class FakeLLM:
-            def predict(self, prompt):
+            def invoke(self, prompt):
                 captured_prompts.append(prompt)
-                return '{"ok": true}'
+                return FakeMessage('{"ok": true}')
 
         # rag_preview.py now builds its chat model via llm_utils.get_chat_llm()
         # (real Azure OpenAI support added in the Azure real-services audit
         # pass) instead of constructing langchain.chat_models.ChatOpenAI
         # directly -- patched at that real call site, not the old one.
+        # Calls .invoke() (not the removed .predict()) to match the real
+        # LangChain ChatOpenAI API this now runs against.
         monkeypatch.setattr(llm_utils, "get_chat_llm", lambda **kwargs: FakeLLM())
 
         class FakeCallback:

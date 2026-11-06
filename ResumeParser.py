@@ -152,11 +152,6 @@ parsed_folder.mkdir(parents=True, exist_ok=True)
 output_folder.mkdir(parents=True, exist_ok=True)
 csv_output_folder.mkdir(parents=True, exist_ok=True)
 
-def write_log(msg):
-    now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open("log.txt", "a", encoding="utf-8") as f:
-        f.write(f"[{now}] {msg}\n")
-
 def extract_text_from_pdf(pdf_path):
     text = ""
     reader = PdfReader(str(pdf_path))
@@ -242,7 +237,7 @@ def summarize_pdf(pdf_path, jd, jd_vector, semantic_store, trace_id, correlation
     for chunk in chunks:
         prompt = CHUNK_SUMMARIZATION_PROMPT["template"].format(text=sanitize_for_prompt(chunk), jd=sanitized_jd)
         partial_summary = cached_call_with_retry(
-            llm.predict, prompt,
+            lambda p, _llm=llm: _llm.invoke(p).content, prompt,
             on_retry=lambda attempt, e: write_log(f"Retry {attempt} for chunk summarization on {pdf_path.name}: {e}"),
             label="resume_chunk_summarization", model=gen_cfg["model"],
             temperature=gen_cfg["temperature"], max_tokens=gen_cfg["max_tokens"],
@@ -263,7 +258,7 @@ def summarize_pdf(pdf_path, jd, jd_vector, semantic_store, trace_id, correlation
         model_kwargs={"response_format": {"type": "json_object"}},
     )
     final_response = cached_call_with_retry(
-        llm_merge.predict, merge_prompt,
+        lambda p, _llm=llm_merge: _llm.invoke(p).content, merge_prompt,
         on_retry=lambda attempt, e: write_log(f"Retry {attempt} for merge step on {pdf_path.name}: {e}"),
         label="resume_merge_structured_extraction", model=merge_cfg["model"],
         temperature=merge_cfg["temperature"], max_tokens=merge_cfg["max_tokens"],
