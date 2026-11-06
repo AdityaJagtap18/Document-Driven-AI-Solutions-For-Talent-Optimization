@@ -44,3 +44,38 @@ jobs:
           target: "domains/adityajagtap.com/public_html/app"
           strip_components: 1
           overwrite: true
+
+      # Without this, Hostinger's CDN (hcdn) can keep serving a
+      # pre-deploy copy of a changed file from some edge nodes (observed
+      # 2026-11-06: apiClient.js stale on several edges well after a
+      # "successful" SCP upload -- a newer Login.jsx calling a method the
+      # stale cached apiClient.js didn't have yet, crashing the whole
+      # app blank for any visitor hitting one of those edges). Best
+      # effort, not fatal to the deploy -- a failed/skipped purge means
+      # edges self-expire on their own TTL (see Cache-Control) rather
+      # than the frontend never having been deployed at all, so the step
+      # below only prints a `::warning::` annotation on failure, it never
+      # calls `exit 1`.
+      - name: Check Hostinger API token is configured
+        id: check_cdn
+        run: |
+          if [ -z "${{ secrets.HOSTINGER_API_TOKEN }}" ]; then
+            echo "HOSTINGER_API_TOKEN not set yet -- skipping CDN purge (edges will self-expire on their own TTL). See VPS_DEPLOY.md section 4." >&2
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Purge Hostinger CDN cache for app.adityajagtap.com
+        if: steps.check.outputs.configured == 'true' && steps.check_cdn.outputs.configured == 'true'
+        run: |
+          status=$(curl -s -o /tmp/purge_response.json -w '%{http_code}' \
+            -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.HOSTINGER_API_TOKEN }}" \
+            -H "Accept: application/json" \
+            "https://developers.hostinger.com/api/hosting/v1/accounts/u185188662/websites/adityajagtap.com/cache/clear?directory=app")
+          echo "Hostinger cache-clear API responded $status:"
+          cat /tmp/purge_response.json || true
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::warning::Hostinger CDN purge failed (HTTP $status) -- stale edges will still self-expire on their own Cache-Control TTL, but may serve mismatched files until then. See VPS_DEPLOY.md section 4."
+          fi

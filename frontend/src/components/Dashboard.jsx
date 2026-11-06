@@ -33,8 +33,30 @@ function sortValue(candidate, key) {
   return v;
 }
 
+function greetingForHour(hour) {
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+/** Last `days` calendar days as YYYY-MM-DD keys, oldest first — the
+ * x-axis for the Hiring Trend chart below, independent of whether any
+ * audit events actually land on a given day (a day with none is a real
+ * zero, not a gap). */
+function recentDayKeys(days) {
+  var out = [];
+  var now = new Date();
+  for (var i = days - 1; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
 function Dashboard(props) {
   var api = props.api;
+  var currentUser = props.currentUser;
+  var firstName = ((currentUser && (currentUser.display_name || currentUser.username)) || "").trim().split(/\s+/)[0];
   var filterState = React.useState("");
   var filter = filterState[0];
   var setFilter = filterState[1];
@@ -47,6 +69,42 @@ function Dashboard(props) {
   var sortState = React.useState({ key: null, dir: 1 });
   var sort = sortState[0];
   var setSort = sortState[1];
+
+  // Hiring Pipeline funnel + Hiring Trend need the same audit trail
+  // Pipeline.jsx computes candidate stages from (see its computeStage/
+  // STAGES, reused here as-is rather than re-deriving the same logic) --
+  // and Open Positions needs the JD records, not the plain jd_folder
+  // listing. Plain state, not report-snapshot-cached: this is the same
+  // "always current, not yesterday's cache" operational page as the rest
+  // of the Dashboard (see reportSnapshot.js's doc comment).
+  var extrasState = React.useState({ loading: true, error: null, auditEntries: [], jds: [], jdsError: null });
+  var extras = extrasState[0];
+  var setExtras = extrasState[1];
+
+  function loadExtras() {
+    setExtras(function (e) { return Object.assign({}, e, { loading: true, error: null }); });
+    return api.listAuditLog()
+      .then(function (auditResult) {
+        return api.listJdRecords("published")
+          .then(function (jdResult) {
+            setExtras({ loading: false, error: null, auditEntries: auditResult.entries, jds: jdResult.jds, jdsError: null });
+          })
+          .catch(function (jdErr) {
+            // Role may not have jds.read, or /api/manage/jds may not be
+            // deployed yet -- Open Positions just hides itself below
+            // rather than failing the whole dashboard.
+            setExtras({ loading: false, error: null, auditEntries: auditResult.entries, jds: [], jdsError: jdErr.message });
+          });
+      })
+      .catch(function (err) {
+        setExtras(function (e) { return Object.assign({}, e, { loading: false, error: err.message }); });
+      });
+  }
+
+  React.useEffect(function () {
+    loadExtras();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Snapshot-cached, per the "reports show their last snapshot, never
   // reload on revisit" requirement -- keyed by filter, so switching the
@@ -68,11 +126,61 @@ function Dashboard(props) {
   function refreshAll() {
     snapshot.refresh();
     observabilitySnapshot.refresh();
+    loadExtras();
   }
 
   var tierCounts = { "Recommended for Fast-Track": 0, "To be Considered": 0, "Rejected": 0 };
   data.candidates.forEach(function (c) {
     if (tierCounts[c.ranking_tier] !== undefined) tierCounts[c.ranking_tier] += 1;
+  });
+  var totalCandidates = data.candidates.length;
+
+  // Hiring Pipeline funnel -- same per-candidate stage derivation as
+  // Pipeline.jsx (STAGES/computeStage, global functions defined there),
+  // reused rather than duplicated so the two views can't drift.
+  var candidatesById = {};
+  data.candidates.forEach(function (c) { candidatesById[c.candidate_id] = c; });
+  var auditByCandidate = {};
+  extras.auditEntries.forEach(function (e) {
+    (auditByCandidate[e.candidate_id] = auditByCandidate[e.candidate_id] || []).push(e);
+  });
+  var funnelIds = Object.keys(candidatesById);
+  Object.keys(auditByCandidate).forEach(function (id) {
+    if (funnelIds.indexOf(id) === -1) funnelIds.push(id);
+  });
+  var funnelCounts = (typeof STAGES !== "undefined" ? STAGES : []).map(function (stage) {
+    var count = funnelIds.filter(function (id) { return computeStage(id, candidatesById, auditByCandidate).key === stage.key; }).length;
+    return { label: stage.label, count: count };
+  });
+  var funnelMax = Math.max.apply(null, funnelCounts.map(function (f) { return f.count; }).concat([1]));
+  var funnelShades = ["#32145F", "#6525D9", "#8B5CF6", "#C9B3F7"];
+
+  // Hiring Trend -- real application_submitted audit events, bucketed by
+  // calendar day over the last 14 days. A day with zero events is a real
+  // zero; if there have been NO application_submitted events at all in
+  // that window, we say so rather than drawing a misleading flat line.
+  var trendDays = recentDayKeys(14);
+  var trendCountByDay = {};
+  trendDays.forEach(function (d) { trendCountByDay[d] = 0; });
+  var trendHasAnyEvent = false;
+  extras.auditEntries.forEach(function (e) {
+    if (e.action !== "application_submitted" || !e.logged_at) return;
+    var day = e.logged_at.slice(0, 10);
+    if (trendCountByDay[day] !== undefined) { trendCountByDay[day] += 1; trendHasAnyEvent = true; }
+  });
+
+  // Recent Candidates -- real records, newest-ingested first when that
+  // timestamp is present (falls back to list order otherwise).
+  var recentCandidates = data.candidates.slice().sort(function (a, b) {
+    return (b.ingested_at || "").localeCompare(a.ingested_at || "");
+  }).slice(0, 5);
+
+  // Open Positions -- published JD records; application count is the
+  // number of loaded candidates actually linked to that JD via jd_id
+  // (real FK per candidate.schema.json), zero when none are linked yet.
+  var openPositions = extras.jds.slice(0, 5).map(function (jd) {
+    var count = data.candidates.filter(function (c) { return c.jd_id === jd.jd_id; }).length;
+    return { jd: jd, applicationCount: count };
   });
 
   var visibleCandidates = data.candidates.filter(function (c) {
@@ -98,7 +206,8 @@ function Dashboard(props) {
 
   return (
     <div className="view">
-      <h2>Recruiter Dashboard</h2>
+      <h2 className="view-heading">{greetingForHour(new Date().getHours())}{firstName ? ", " + firstName : ""} 👋</h2>
+      <p className="view-subheading">Here's what's happening with your hiring today.</p>
       <div className="toolbar">
         <p className="muted">
           Showing the snapshot from {meta.lastUpdated ? new Date(meta.lastUpdated).toLocaleString() : "just now"} —
@@ -110,16 +219,136 @@ function Dashboard(props) {
       {data.error && <div className="banner banner-error">Couldn't load data: {data.error}</div>}
 
       <div className="stat-row">
-        <StatTile label="Fast-Track" value={tierCounts["Recommended for Fast-Track"]} tone="good" />
-        <StatTile label="To Be Considered" value={tierCounts["To be Considered"]} tone="neutral" />
-        <StatTile label="Rejected" value={tierCounts["Rejected"]} tone="bad" />
+        <StatTile label="Total Candidates" value={totalCandidates} tone="info" icon={<IconUsers />} />
+        <StatTile label="Fast-Track" value={tierCounts["Recommended for Fast-Track"]} tone="good" icon={<IconPipeline />} />
+        <StatTile label="To Be Considered" value={tierCounts["To be Considered"]} tone="warn" icon={<IconQueue />} />
+        <StatTile label="Rejected" value={tierCounts["Rejected"]} tone="bad" icon={<IconShield />} />
+      </div>
+
+      <div className="dash-grid">
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <h3 className="dash-card-title">Hiring Pipeline</h3>
+          </div>
+          {totalCandidates === 0 ? (
+            <p className="dash-card-empty">No candidates in the pipeline yet.</p>
+          ) : (
+            <div className="funnel-list">
+              {funnelCounts.map(function (f, i) {
+                var pct = Math.max(8, Math.round((f.count / funnelMax) * 100));
+                return (
+                  <div className="funnel-row" key={f.label}>
+                    <div className="funnel-row-label">{f.label}</div>
+                    <div className="funnel-row-track">
+                      <div className="funnel-row-bar" style={{ width: pct + "%", background: funnelShades[i % funnelShades.length] }} />
+                    </div>
+                    <div className="funnel-row-count">{f.count}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <h3 className="dash-card-title">Hiring Trend</h3>
+            <span className="muted" style={{ fontSize: "0.76rem" }}>Last 14 days</span>
+          </div>
+          {!trendHasAnyEvent ? (
+            <p className="dash-card-empty">No application activity recorded in the last 14 days yet.</p>
+          ) : (
+            <div className="trend-chart-wrap">
+              <ChartCanvas config={{
+                type: "line",
+                data: {
+                  labels: trendDays.map(function (d) { return d.slice(5); }),
+                  datasets: [{
+                    data: trendDays.map(function (d) { return trendCountByDay[d]; }),
+                    borderColor: "#6525D9", backgroundColor: "rgba(101,37,217,0.12)", fill: true,
+                    tension: 0.35, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2.5,
+                  }],
+                },
+                options: {
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    x: { grid: { display: false }, ticks: { font: { family: "'Plus Jakarta Sans', sans-serif" } } },
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { family: "'Plus Jakarta Sans', sans-serif" } }, grid: { color: "#EAE7F2" } },
+                  },
+                },
+              }} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="dash-grid">
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <h3 className="dash-card-title">Recent Candidates</h3>
+          </div>
+          {recentCandidates.length === 0 ? (
+            <p className="dash-card-empty">No candidates yet.</p>
+          ) : (
+            <div className="recent-list">
+              {recentCandidates.map(function (c) {
+                return (
+                  <div className="recent-row" key={c.candidate_id}>
+                    <div className="avatar-circle">{initialsFor(c.Name)}</div>
+                    <div className="recent-row-main">
+                      <div className="recent-row-name">{c.Name}</div>
+                      <div className="recent-row-sub">{c["Candidate Type"] || "—"}</div>
+                    </div>
+                    <div className="recent-row-meta">
+                      <TierBadge tier={c.ranking_tier} />
+                      {c.ingested_at && <span className="recent-row-time">{new Date(c.ingested_at).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="dash-card">
+          <div className="dash-card-header">
+            <h3 className="dash-card-title">Open Positions</h3>
+            <button className="dash-card-link" onClick={function () { if (props.onNavigate) props.onNavigate("jd-management"); }}>View all →</button>
+          </div>
+          {extras.jdsError ? (
+            <p className="dash-card-empty">{extras.jdsError}</p>
+          ) : openPositions.length === 0 ? (
+            <p className="dash-card-empty">No published job descriptions yet.</p>
+          ) : (
+            <div className="position-list">
+              {openPositions.map(function (p) {
+                return (
+                  <div
+                    className="position-row"
+                    key={p.jd.jd_id}
+                    onClick={function () { if (props.onNavigate) props.onNavigate("jd-management"); }}
+                  >
+                    <div>
+                      <div className="position-row-title">{p.jd.title}</div>
+                      <div className="position-row-sub">
+                        {p.jd.location || "Location not specified"} · {p.applicationCount} application{p.applicationCount === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <span className="position-row-arrow">→</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {data.observability && (
         <div className="stat-row">
-          <StatTile label="LLM Calls" value={data.observability.total_calls} tone="neutral" />
-          <StatTile label="Tokens Used" value={data.observability.total_tokens.toLocaleString()} tone="neutral" />
-          <StatTile label="Total Cost" value={"$" + data.observability.total_cost_usd.toFixed(4)} tone="neutral" />
+          <StatTile label="LLM Calls" value={data.observability.total_calls} tone="info" icon={<IconPulse />} />
+          <StatTile label="Tokens Used" value={data.observability.total_tokens.toLocaleString()} tone="info" icon={<IconCloud />} />
+          <StatTile label="Total Cost" value={"$" + data.observability.total_cost_usd.toFixed(4)} tone="warn" icon={<IconKey />} />
         </div>
       )}
 
@@ -327,6 +556,11 @@ function CandidateDetail(props) {
 function StatTile(props) {
   return (
     <div className={"stat-tile stat-tile-" + props.tone}>
+      {props.icon && (
+        <div className="stat-tile-top">
+          <div className="stat-tile-icon">{props.icon}</div>
+        </div>
+      )}
       <div className="stat-tile-value">{props.value}</div>
       <div className="stat-tile-label">{props.label}</div>
     </div>

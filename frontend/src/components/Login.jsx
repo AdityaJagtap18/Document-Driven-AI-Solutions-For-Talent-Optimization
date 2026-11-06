@@ -56,6 +56,17 @@ function Login(props) {
   var demoError = demoErrorState[0];
   var setDemoError = demoErrorState[1];
 
+  // Visual-only: whether the password field shows plaintext, and the
+  // "remember me" checkbox state. Neither changes what handleSubmit sends --
+  // the real session persistence is App.jsx's localStorage-backed session,
+  // unconditional on every login (see App.jsx's storeSession doc comment).
+  var showPasswordState = React.useState(false);
+  var showPassword = showPasswordState[0];
+  var setShowPassword = showPasswordState[1];
+  var rememberState = React.useState(true);
+  var remember = rememberState[0];
+  var setRemember = rememberState[1];
+
   // Loaded once on mount -- small, cheap, and the admin quick-login button
   // (below) needs it too: the admin persona's id is "P08" in real mode but
   // just "admin" in mock mode (mockApiClient.js reuses each MOCK_USERS
@@ -121,40 +132,44 @@ function Login(props) {
   if (view === "personas") {
     return (
       <div className="login-shell">
-        <div className="login-card login-card-wide">
-          <div className="app-title">CDPI</div>
-          <p className="muted">Persona testing — pick a persona to sign in directly as that user, no password needed.</p>
-
-          {demoError && <div className="banner-error-inline">{demoError}</div>}
-          {personas === null && <p className="muted">Loading personas…</p>}
-          {personasError && <div className="banner-error-inline">{personasError}</div>}
-
-          {personas && personas.length > 0 && (
-            <div className="persona-picker-grid">
-              {personas.map(function (p) {
-                var busy = demoBusy === p.persona_id;
-                return (
-                  <button
-                    key={p.persona_id}
-                    type="button"
-                    className="persona-picker-card"
-                    disabled={!!demoBusy}
-                    onClick={function () { demoLoginAs(p.persona_id); }}
-                  >
-                    <div className="persona-picker-name">{p.display_name}</div>
-                    <div className="muted persona-picker-role">{p.role_display_name}</div>
-                    <div className="muted persona-picker-desc">{p.responsibilities}</div>
-                    {busy && <div className="muted persona-picker-busy">Signing in…</div>}
-                  </button>
-                );
-              })}
+        <div className="login-form-panel" style={{ width: "100%" }}>
+          <div className="login-card login-card-wide">
+            <div className="login-card-header">
+              <div className="login-card-title">Persona testing</div>
+              <p className="login-card-desc">Pick a persona to sign in directly as that user, no password needed.</p>
             </div>
-          )}
 
-          <button type="button" className="btn login-back-link" onClick={function () { setView("form"); setDemoError(null); }}>
-            ← Back to sign in
-          </button>
-          <p className="muted login-version">v{window.CDPI_VERSION}</p>
+            {demoError && <div className="banner-error-inline">{demoError}</div>}
+            {personas === null && <p className="muted">Loading personas…</p>}
+            {personasError && <div className="banner-error-inline">{personasError}</div>}
+
+            {personas && personas.length > 0 && (
+              <div className="persona-picker-grid">
+                {personas.map(function (p) {
+                  var busy = demoBusy === p.persona_id;
+                  return (
+                    <button
+                      key={p.persona_id}
+                      type="button"
+                      className="persona-picker-card"
+                      disabled={!!demoBusy}
+                      onClick={function () { demoLoginAs(p.persona_id); }}
+                    >
+                      <div className="persona-picker-name">{p.display_name}</div>
+                      <div className="muted persona-picker-role">{p.role_display_name}</div>
+                      <div className="muted persona-picker-desc">{p.responsibilities}</div>
+                      {busy && <div className="muted persona-picker-busy">Signing in…</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <button type="button" className="btn login-back-link" onClick={function () { setView("form"); setDemoError(null); }}>
+              ← Back to sign in
+            </button>
+            <p className="muted login-version">v{window.CDPI_VERSION}</p>
+          </div>
         </div>
       </div>
     );
@@ -162,61 +177,128 @@ function Login(props) {
 
   return (
     <div className="login-shell">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <div className="app-title">CDPI</div>
-        <p className="muted">Sign in to continue.</p>
-
-        <label className="login-field">
-          Username
-          <input
-            type="text"
-            value={username}
-            autoComplete="username"
-            onChange={function (e) { setUsername(e.target.value); }}
-          />
-        </label>
-
-        <label className="login-field">
-          Password
-          <input
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            onChange={function (e) { setPassword(e.target.value); }}
-          />
-        </label>
-
-        {error && <div className="banner-error-inline">{error}</div>}
-
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? "Signing in…" : "Sign in"}
-        </button>
-
-        <div className="login-demo-section">
-          {demoError && <div className="banner-error-inline">{demoError}</div>}
-          <button
-            type="button"
-            className="btn login-demo-btn"
-            disabled={!!demoBusy || !adminPersona}
-            onClick={function () { if (adminPersona) demoLoginAs(adminPersona.persona_id); }}
-          >
-            {adminPersona && demoBusy === adminPersona.persona_id ? "Signing in…" : "Login as Admin (Demo)"}
-          </button>
-          <button type="button" className="btn login-persona-link" onClick={openPersonaPicker}>
-            Try a different persona →
-          </button>
+      <div className="login-split">
+        <div className="login-brand-panel">
+          <div className="login-brand-content">
+            <div className="login-brand-logo">
+              <div className="login-brand-logo-mark">C</div>
+              <div>
+                <div className="login-brand-logo-name">CDPI</div>
+                <div className="login-brand-logo-sub">RECRUITER PORTAL</div>
+              </div>
+            </div>
+            <h1 className="login-brand-headline">Hire Smarter.<br /><em>Faster. Together.</em></h1>
+            <p className="login-brand-desc">
+              An AI-powered recruiting platform for managing candidates, running
+              your applicant pipeline, and making faster, better-informed
+              hiring decisions.
+            </p>
+            <div className="login-feature-list">
+              <div className="login-feature-item">
+                <span className="login-feature-icon"><IconPulse /></span>
+                AI-assisted resume scoring &amp; ranking
+              </div>
+              <div className="login-feature-item">
+                <span className="login-feature-icon"><IconPipeline /></span>
+                End-to-end applicant pipeline tracking
+              </div>
+              <div className="login-feature-item">
+                <span className="login-feature-icon"><IconUsers /></span>
+                Collaborative recruiter &amp; interviewer workflows
+              </div>
+            </div>
+          </div>
         </div>
 
-        {window.CDPI_CONFIG.mode === "mock" && (
-          <p className="muted login-demo-hint">
-            Mock-mode demo accounts (see mockApiClient.js's MOCK_USERS; not real auth --
-            switch config.js to mode:"real" for an actual Azure Functions backend):
-            admin/Admin#12345 (top-level role), recruiter/Recruiter#123,
-            interviewer/Interviewer#123, candidate/Candidate#123
-          </p>
-        )}
-        <p className="muted login-version">v{window.CDPI_VERSION}</p>
-      </form>
+        <div className="login-form-panel">
+          <form className="login-card" onSubmit={handleSubmit}>
+            <div className="login-card-header">
+              <div className="login-card-title">Welcome to CDPI Recruiter Portal</div>
+              <p className="login-card-desc">Sign in to continue to your workspace.</p>
+            </div>
+
+            <label className="login-field">
+              Username
+              <div className="login-field-icon-wrap">
+                <span className="login-field-icon"><IconUsers width={16} height={16} /></span>
+                <input
+                  type="text"
+                  value={username}
+                  autoComplete="username"
+                  placeholder="you@company.com"
+                  onChange={function (e) { setUsername(e.target.value); }}
+                />
+              </div>
+            </label>
+
+            <label className="login-field">
+              Password
+              <div className="login-field-icon-wrap">
+                <span className="login-field-icon"><IconLock width={16} height={16} /></span>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  autoComplete="current-password"
+                  placeholder="••••••••••"
+                  onChange={function (e) { setPassword(e.target.value); }}
+                />
+                <button
+                  type="button"
+                  className="login-field-toggle"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  onClick={function () { setShowPassword(!showPassword); }}
+                >
+                  {showPassword ? <IconEyeOff width={16} height={16} /> : <IconEye width={16} height={16} />}
+                </button>
+              </div>
+            </label>
+
+            <div className="login-row">
+              <label className="login-remember">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={function (e) { setRemember(e.target.checked); }}
+                />
+                Remember me
+              </label>
+              <span className="login-forgot" role="button">Forgot password?</span>
+            </div>
+
+            {error && <div className="banner-error-inline">{error}</div>}
+
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? "Signing in…" : "Sign In"}
+            </button>
+
+            <div className="login-demo-section">
+              {demoError && <div className="banner-error-inline">{demoError}</div>}
+              <div className="login-demo-divider">or try it out</div>
+              <button
+                type="button"
+                className="btn login-demo-btn"
+                disabled={!!demoBusy || !adminPersona}
+                onClick={function () { if (adminPersona) demoLoginAs(adminPersona.persona_id); }}
+              >
+                {adminPersona && demoBusy === adminPersona.persona_id ? "Signing in…" : "Login as Admin (Demo)"}
+              </button>
+              <button type="button" className="btn login-persona-link" onClick={openPersonaPicker}>
+                Try a different persona →
+              </button>
+            </div>
+
+            {window.CDPI_CONFIG.mode === "mock" && (
+              <p className="muted login-demo-hint">
+                Mock-mode demo accounts (see mockApiClient.js's MOCK_USERS; not real auth --
+                switch config.js to mode:"real" for an actual Azure Functions backend):
+                admin/Admin#12345 (top-level role), recruiter/Recruiter#123,
+                interviewer/Interviewer#123, candidate/Candidate#123
+              </p>
+            )}
+            <p className="muted login-version">v{window.CDPI_VERSION}</p>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

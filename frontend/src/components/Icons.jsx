@@ -133,6 +133,61 @@ function IconKey(props) {
   );
 }
 
+function IconLock(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5" />
+    </svg>
+  );
+}
+
+function IconBell(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+function IconHelp(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.2a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2-2.4 3.5" />
+      <path d="M12 17.2h.01" />
+    </svg>
+  );
+}
+
+function IconEye(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function IconEyeOff(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a15.5 15.5 0 0 1-3.6 4.5M6.3 6.5C3.5 8.3 2 12 2 12s3.5 7 10 7a9.9 9.9 0 0 0 4-.8" />
+      <path d="M9.5 9.8a3 3 0 0 0 4.2 4.2" />
+    </svg>
+  );
+}
+
+function IconChevronDown(props) {
+  return (
+    <svg {...iconProps(props)}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 /** Mobile-only: opens/closes the sidebar drawer (see App.jsx's
  * "sidebar-open" state and styles.css's <=900px rules). */
 function IconMenu(props) {
