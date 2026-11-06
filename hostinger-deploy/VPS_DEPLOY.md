@@ -140,7 +140,41 @@ best-effort and never fails the deploy job on its own (see the
 token or a failed purge just means edges fall back to self-expiring on
 their own TTL, same as before this existed.
 
-## 5. Verify end-to-end after any deploy
+## 5. Resume processing (`RESUME_PROCESSING_MODE`, resume_blob_poller.py)
+
+**Why this exists:** on 2026-11-06, candidate applications submitted
+through the Candidate Portal uploaded their resume to Blob Storage
+successfully (the `POST /applications` 202 response was correct) but
+nothing ever parsed them -- `resume_blob_poller.py` (this VPS's stand-in
+for the real Azure blob-trigger event, since shared/VPS hosting has no
+such event) was never scheduled as a Cron Job here. `crontab -l` showed
+nothing, and the poller's own processed-log didn't exist, confirming it
+had never run even once.
+
+Two parts fixed this:
+
+1. `api_blueprint.py`'s `submit_application_endpoint` now calls
+   `_maybe_trigger_inline_resume_processing()` right after the blob
+   upload, which runs `resume_blob_poller.py`'s `run_once()` in a
+   background thread -- near-real-time processing instead of waiting on
+   a poll interval. Gated behind an env var so a real Azure Functions
+   deployment (which already gets this for free from its native blob
+   trigger) never double-processes:
+
+   | Secret/config | Value |
+   |---|---|
+   | `RESUME_PROCESSING_MODE` | Set to `inline` in this VPS's `.env` only. Leave unset on any Azure Functions deployment. |
+
+2. The Cron Job is still worth adding as a fallback (the inline trigger
+   fails soft and is best-effort; a crashed thread or a restart mid-upload
+   just means the next poll run catches it -- `run_once()` is idempotent
+   via its own `PROCESSED_LOG`, so running both is never duplicate work):
+
+   ```
+   */5 * * * * /opt/cdpi-backend/venv/bin/python /opt/cdpi-backend/hostinger-deploy/resume_blob_poller.py >> /opt/cdpi-backend/logs/resume_poller.log 2>&1
+   ```
+
+## 6. Verify end-to-end after any deploy
 
 ```bash
 curl -s https://api.adityajagtap.com/api/auth/demo-login-options
