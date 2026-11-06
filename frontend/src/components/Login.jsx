@@ -181,17 +181,15 @@ function Login(props) {
         <div className="login-brand-panel">
           <div className="login-brand-content">
             <div className="login-brand-logo">
-              <div className="login-brand-logo-mark">C</div>
+              <div className="login-brand-logo-mark">T</div>
               <div>
-                <div className="login-brand-logo-name">CDPI</div>
-                <div className="login-brand-logo-sub">RECRUITER PORTAL</div>
+                <div className="login-brand-logo-name">TalentIQ</div>
+                <div className="login-brand-logo-sub">AI-POWERED TALENT INTELLIGENCE</div>
               </div>
             </div>
-            <h1 className="login-brand-headline">Hire Smarter.<br /><em>Faster. Together.</em></h1>
+            <h1 className="login-brand-headline">See beyond<br /><em>the resume.</em></h1>
             <p className="login-brand-desc">
-              An AI-powered recruiting platform for managing candidates, running
-              your applicant pipeline, and making faster, better-informed
-              hiring decisions.
+              Transform professional documents into meaningful talent insights.
             </p>
             <div className="login-feature-list">
               <div className="login-feature-item">
@@ -213,7 +211,7 @@ function Login(props) {
         <div className="login-form-panel">
           <form className="login-card" onSubmit={handleSubmit}>
             <div className="login-card-header">
-              <div className="login-card-title">Welcome to CDPI Recruiter Portal</div>
+              <div className="login-card-title">Welcome to TalentIQ</div>
               <p className="login-card-desc">Sign in to continue to your workspace.</p>
             </div>
 
